@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+riverflow.access_riverflow_service,access_riverflow_service,riverflow.model_riverflow_service,base.group_user,1,1,1,1
+riverflow.access_riverflow_service_wizard,access_riverflow_service_wizard,riverflow.model_riverflow_service_wizard,base.group_user,1,1,1,1
