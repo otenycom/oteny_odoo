@@ -1,0 +1,85 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id='riverflow.service_view_tree' model='ir.ui.view'>
+        <field name='name'>riverflow.service.tree</field>
+        <field name='model'>riverflow.service</field>
+        <field name='arch' type='xml'>
+            <tree string='Services' edit="true">
+                <field name='timing' optional="show" />
+                <field name="deadline_formatted" optional="hide" />                                    
+                <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
+                <field name='indented_name' />
+                <field name="display_name" optional="hide" />
+                <field name='internal_remarks' />
+
+                <!-- Uncomment to see how the padding and margin styles are applied -->
+                <!-- <button name='action_button_click' type='object' string='Server'
+                class='btn-primary' /> -->
+            </tree>
+        </field>
+    </record>
+
+    <record id='riverflow.service_view_form' model='ir.ui.view'>
+        <field name="name">riverflow.service.form</field>
+        <field name="model">riverflow.service</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" on_change="1" />
+                            <field name="internal_remarks" />
+                            <field name="project_deadline" invisible="parent_id" on_change="1" />
+                            <field name="days_relative_to_project" invisible="not parent_id" on_change="1" />
+                            <field name="company_id" invisible="1" />
+                            <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
+                        </group>
+                        <group>
+                            <field name="complete_name" />
+                            <field name="parent_id" on_change="1" can_create="False" can_write="True" />
+                            <field name="related_project_deadline" />
+                            <field name="timing" />
+                        </group>
+                    </group>
+                    <separator/>
+                    <group>
+                        <field name="child_ids">
+                            <tree string="Services" edit="true" studio_subview_inlined="1">
+                                <field name="workflow_transition_buttons_json"
+                                    widget="dynamic_buttons" />
+                                <field name="deadline_formatted" optional="hide" />                                    
+                                <field name="timing" optional="show" />
+                                <field name="name" optional="hide" />
+                                <field name="display_name" optional="show" />
+                                <field name="internal_remarks" />
+                            </tree>
+                        </field>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <!-- <field name="activity_ids"/> -->
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id='riverflow.service_action' model='ir.actions.act_window'>
+        <field name='name'>Services</field>
+        <field name='res_model'>riverflow.service</field>
+        <field name="view_mode">tree,form</field>
+        <field name='help' type='html'>
+            <p class='o_view_nocontent_smiling_face'>
+                Add a new service!
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Item Definitions -->
+    <menuitem id='riverflow.service_root' name='Services'
+        web_icon='riverflow,static/description/icon.png'>
+        <menuitem id='menu_service' action='riverflow.service_action' sequence='10' />
+    </menuitem>
+</odoo>

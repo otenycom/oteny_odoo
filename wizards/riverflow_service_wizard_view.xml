@@ -1,0 +1,27 @@
+<odoo>
+    <record id="view_service_wizard_form" model="ir.ui.view">
+        <field name="name">service.wizard.form</field>
+        <field name="model">riverflow.service.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Update Service">
+                <group>
+                    <field name="service_ids" invisible="1"/>
+                    <field name="name" readonly="context.get('name_readonly', True)" required="1" />
+                    <field name="internal_remarks" required="0" invisible="context.get('internal_remarks_invisible', False)" />
+                    <field name="days_relative_to_project" invisible="context.get('days_relative_to_project_invisible')"/>
+                </group>
+                <footer>
+                    <button string="Save" type="object" name="action_save" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_service_wizard" model="ir.actions.act_window">
+        <field name="name">Set Service Name</field>
+        <field name="res_model">riverflow.service.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
