@@ -5,12 +5,15 @@
         <field name='model'>riverflow.service</field>
         <field name='arch' type='xml'>
             <tree string='Services' edit="true">
+                <field name="active" column_invisible="True" />
                 <field name='timing' optional="show" />
-                <field name="deadline_formatted" optional="hide" />                                    
+                <field name="deadline_formatted" optional="hide" />
                 <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
                 <field name='indented_name' />
                 <field name="display_name" optional="hide" />
                 <field name='internal_remarks' />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
+                    readonly="1" />
 
                 <!-- Uncomment to see how the padding and margin styles are applied -->
                 <!-- <button name='action_button_click' type='object' string='Server'
@@ -26,29 +29,42 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="name" class="w-100" on_change="1" />
+                        </h1>
+                        <label for="tag_ids" class="me-3" />
+                        <field name="tag_ids" widget="many2many_tags"
+                            options="{'color_field': 'color', 'no_create_edit': True}" />
+                    </div>
                     <group>
                         <group>
-                            <field name="name" on_change="1" />
-                            <field name="internal_remarks" />
+                            <field name="internal_remarks" invisible="1" />
                             <field name="project_deadline" invisible="parent_id" on_change="1" />
-                            <field name="days_relative_to_project" invisible="not parent_id" on_change="1" />
-                            <field name="company_id" invisible="1" />
+                            <field name="related_project_deadline" invisible="not parent_id" />
+                            <field name="days_relative_to_project" invisible="not parent_id"
+                                on_change="1" />
+                            <field name="timing" invisible="not parent_id" />
                             <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
                         </group>
                         <group>
-                            <field name="complete_name" />
-                            <field name="parent_id" on_change="1" can_create="False" can_write="True" />
-                            <field name="related_project_deadline" />
-                            <field name="timing" />
+                            <field name="complete_name" invisible="not parent_id" />
+                            <field name="parent_id" on_change="1" can_create="False"
+                                can_write="True" />
+                            <field name="company_id" invisible="1" />
+                            <field name="active" invisible="1" />
                         </group>
                     </group>
-                    <separator/>
+                    <separator />
                     <group>
                         <field name="child_ids">
                             <tree string="Services" edit="true" studio_subview_inlined="1">
                                 <field name="workflow_transition_buttons_json"
                                     widget="dynamic_buttons" />
-                                <field name="deadline_formatted" optional="hide" />                                    
+                                <field name="deadline_formatted" optional="hide" />
                                 <field name="timing" optional="show" />
                                 <field name="name" optional="hide" />
                                 <field name="display_name" optional="show" />
@@ -58,9 +74,9 @@
                     </group>
                 </sheet>
                 <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
+                    <field name="message_follower_ids" />
                     <!-- <field name="activity_ids"/> -->
-                    <field name="message_ids"/>
+                    <field name="message_ids" />
                 </div>
             </form>
         </field>
@@ -77,9 +93,51 @@
         </field>
     </record>
 
+    <record id="riverflow.service_tag_view_view_form" model="ir.ui.view">
+        <field name="name">riverflow.service.tag.form</field>
+        <field name="model">riverflow.service.tag</field>
+        <field name="arch" type="xml">
+            <form string="Service Tags">
+                <sheet>
+                    <group>
+                        <field name="name" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="riverflow.service_tag_view_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.service.tag.tree</field>
+        <field name="model">riverflow.service.tag</field>
+        <field name="arch" type="xml">
+            <tree string="Service Tags" editable="bottom">
+                <field name="name" />
+                <field name="color" widget="color_picker" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="riverflow.service_tag_action" model="ir.actions.act_window">
+        <field name="name">Tags</field>
+        <field name="res_model">riverflow.service.tag</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new tag
+            </p>
+        </field>
+    </record>
+
     <!-- Menu Item Definitions -->
     <menuitem id='riverflow.service_root' name='Services'
         web_icon='riverflow,static/description/icon.png'>
-        <menuitem id='menu_service' action='riverflow.service_action' sequence='10' />
+        <menuitem id="riverflow.services_menu" name="Services" action="riverflow.service_action">
+
+        </menuitem>
+        <menuitem id="riverflow.services_configuration_menu" name="Configuration">
+            <menuitem id="riverflow.services_menu_configuration_tags"
+                action="riverflow.service_tag_action" />
+        </menuitem>
     </menuitem>
+
 </odoo>

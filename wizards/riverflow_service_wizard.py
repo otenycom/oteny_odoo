@@ -3,6 +3,8 @@ from odoo.exceptions import UserError, ValidationError
 
 # base-class for all service wizards
 # see AutomaticEntryWizard
+
+
 class ServiceWizard(models.TransientModel):
     _name = 'riverflow.service.wizard'
     _description = 'Service Wizard'
@@ -21,8 +23,8 @@ class ServiceWizard(models.TransientModel):
                     service.internal_remarks = self.internal_remarks
                 if not self.env.context.get('days_relative_to_project_invisible'):
                     service.days_relative_to_project = self.days_relative_to_project
-   
-        action = { 'type': 'ir.actions.act_window_close' }
+
+        action = {'type': 'ir.actions.act_window_close'}
         return action
 
     @api.model
@@ -33,14 +35,15 @@ class ServiceWizard(models.TransientModel):
         default_service_ids = self.env.context.get('default_service_ids')
         if not default_service_ids:
             raise UserError(_('No services selected'))
-        
+
         services = self.env['riverflow.service'].browse(default_service_ids)
-        defaultValues['service_ids'] = [(6, 0, services.ids)] # 6: replace the list of ids in the Many2many field
-        
+        # 6: replace the list of ids in the Many2many field
+        defaultValues['service_ids'] = [(6, 0, services.ids)]
+
         if (len(services) == 1):
             service = services[0]
             defaultValues['name'] = service.name
             defaultValues['internal_remarks'] = service.internal_remarks
             defaultValues['days_relative_to_project'] = service['days_relative_to_project']
-        
+
         return defaultValues
