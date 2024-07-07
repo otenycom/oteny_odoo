@@ -2,3 +2,4 @@
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 from . import riverflow_service
+from . import riverflow_service_tag
