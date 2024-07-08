@@ -18,6 +18,7 @@
         'views/riverflow_workflow_views.xml',
         'views/riverflow_workflow_state_views.xml',
         'views/riverflow_workflow_transition_views.xml',
+        'views/riverflow_workflow_transition_action_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

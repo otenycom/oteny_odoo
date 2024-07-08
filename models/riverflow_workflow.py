@@ -13,7 +13,7 @@ class RiverFlowWorkflowState(models.Model):
 
     name = fields.Char('Workflow name', index='trigram', required=True)
     description = fields.Text('Description', required=False)
-    icon = fields.Char('Icon', help="Font awesome icon e.g. fa-tasks")
+    icon = fields.Char('Workflow icon', help="Font awesome icon e.g. fa-tasks")
     icon_name_html = fields.Html(
         'Name', compute='_compute_icon_name_html', help="Combination of Icon and name", store=True)
 
