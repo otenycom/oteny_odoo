@@ -11,7 +11,7 @@
                 <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
                 <field name='indented_name' />
                 <field name="display_name" optional="hide" />
-                <field name='internal_remarks' />
+                <field name='latest_messages' />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                     readonly="1" />
 
@@ -42,7 +42,7 @@
                     </div>
                     <group>
                         <group>
-                            <field name="internal_remarks" invisible="1" />
+                            <field name="latest_messages" invisible="1" />
                             <field name="project_deadline" invisible="parent_id" on_change="1" />
                             <field name="related_project_deadline" invisible="not parent_id" />
                             <field name="days_relative_to_project" invisible="not parent_id"
@@ -61,14 +61,14 @@
                     <separator />
                     <group>
                         <field name="child_ids">
-                            <tree string="Services" edit="true" studio_subview_inlined="1">
+                            <tree string="Services" edit="true">
                                 <field name="workflow_transition_buttons_json"
                                     widget="dynamic_buttons" />
                                 <field name="deadline_formatted" optional="hide" />
                                 <field name="timing" optional="show" />
                                 <field name="name" optional="hide" />
                                 <field name="display_name" optional="show" />
-                                <field name="internal_remarks" />
+                                <field name="latest_messages" />
                             </tree>
                         </field>
                     </group>
@@ -119,11 +119,11 @@
     </record>
 
     <record id="riverflow.service_tag_action" model="ir.actions.act_window">
-        <field name="name">Tags</field>
+        <field name="name">Service Tags</field>
         <field name="res_model">riverflow.service.tag</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Add a new tag
+                Add a new service tag!
             </p>
         </field>
     </record>
@@ -136,7 +136,7 @@
         </menuitem>
         <menuitem id="riverflow.services_configuration_menu" name="Configuration">
             <menuitem id="riverflow.services_menu_configuration_tags"
-                action="riverflow.service_tag_action" />
+                action="riverflow.service_tag_action" sequence="10" />
         </menuitem>
     </menuitem>
 

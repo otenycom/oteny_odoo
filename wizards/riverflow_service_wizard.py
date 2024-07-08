@@ -11,7 +11,7 @@ class ServiceWizard(models.TransientModel):
 
     name = fields.Char('Service Name')
     service_ids = fields.Many2many('riverflow.service')
-    internal_remarks = fields.Text('Internal Remarks')
+    new_remark = fields.Html('New Remark')
     days_relative_to_project = fields.Integer('Days relative to project')
 
     def action_save(self):
@@ -19,8 +19,17 @@ class ServiceWizard(models.TransientModel):
             for service in wizard.service_ids:
                 if not self.env.context.get('name_readonly'):
                     service.name = self.name
-                if not self.env.context.get('internal_remarks_invisible'):
-                    service.internal_remarks = self.internal_remarks
+                if not self.env.context.get('new_remark_invisible'):
+                    if self.new_remark:
+                        # post a message in the mail_message model linked to the service
+                        self.env['mail.message'].create({
+                            'body': self.new_remark,
+                            'model': 'riverflow.service',
+                            'res_id': service.id,
+                            'message_type': 'comment',
+                            # 'Note' subtype
+                            'subtype_id': self.env.ref('mail.mt_note').id,
+                        })
                 if not self.env.context.get('days_relative_to_project_invisible'):
                     service.days_relative_to_project = self.days_relative_to_project
 
@@ -43,7 +52,7 @@ class ServiceWizard(models.TransientModel):
         if (len(services) == 1):
             service = services[0]
             defaultValues['name'] = service.name
-            defaultValues['internal_remarks'] = service.internal_remarks
+            defaultValues['new_remark'] = ''
             defaultValues['days_relative_to_project'] = service['days_relative_to_project']
 
         return defaultValues

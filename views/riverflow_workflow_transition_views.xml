@@ -1,0 +1,69 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="riverflow.workflow_transition_view_form" model="ir.ui.view">
+        <field name="name">riverflow.workflow.transition.form</field>
+        <field name="model">riverflow.workflow.transition</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="active" invisible="True" />
+                            <field name="name" class="w-100" on_change="1" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="description" />
+                            <field name="icon" on_change="1" />
+                            <field name="icon_name_html" readonly="1" />
+                            <field name="from_state_id" />
+                            <field name="to_state_id" />
+                            <field name="action" />
+                            <field name="action_context" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="riverflow.workflow_transition_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.workflow.transition.tree</field>
+        <field name="model">riverflow.workflow.transition</field>
+        <field name="arch" type="xml">
+            <tree string="Transitions">
+                <field name="active" column_invisible="True" />
+                <field name="sequence" widget="handle" />
+                <field name="workflow_id" />
+                <field name="name" optional="hide" />
+                <field name="icon_name_html" optional="show" />
+                <field name="icon" optional="hide" />
+                <field name="from_state_id" />
+                <field name="to_state_id" />
+                <field name="action" />
+                <field name="description" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="riverflow.workflow_transition_action" model="ir.actions.act_window">
+        <field name="name">Transitions</field>
+        <field name="res_model">riverflow.workflow.transition</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new workflow transition!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="riverflow.services_menu_configuration_workflow_transitions"
+        parent="riverflow.services_configuration_menu" sequence="40"
+        action="riverflow.workflow_transition_action" />
+
+</odoo>

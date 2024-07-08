@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<odoo>
+    <data noupdate="1">
+        <record id="service_tag_alert" model="riverflow.service.tag">
+            <field name="name">Alert</field>
+            <field name="color" eval="1" />
+        </record>
+        <record id="service_tag_nl" model="riverflow.service.tag">
+            <field name="name">NL-Team</field>
+            <field name="color" eval="2" />
+        </record>
+        <record id="service_tag_de" model="riverflow.service.tag">
+            <field name="name">DE-Team</field>
+            <field name="color" eval="3" />
+        </record>
+    </data>
+</odoo>
