@@ -49,6 +49,7 @@
                 <field name="sequence" widget="handle" />
                 <field name="workflow_id" />
                 <field name="name" />
+                <field name="complete_name" optional="hide" />
                 <field name="description" />
             </tree>
         </field>

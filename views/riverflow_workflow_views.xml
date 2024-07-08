@@ -19,6 +19,8 @@
                     <group>
                         <group>
                             <field name="description" />
+                            <field name="icon" on_change="1" />
+                            <field name="icon_name_html" readonly="1" />
                         </group>
                     </group>
                     <group>
@@ -26,9 +28,9 @@
                             <tree>
                                 <field name="active" column_invisible="True" />
                                 <field name="sequence" widget="handle" />
-                                <field name="name" />
-                                <field name="description" />
+                                <field name="icon_name_html" />
                                 <field name="to_state_id" />
+                                <field name="description" />
                             </tree>
                         </field>
                     </group>
@@ -58,7 +60,8 @@
         <field name="arch" type="xml">
             <tree string="Workflows">
                 <field name="active" column_invisible="True" />
-                <field name="name" />
+                <field name="icon_name_html" />
+                <field name="name" optional="hide" />
                 <field name="description" />
             </tree>
         </field>
