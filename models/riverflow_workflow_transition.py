@@ -26,8 +26,9 @@ class RiverFlowWorkflowTransition(models.Model):
         'riverflow.workflow.state', 'To', copy=True, index=True, required=True)
     workflow_id = fields.Many2one(
         'riverflow.workflow', string='Workflow', help='Derived from the to-state, since the from-state is optional', compute='_compute_workflow_id', store=True)
-    action = fields.Many2one('riverflow.workflow.transition.action',
-                             'Action', copy=True)
+    action_id = fields.Many2one(
+        'riverflow.workflow.transition.action',
+        'Action', copy=True)
     action_context = fields.Text("Action context",
                                  help='Configuration values for the action screen', copy=True)
     complete_name = fields.Char(
@@ -48,10 +49,11 @@ class RiverFlowWorkflowTransition(models.Model):
             fromState = transition.from_state_id.name if transition.from_state_id else 'Start'
             transition.complete_name = f"{fromState} -> ({transition.name}) -> {transition.to_state_id.name}"
 
-    @api.depends('icon', "name")
+    @api.depends('icon', "name", "action_id.icon")
     def _compute_icon_name_html(self):
         for record in self:
-            if record.icon:
-                record.icon_name_html = f'<span><span class="fa {escape(record.icon)}"></span>&nbsp;{escape(record.name)}</span>'
+            icon = record.icon or record.action_id.icon
+            if icon:
+                record.icon_name_html = f'<span><span class="fa {escape(icon)}"></span>&nbsp;{escape(record.name)}</span>'
             else:
                 record.icon_name_html = escape(record.name)

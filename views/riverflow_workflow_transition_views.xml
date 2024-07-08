@@ -24,7 +24,7 @@
                             <field name="workflow_id" readonly="1" />
                             <field name="from_state_id" />
                             <field name="to_state_id" />
-                            <field name="action" />
+                            <field name="action_id" />
                             <field name="action_context" />
                         </group>
                     </group>
@@ -47,7 +47,7 @@
                 <field name="icon" optional="hide" />
                 <field name="from_state_id" />
                 <field name="to_state_id" />
-                <field name="action" />
+                <field name="action_id" />
                 <field name="description" />
             </tree>
         </field>
