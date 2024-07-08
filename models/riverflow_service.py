@@ -6,7 +6,8 @@ import re
 
 class Service(models.Model):
     _name = 'riverflow.service'
-    _inherit = ['mail.thread']  # , 'mail.activity.mixin']
+    # no activities 'mail.activity.mixin', we use workflow buttons instead
+    _inherit = ['mail.thread', 'riverflow.workflow.state.mixin']
     _description = 'Service'
     _parent_name = 'parent_id'
     _parent_store = True
@@ -60,9 +61,9 @@ class Service(models.Model):
         'Timing', compute='_compute_timing', store=False, recursive=True)
     sequence = fields.Integer(default=1, compute='_compute_sequence',
                               index=True, required=True, store=True, recursive=True)
-    internal_remarks = fields.Html(
+    latest_messages = fields.Html(
         string='Latest Messages',
-        compute='_compute_internal_remarks',
+        compute='_compute_latest_messages',
         store=True,
         tracking=False,
         index='trigram'
@@ -82,7 +83,7 @@ class Service(models.Model):
             'context': {
                 'default_service_ids': self.ids,
                 'name_readonly': False,
-                'internal_remarks_invisible': False,
+                'latest_messages_invisible': False,
                 'days_relative_to_project_invisible': False,
             },
         }
@@ -90,7 +91,7 @@ class Service(models.Model):
         return action
 
     @api.depends('message_ids.body')
-    def _compute_internal_remarks(self):
+    def _compute_latest_messages(self):
         for record in self:
             # this finds any edited body in the orm cache, which a direct
             # sql query would not find
@@ -103,15 +104,15 @@ class Service(models.Model):
             # Concatenate the bodies of the latest two messages, marking them up as safe HTML
             # todo: add a css class to the <p> tag, as the default css has too big a margin
             # p {   margin-top: 0;    margin-bottom: 1rem; }
-            internal_remarks = ''
+            latest_messages = ''
             for message in messages:
                 # trim the Markup wrapper class from the body value
                 body = str(message.body)
                 # Replace <p> tags with <p> tags that have inline styles
                 body = body.replace('<p>', '<p style="margin-bottom: 0rem;">')
-                internal_remarks += body
+                latest_messages += body
 
-            record.internal_remarks = internal_remarks
+            record.latest_messages = latest_messages
 
     def _compute_workflow_transition_buttons_json(self):
         for service in self:
@@ -125,7 +126,7 @@ class Service(models.Model):
                 'buttons': [
                     {
                         'index': 0,
-                        'caption': 'Start',
+                        'caption': 'Remark',
                         'action': 'action_button_click'
                     },
                     {
@@ -221,7 +222,7 @@ class Service(models.Model):
 
     # no need for depends on 'root_id', 'parent_id.sequence',
     # because upon parent_id change, the sequence is recalculated for the entire tree up to the root
-    @api.depends('parent_id', 'days_relative_to_project')
+    @api.depends('parent_id', 'days_relative_to_project', 'name')
     def _compute_sequence(self):
         if isinstance(self.id, models.NewId):
             self.sequence = 0
@@ -276,10 +277,14 @@ class Service(models.Model):
             # If the current service has children, sort them by `days_relative_to_project` and recursively assign sequences to them
             if service_id in service_tree:
                 children_ids = service_tree[service_id]
-                # Sort children based on `days_relative_to_project`
+                # Sort children based on `days_relative_to_project`, then `name`, then `id`
                 sorted_children_ids = sorted(
                     children_ids,
-                    key=lambda child_id: service_dict[child_id].days_relative_to_project
+                    key=lambda child_id: (
+                        service_dict[child_id].days_relative_to_project,
+                        service_dict[child_id].name,
+                        service_dict[child_id].id
+                    )
                 )
                 for child_id in sorted_children_ids:
                     # Use a copy of the visited set to avoid modifying it during recursion
@@ -289,8 +294,13 @@ class Service(models.Model):
         if None in service_tree:
             visited = set()
 
-            # Sort the root services by `project_deadline` and assign sequences
+            # Sort the root services by `project_deadline`, then `name`, then `id`
             root_ids = sorted(
-                service_tree[None], key=lambda root_id: service_dict[root_id].project_deadline)
+                service_tree[None], key=lambda root_id: (
+                    service_dict[root_id].project_deadline,
+                    service_dict[root_id].name,
+                    service_dict[root_id].id,
+                )
+            )
             for root_id in root_ids:
                 assign_sequence(root_id, visited)
