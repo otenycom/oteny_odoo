@@ -17,14 +17,15 @@ class RiverFlowWorkflowTransition(models.Model):
     icon = fields.Char(
         'Icon', help="Font awesome icon e.g. fa-tasks")
     icon_name_html = fields.Html(
-        'Name', compute='_compute_icon_name_html', store=True)
+        'Name', compute='_compute_icon_name_html', store=True, help="Combination of Icon and name")
     active = fields.Boolean('Active', default=True)
     from_state_id = fields.Many2one(
-        'riverflow.workflow.state', 'From', copy=True, index=True)
+        'riverflow.workflow.state', 'From', help='Leave blank to define a start-transition',
+        copy=True, index=True, required=False)
     to_state_id = fields.Many2one(
-        'riverflow.workflow.state', 'To', copy=True, index=True)
+        'riverflow.workflow.state', 'To', copy=True, index=True, required=True)
     workflow_id = fields.Many2one(
-        'riverflow.workflow', string='Workflow', compute='_compute_workflow_id', store=True)
+        'riverflow.workflow', string='Workflow', help='Derived from the to-state, since the from-state is optional', compute='_compute_workflow_id', store=True)
     action = fields.Many2one('riverflow.workflow.transition.action',
                              'Action', copy=True)
     action_context = fields.Text("Action context",

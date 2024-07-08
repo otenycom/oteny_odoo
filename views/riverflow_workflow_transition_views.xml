@@ -10,7 +10,7 @@
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                         invisible="active" />
                     <div class="oe_title">
-                        <label for="name" />
+                        <label for="name" on_change="1" />
                         <h1>
                             <field name="active" invisible="True" />
                             <field name="name" class="w-100" on_change="1" />
@@ -21,6 +21,7 @@
                             <field name="description" />
                             <field name="icon" on_change="1" />
                             <field name="icon_name_html" readonly="1" />
+                            <field name="workflow_id" readonly="1" />
                             <field name="from_state_id" />
                             <field name="to_state_id" />
                             <field name="action" />
@@ -41,6 +42,7 @@
                 <field name="sequence" widget="handle" />
                 <field name="workflow_id" />
                 <field name="name" optional="hide" />
+                <field name="complete_name" optional="hide" />
                 <field name="icon_name_html" optional="show" />
                 <field name="icon" optional="hide" />
                 <field name="from_state_id" />
