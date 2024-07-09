@@ -32,15 +32,13 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                 record.id, models.NewId) else int(record.id)
 
             transition_ids = record.from_transition_ids
-            if (not transition_ids):
-                record.workflow_transition_buttons_json = ''
-            else:
-                workflow_transition_buttons = {
-                    'text': record.workflow_state_name or '',
-                    'buttons': [],
-                    'record_id': record_id,
-                }
+            workflow_transition_buttons = {
+                'text': record.workflow_state_name or '',
+                'buttons': [],
+                'record_id': record_id,
+            }
 
+            if transition_ids:
                 for transition in transition_ids:
                     workflow_transition_buttons['buttons'].append({
                         'index': transition.sequence,
@@ -53,8 +51,8 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                         }
                     })
 
-                record.workflow_transition_buttons_json = json.dumps(
-                    workflow_transition_buttons)
+            record.workflow_transition_buttons_json = json.dumps(
+                workflow_transition_buttons)
 
     def action_button_click(self):
         transition_id = self.env.context.get('transition_id')
@@ -71,6 +69,7 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
         #     'days_relative_to_project_invisible': False,
         # })
         action_context['service_ids'] = self.ids
+        action_context['transition_id'] = transition_id
 
         # This is a workflow transition action, for now just one base wizard
         action = {

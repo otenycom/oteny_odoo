@@ -6,6 +6,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class ServiceWizard(models.TransientModel):
+    # todo: make this a generic transition wizard, make service wizard a subclass
     _name = 'riverflow.service.wizard'
     _description = 'Service Wizard'
 
@@ -13,10 +14,16 @@ class ServiceWizard(models.TransientModel):
     service_ids = fields.Many2many('riverflow.service')
     new_remark = fields.Html('New Remark')
     days_relative_to_project = fields.Integer('Days relative to project')
+    transition_id = fields.Many2one(
+        'riverflow.workflow.transition', 'Transition')
 
     def action_save(self):
         for wizard in self:
+            transition = wizard.transition_id
             for service in wizard.service_ids:
+                # todo: check if the transition is allowed and if the service is in the right state
+                service.workflow_state_id = transition.to_state_id
+
                 if not self.env.context.get('name_readonly'):
                     service.name = self.name
                 if not self.env.context.get('new_remark_invisible'):
@@ -54,5 +61,7 @@ class ServiceWizard(models.TransientModel):
             defaultValues['name'] = service.name
             defaultValues['new_remark'] = ''
             defaultValues['days_relative_to_project'] = service['days_relative_to_project']
+
+        defaultValues['transition_id'] = self.env.context.get('transition_id')
 
         return defaultValues

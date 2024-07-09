@@ -6,6 +6,7 @@
             <form string="Update Service">
                 <group>
                     <field name="service_ids" invisible="1" />
+                    <field name="transition_id" invisible="1" />
                     <field name="new_remark" required="0"
                         invisible="context.get('new_remark_invisible', False)" widget="html" />
                     <field name="name" readonly="context.get('name_readonly', True)" required="1" />
