@@ -19,16 +19,13 @@
         'views/riverflow_workflow_state_views.xml',
         'views/riverflow_workflow_transition_views.xml',
         'views/riverflow_workflow_transition_action_views.xml',
+        'data/workflow_transition_action_data.xml',
     ],
     'assets': {
         'web.assets_backend': [
             'riverflow/static/src/components/**/*',
         ],
     },
-    'demo': [
-        'data/service_tag_demo.xml',
-        'data/service_demo.xml',
-    ],
     'application': True,
     'auto_install': False,
     'license': 'OEEL-1'

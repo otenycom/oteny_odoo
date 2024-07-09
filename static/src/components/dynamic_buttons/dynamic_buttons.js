@@ -10,8 +10,8 @@ export class DynamicButtons extends Component {
     // or wrap the buttons in a popover, to fit an unlimited number of buttons
     static template = "riverflow.DynamicButtons";
     static props = {
-        ...standardFieldProps, 
-        buttons: {type: Object, optional: true},
+        ...standardFieldProps,
+        buttons: { type: Object, optional: true },
     };
 
     setup() {
@@ -21,12 +21,12 @@ export class DynamicButtons extends Component {
 
     fieldValue() {
         const jsonValue = this.props.record.data[this.props.name];
-    
+
         if (!jsonValue) {
             return {
                 buttons: [],
-                text: "", 
-            }; 
+                text: "",
+            };
         }
         return JSON.parse(jsonValue);
     }
@@ -39,20 +39,22 @@ export class DynamicButtons extends Component {
         return this.fieldValue().text;
     }
 
-    serviceId() {
-        return this.fieldValue().service_id;
+    recordId() {
+        return this.fieldValue().record_id;
     }
 
     async executeTransition(button) {
-        await this.action.doActionButton({
+        const action = {
             type: "object",
-            resId: this.serviceId(), 
+            resId: this.recordId(),
             name: "action_button_click",
             resModel: 'riverflow.service',
+            context: button.context,
             onClose: async () => {
                 await this.props.record.model.root.load();;
             }
-        });
+        }
+        await this.action.doActionButton(action);
     }
 }
 

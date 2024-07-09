@@ -21,7 +21,7 @@
                             <field name="description" />
                             <field name="icon" on_change="1" />
                             <field name="icon_name_html" readonly="1" />
-                            <field name="odoo_action" />
+                            <field name="odoo_view" />
                         </group>
                     </group>
                 </sheet>
