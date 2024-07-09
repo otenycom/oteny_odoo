@@ -5,7 +5,7 @@ from odoo import models, fields, api
 from markupsafe import escape
 
 
-class RiverFlowWorkflowState(models.Model):
+class RiverFlowWorkflowTransitionAction(models.Model):
     _name = 'riverflow.workflow.transition.action'
     _description = 'Workflow transition action'
     _order = "name"
@@ -17,8 +17,8 @@ class RiverFlowWorkflowState(models.Model):
     active = fields.Boolean('Active', default=True)
     icon = fields.Char(
         'Icon', help="Font awesome icon e.g. fa-tasks. If blank, the relation action's icon will be used.")
-    odoo_action = fields.Text(
-        'Odoo action', help="An Odoo-action command, for example to open a screen")
+    odoo_view = fields.Text(
+        'Odoo View', help="Odoo wizard form-view")
 
     _sql_constraints = [('name_uniq', 'unique (name)',
                          "Workflow name already exists!")]

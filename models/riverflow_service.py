@@ -1,5 +1,4 @@
 from odoo import models, fields, api, _
-import json
 from datetime import timedelta
 import re
 
@@ -32,8 +31,6 @@ class Service(models.Model):
         'Service', compute='_compute_indented_name', store=False, recursive=True)
     complete_name = fields.Char(
         'Complete Name', compute='_compute_complete_name', store=True, index='trigram', recursive=True)
-    workflow_transition_buttons_json = fields.Char(
-        'Actions', compute='_compute_workflow_transition_buttons_json', store=False)
     company_id = fields.Many2one('res.company', string='Company', required=True, readonly=False,
                                  default=lambda self: self.env.company, tracking=True)
     active = fields.Boolean(
@@ -71,25 +68,6 @@ class Service(models.Model):
     tag_ids = fields.Many2many('riverflow.service.tag', 'riverflow_service_ship_tag_rel',
                                'service_tag_id', 'tag_id', 'Tags', tracking=True, copy=True)
 
-    def action_button_click(self):
-        # This is a workflow transition action, for now just one base wizard
-        action = {
-            'type': 'ir.actions.act_window',
-            'name': 'Update Service',  # Dialog title
-            'res_model': 'riverflow.service.wizard',
-            'view_mode': 'form',
-            'views': [[False, "form"]],
-            'target': 'new',
-            'context': {
-                'default_service_ids': self.ids,
-                'name_readonly': False,
-                'latest_messages_invisible': False,
-                'days_relative_to_project_invisible': False,
-            },
-        }
-
-        return action
-
     @api.depends('message_ids.body')
     def _compute_latest_messages(self):
         for record in self:
@@ -113,31 +91,6 @@ class Service(models.Model):
                 latest_messages += body
 
             record.latest_messages = latest_messages
-
-    def _compute_workflow_transition_buttons_json(self):
-        for service in self:
-            # needs int, for json serialization
-            service_id = - \
-                1 if isinstance(service.id, models.NewId) else int(service.id)
-
-            workflow_transition_buttons = {
-                'text': '',  # record.indented_name,
-                'service_id': service_id,
-                'buttons': [
-                    {
-                        'index': 0,
-                        'caption': 'Remark',
-                        'action': 'action_button_click'
-                    },
-                    {
-                        'index': 1,
-                        'caption': 'Cancel',
-                        'action': 'action_button_click'
-                    }
-                ]
-            }
-            service.workflow_transition_buttons_json = json.dumps(
-                workflow_transition_buttons)
 
     @api.depends('parent_path')
     def _compute_root_id(self):

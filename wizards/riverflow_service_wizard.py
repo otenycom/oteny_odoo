@@ -41,11 +41,11 @@ class ServiceWizard(models.TransientModel):
         defaultValues = super().default_get(form_fields)
 
         # Get the default service_ids from the action.context
-        default_service_ids = self.env.context.get('default_service_ids')
-        if not default_service_ids:
+        service_ids = self.env.context.get('service_ids')
+        if not service_ids:
             raise UserError(_('No services selected'))
 
-        services = self.env['riverflow.service'].browse(default_service_ids)
+        services = self.env['riverflow.service'].browse(service_ids)
         # 6: replace the list of ids in the Many2many field
         defaultValues['service_ids'] = [(6, 0, services.ids)]
 
