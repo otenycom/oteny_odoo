@@ -6,6 +6,9 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
     _name = "riverflow.workflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
+    workflow_id = fields.Many2one(
+        'riverflow.workflow', 'Workflow', tracking=True)
+
     workflow_state_id = fields.Many2one(
         'riverflow.workflow.state', 'State',
         tracking=True, index=True, help='Current workflow state')
@@ -15,8 +18,19 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
     )
     workflow_state_name = fields.Char(
         'State name', related='workflow_state_id.name', store=True, index=True)
-    transition_buttons_json = fields.Char(
+    # todo: fields.Json
+    transition_buttons_json = fields.Text(
         'Actions', compute='_compute_transition_buttons_json', store=False)
+
+    @api.onchange('workflow_id', 'workflow_state_id')
+    def on_change_workflow_id(self):
+        for s in self:
+            if s.workflow_id and not s.workflow_state_id:
+                startStates = self.env['riverflow.workflow.state'].search([
+                    ('workflow_id', '=', s.workflow_id.id),
+                ], limit=1, order='sequence,name,id')
+                if (len(startStates)):
+                    s.workflow_state_id = startStates[0]
 
     @api.depends('workflow_state_id', 'workflow_state_id.from_transition_ids')
     def _compute_from_transition_ids(self):
