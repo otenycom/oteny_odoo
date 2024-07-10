@@ -7,6 +7,7 @@
                 <group>
                     <field name="service_ids" invisible="1" />
                     <field name="transition_id" invisible="1" />
+                    <field name="transition_description" readonly="1" invisible="not transition_description" />
                     <field name="new_remark" required="0"
                         invisible="context.get('new_remark_invisible', False)" widget="html" />
                     <field name="name" readonly="context.get('name_readonly', True)" required="1" />
@@ -14,18 +15,11 @@
                         invisible="context.get('days_relative_to_project_invisible')" />
                 </group>
                 <footer>
-                    <button string="Save" type="object" name="action_save" class="btn-primary"
+                    <button string="OK" type="object" name="action_save" class="btn-primary"
                         data-hotkey="q" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>
             </form>
         </field>
     </record>
-
-    <!-- <record id="action_transition_action_default" model="ir.actions.act_window">
-        <field name="name">Update Service State</field>
-        <field name="res_model">riverflow.service.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-    </record> -->
 </odoo>
