@@ -8,7 +8,7 @@
                 <field name="active" column_invisible="True" />
                 <field name='timing' optional="show" />
                 <field name="deadline_formatted" optional="hide" />
-                <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
+                <field name='transition_buttons_json' widget="transition_buttons" />
                 <field name='indented_name' />
                 <field name="display_name" optional="hide" />
                 <field name='latest_messages' />
@@ -48,7 +48,7 @@
                             <field name="days_relative_to_project" invisible="not parent_id"
                                 on_change="1" />
                             <field name="timing" invisible="not parent_id" />
-                            <field name='workflow_transition_buttons_json' widget="dynamic_buttons" />
+                            <field name='transition_buttons_json' widget="transition_buttons" />
                         </group>
                         <group>
                             <field name="complete_name" invisible="not parent_id" />
@@ -62,8 +62,8 @@
                     <group>
                         <field name="child_ids">
                             <tree string="Services" edit="true">
-                                <field name="workflow_transition_buttons_json"
-                                    widget="dynamic_buttons" />
+                                <field name="transition_buttons_json"
+                                    widget="transition_buttons" />
                                 <field name="deadline_formatted" optional="hide" />
                                 <field name="timing" optional="show" />
                                 <field name="name" optional="hide" />
