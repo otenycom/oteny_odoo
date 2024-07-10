@@ -16,6 +16,7 @@ class ServiceWizard(models.TransientModel):
     days_relative_to_project = fields.Integer('Days relative to project')
     transition_id = fields.Many2one(
         'riverflow.workflow.transition', 'Transition')
+    transition_description = fields.Text('Description')
 
     def action_save(self):
         for wizard in self:
@@ -48,9 +49,9 @@ class ServiceWizard(models.TransientModel):
         defaultValues = super().default_get(form_fields)
 
         # Get the default service_ids from the action.context
-        service_ids = self.env.context.get('service_ids')
+        service_ids = self.env.context.get('active_ids')
         if not service_ids:
-            raise UserError(_('No services selected'))
+            raise UserError(_('No records selected'))
 
         services = self.env['riverflow.service'].browse(service_ids)
         # 6: replace the list of ids in the Many2many field
@@ -62,6 +63,10 @@ class ServiceWizard(models.TransientModel):
             defaultValues['new_remark'] = ''
             defaultValues['days_relative_to_project'] = service['days_relative_to_project']
 
-        defaultValues['transition_id'] = self.env.context.get('transition_id')
+        transition_id = self.env.context.get('transition_id')
+        defaultValues['transition_id'] = transition_id
+        transition = self.env['riverflow.workflow.transition'].browse(
+            transition_id)
+        defaultValues['transition_description'] = transition.description
 
         return defaultValues

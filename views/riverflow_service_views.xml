@@ -43,12 +43,14 @@
                     <group>
                         <group>
                             <field name="latest_messages" invisible="1" />
+                            <!-- <field name="workflow_state_name" invisible="1" /> -->
+                            <field name="workflow_state_id" on_change="1" />
+                            <field name='transition_buttons_json' widget="transition_buttons" />
                             <field name="project_deadline" invisible="parent_id" on_change="1" />
                             <field name="related_project_deadline" invisible="not parent_id" />
                             <field name="days_relative_to_project" invisible="not parent_id"
                                 on_change="1" />
                             <field name="timing" invisible="not parent_id" />
-                            <field name='transition_buttons_json' widget="transition_buttons" />
                         </group>
                         <group>
                             <field name="complete_name" invisible="not parent_id" />
