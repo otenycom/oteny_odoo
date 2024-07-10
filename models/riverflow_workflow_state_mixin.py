@@ -15,8 +15,8 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
     )
     workflow_state_name = fields.Char(
         'State name', related='workflow_state_id.name', store=True, index=True)
-    workflow_transition_buttons_json = fields.Char(
-        'Actions', compute='_compute_workflow_transition_buttons_json', store=False)
+    transition_buttons_json = fields.Char(
+        'Actions', compute='_compute_transition_buttons_json', store=False)
 
     @api.depends('workflow_state_id', 'workflow_state_id.from_transition_ids')
     def _compute_from_transition_ids(self):
@@ -25,19 +25,19 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                 ('from_state_id', '=', s.workflow_state_id.id),
             ])
 
-    def _compute_workflow_transition_buttons_json(self):
+    def _compute_transition_buttons_json(self):
         for record in self:
             # needs int, for json serialization
             record_id = 0 if isinstance(
                 record.id, models.NewId) else int(record.id)
 
-            transition_ids = record.from_transition_ids
             workflow_transition_buttons = {
                 'text': record.workflow_state_name or '',
                 'buttons': [],
                 'record_id': record_id,
             }
 
+            transition_ids = record.from_transition_ids
             if transition_ids:
                 for transition in transition_ids:
                     workflow_transition_buttons['buttons'].append({
@@ -51,7 +51,7 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                         }
                     })
 
-            record.workflow_transition_buttons_json = json.dumps(
+            record.transition_buttons_json = json.dumps(
                 workflow_transition_buttons)
 
     def action_button_click(self):
