@@ -8,8 +8,8 @@
                 <field name="active" column_invisible="True" />
                 <field name='timing' optional="show" />
                 <field name="deadline_formatted" optional="hide" />
-                <field name='transition_buttons_json' widget="transition_buttons" />
                 <field name='indented_name' />
+                <field name='transition_buttons_json' widget="transition_buttons" />
                 <field name="display_name" optional="hide" />
                 <field name='latest_messages' />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
@@ -44,7 +44,8 @@
                         <group>
                             <field name="latest_messages" invisible="1" />
                             <field name="workflow_state_name" invisible="1" on_change="1" />
-                            <field name="workflow_state_id" on_change="1" />
+                            <field name="workflow_state_id" on_change="1" invisible="1" />
+                            <field name="workflow_id" on_change="1" readonly="workflow_id" />
                             <field name='transition_buttons_json' widget="transition_buttons" />
                             <field name="project_deadline" invisible="parent_id" on_change="1" />
                             <field name="related_project_deadline" invisible="not parent_id" />
