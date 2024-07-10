@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates>
     <t t-name="riverflow.TransitionButtons">
+        <t t-if="this.iconClass()">
+            <span t-att-class="this.iconClass()"></span>
+            <!-- workaround: &nbsp; does not work -->
+            <span>&#160;</span>
+        </t>
         <span t-esc="this.text()" />
         <div>
             <t t-set="buttons" t-value="this.buttonDefs()" />

@@ -39,6 +39,12 @@ export class TransitionButtons extends Component {
         return this.state.fieldValue.buttons;
     }
 
+    iconClass() {
+        if (this.state.fieldValue.workflow_icon)
+            return "fa " + this.state.fieldValue.workflow_icon;
+        else return "";
+    }
+
     text() {
         return this.state.fieldValue.text;
     }

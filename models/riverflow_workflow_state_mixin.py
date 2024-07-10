@@ -33,15 +33,18 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
 
             workflow_transition_buttons = {
                 'text': record.workflow_state_name or '',
+                # todo: store the icon so its not a lookup
+                'workflow_icon': record.workflow_state_id.workflow_id.icon or '',
                 'buttons': [],
                 'record_id': record_id,
             }
 
             transition_ids = record.from_transition_ids
             if transition_ids:
+                index = 0
                 for transition in transition_ids:
                     workflow_transition_buttons['buttons'].append({
-                        'index': transition.sequence,
+                        'index': index,
                         'caption': transition.name,
                         'help': transition.description,
                         'action': 'action_button_click',
@@ -49,7 +52,9 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                         'context': {
                             'transition_id': transition.id,
                         }
-                    })
+                    }
+                    )
+                    index += 1
 
             record.transition_buttons_json = json.dumps(
                 workflow_transition_buttons)
