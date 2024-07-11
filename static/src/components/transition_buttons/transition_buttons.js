@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, useState } from "@odoo/owl";
+import { Component, useState, onWillUpdateProps } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 export class TransitionButtons extends Component {
@@ -11,53 +11,59 @@ export class TransitionButtons extends Component {
     static template = "riverflow.TransitionButtons";
     static props = {
         ...standardFieldProps,
-        buttons: { type: Object, optional: true },
     };
 
     setup() {
-        // returns 'transition_buttons_json' field value
-        function fieldValue(props) {
-            const jsonValue = props.record.data[props.name];
-
-            if (!jsonValue) {
-                return {
-                    buttons: [],
-                    text: "",
-                };
-            }
-            return JSON.parse(jsonValue);
-        }
-        this.state = useState({
-            fieldValue: fieldValue(this.props),
-        });
+        //this.updateStateFromProps(this.props);
+        //onWillUpdateProps((props) => this.updateStateFromProps(props));
 
         this.orm = useService("orm");
         this.action = useService("action");
     }
 
+    // updateStateFromProps(props) {
+    //     this.state = useState({
+    //         fieldValue: fieldValue(props),
+    //     });
+    // }
+
+    // returns 'transition_buttons_json' field value
+    fieldValue(props) {
+        const jsonValue = props.record.data[props.name];
+
+        if (jsonValue === undefined || jsonValue === "") {
+            return {
+                buttons: [],
+                text: "",
+            };
+        }
+        return JSON.parse(jsonValue);
+    }
+
     buttonDefs() {
-        return this.state.fieldValue.buttons;
+        //return this.state.fieldValue.buttons;
+        return this.fieldValue(this.props).buttons;
     }
 
     iconClass() {
-        if (this.state.fieldValue.workflow_icon)
-            return "fa " + this.state.fieldValue.workflow_icon;
+        if (this.fieldValue(this.props).workflow_icon)
+            return "fa " + this.fieldValue(this.props).workflow_icon;
         else return "";
     }
 
     text() {
-        return this.state.fieldValue.text;
+        return this.fieldValue(this.props).text;
     }
 
-    // hack: find a better way to get the record id
-    recordId() {
-        return this.state.fieldValue.record_id;
-    }
+    // // hack: find a better way to get the record id
+    // recordId() {
+    //     return this.fieldValue(this.props).record_id;
+    // }
 
     async executeTransition(button) {
         const action = {
             type: "object",
-            resId: this.recordId(),
+            resId: this.props.record.resId, //this.recordId(),
             name: button.action,
             resModel: this.props.record.resModel,
             context: button.context,
@@ -72,7 +78,7 @@ export class TransitionButtons extends Component {
 // see event_icon_selection
 export const transitionButtons = {
     component: TransitionButtons,
-    displayName: "Buttons",
+    displayName: "Transition Buttons",
     supportedTypes: ["char", "text", "selection"],
 };
 
