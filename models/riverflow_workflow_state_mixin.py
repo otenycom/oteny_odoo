@@ -57,6 +57,9 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
             if transition_ids:
                 index = 0
                 for transition in transition_ids:
+                    # workaround, sometimes transition is a clone? in lookup tables or so
+                    transition_id = transition.id.origin if isinstance(
+                        record.id, models.NewId) else int(transition.id)
                     workflow_transition_buttons['buttons'].append({
                         'index': index,
                         'caption': transition.name,
@@ -64,7 +67,7 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
                         'action': 'action_button_click',
                         # context is posted back to the server side action method
                         'context': {
-                            'transition_id': transition.id,
+                            'transition_id': transition_id,
                         }
                     }
                     )
@@ -93,7 +96,8 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
         # This is a workflow transition action, for now just one base wizard
         action = {
             'type': 'ir.actions.act_window',
-            'name': transition.name,  # Dialog title
+            # Dialog title
+            'name': f'{self.complete_name}: {transition.name}',
             'res_model': 'riverflow.service.wizard',
             'view_mode': 'form',
             # ' riverflow.view_service_transition_action_default_form'

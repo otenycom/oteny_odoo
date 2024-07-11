@@ -10,7 +10,7 @@
                     <field name="transition_description" readonly="1" invisible="not transition_description" />
                     <field name="new_remark" required="0"
                         invisible="context.get('new_remark_invisible', False)" widget="html" />
-                    <field name="name" readonly="context.get('name_readonly', True)" required="1" />
+                    <field name="name" readonly="context.get('name_readonly', True)" invisible="1" required="1" />
                     <field name="days_relative_to_project"
                         invisible="context.get('days_relative_to_project_invisible')" />
                 </group>

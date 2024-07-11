@@ -1,27 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id='riverflow.service_view_tree' model='ir.ui.view'>
-        <field name='name'>riverflow.service.tree</field>
-        <field name='model'>riverflow.service</field>
-        <field name='arch' type='xml'>
-            <tree string='Services' edit="true">
-                <field name="active" column_invisible="True" />
-                <field name='timing' optional="show" />
-                <field name="deadline_formatted" optional="hide" />
-                <field name='indented_name' />
-                <field name='transition_buttons_json' widget="transition_buttons" />
-                <field name="display_name" optional="hide" />
-                <field name='latest_messages' />
-                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
-                    readonly="1" />
-
-                <!-- Uncomment to see how the padding and margin styles are applied -->
-                <!-- <button name='action_button_click' type='object' string='Server'
-                class='btn-primary' /> -->
-            </tree>
-        </field>
-    </record>
-
     <record id='riverflow.service_view_form' model='ir.ui.view'>
         <field name="name">riverflow.service.form</field>
         <field name="model">riverflow.service</field>
@@ -45,7 +23,7 @@
                             <field name="latest_messages" invisible="1" />
                             <field name="workflow_state_name" invisible="1" on_change="1" />
                             <field name="workflow_state_id" on_change="1" invisible="1" />
-                            <field name="workflow_id" on_change="1" readonly="workflow_id" />
+                            <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
                             <field name='transition_buttons_json' widget="transition_buttons" />
                             <field name="project_deadline" invisible="parent_id" on_change="1" />
                             <field name="related_project_deadline" invisible="not parent_id" />
@@ -82,6 +60,28 @@
                     <field name="message_ids" />
                 </div>
             </form>
+        </field>
+    </record>
+
+    <record id='riverflow.service_view_tree' model='ir.ui.view'>
+        <field name='name'>riverflow.service.tree</field>
+        <field name='model'>riverflow.service</field>
+        <field name='arch' type='xml'>
+            <tree string='Services' edit="true">
+                <field name="active" column_invisible="True" />
+                <field name='timing' optional="show" />
+                <field name="deadline_formatted" optional="hide" />
+                <field name='indented_name' />
+                <field name='transition_buttons_json' widget="transition_buttons" />
+                <field name="display_name" optional="hide" />
+                <field name='latest_messages' />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
+                    readonly="1" />
+
+                <!-- Uncomment to see how the padding and margin styles are applied -->
+                <!-- <button name='action_button_click' type='object' string='Server'
+                class='btn-primary' /> -->
+            </tree>
         </field>
     </record>
 
