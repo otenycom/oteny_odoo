@@ -1,5 +1,5 @@
 {
-    'name': "River Flow",
+    'name': "Riverflow",
     'version': '1.3',
     'depends': [
         'base',
