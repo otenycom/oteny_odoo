@@ -26,7 +26,8 @@ class Service(models.Model):
         'riverflow.service', 'parent_id', string='Child Services')
     root_id = fields.Many2one(
         'riverflow.service', compute='_compute_root_id', store=True, recursive=True)
-    name = fields.Char('Name', index='trigram', required=True, tracking=True)
+    name = fields.Char('Service Name', index='trigram',
+                       required=True, tracking=True)
     indented_name = fields.Char(
         'Service', compute='_compute_indented_name', store=False, recursive=True)
     complete_name = fields.Char(
