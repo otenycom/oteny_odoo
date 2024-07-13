@@ -1,4 +1,17 @@
 .transition_button {
-    margin-right: 3px;
-    padding: 0 5px;
+    margin-right: 0px;
+    padding: 0px;
+    border-width: 0px;
+}
+
+// add the separator content between each <button> element but not the last one.
+.button-separator-group button:not(:last-child)::after {
+    content: '\00A0| ';
+    margin-left: 0px;
+    /* Adjust the space between the button and the separator as needed */
+}
+
+.button-separator-group button {
+    margin-right: 0px;
+    /* Adjust the space between the buttons as needed */
 }
