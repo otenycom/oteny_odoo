@@ -25,10 +25,10 @@
                     </group>
                     <group>
                         <field name="workflow_start_transition_ids">
-                            <tree>
+                            <tree editable="bottom" create="1" delete="1" multi_edit="1" open_form_view="True">
                                 <field name="active" column_invisible="True" />
                                 <field name="sequence" widget="handle" />
-                                <field name="icon_name_html" />
+                                <field name="name" />
                                 <field name="to_state_id" />
                                 <field name="description" />
                             </tree>
@@ -36,7 +36,7 @@
                     </group>
                     <group>
                         <field name="workflow_state_ids">
-                            <tree>
+                            <tree editable="bottom" create="1" delete="1" multi_edit="1" open_form_view="True">
                                 <field name="active" column_invisible="True" />
                                 <field name="sequence" widget="handle" />
                                 <field name="name" />

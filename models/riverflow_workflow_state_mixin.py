@@ -90,18 +90,23 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
         #     'latest_messages_invisible': False,
         #     'days_relative_to_project_invisible': False,
         # })
-        action_context['service_ids'] = self.ids
+        # action_context['service_ids'] = self.ids # flow automatically as active_ids
         action_context['transition_id'] = transition_id
+
+        # the wizard form
+        view = self.env.ref(transition.action_id.odoo_view)
+        # the wizard model
+        res_model = view.model
 
         # This is a workflow transition action, for now just one base wizard
         action = {
             'type': 'ir.actions.act_window',
             # Dialog title
-            'name': f'{self.complete_name}: {transition.name}',
-            'res_model': 'riverflow.service.wizard',
+            'name': f'{self.name}: {transition.name}',
+            'res_model': res_model,  # 'riverflow.service.wizard',
             'view_mode': 'form',
             # ' riverflow.view_service_transition_action_default_form'
-            'views': [(self.env.ref(transition.action_id.odoo_view).id, "form")],
+            'views': [(view.id, "form")],
             'target': 'new',
             'context': action_context,
         }
