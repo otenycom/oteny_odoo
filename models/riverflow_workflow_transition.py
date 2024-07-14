@@ -8,7 +8,7 @@ from markupsafe import escape
 class RiverFlowWorkflowTransition(models.Model):
     _name = 'riverflow.workflow.transition'
     _description = 'Workflow state transition'
-    _order = "from_state_id,sequence,name,id"
+    _order = "workflow_id,from_state_id,sequence,name,id"
     _rec_name = 'complete_name'
 
     name = fields.Char('Transition name', required=True)
