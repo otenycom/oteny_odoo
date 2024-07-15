@@ -5,6 +5,7 @@
             <field name="name">Default Transition Action</field>
             <field name="description">Optionally prompts for new remark</field>
             <field name="odoo_view">riverflow.view_service_transition_action_default_form</field>
+            <field name="model_id" ref="riverflow.model_riverflow_service" />
             <!-- <field name="icon" /> -->
         </record>
     </data>

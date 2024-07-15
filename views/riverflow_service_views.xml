@@ -28,6 +28,7 @@
                     </div>
                     <group>
                         <group>
+                            <field name="model" invisible="1" />
                             <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
                             <field name="tag_ids" widget="many2many_tags"
                                 options="{'color_field': 'color', 'no_create_edit': True}" />

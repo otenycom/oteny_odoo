@@ -5,7 +5,7 @@ from odoo import models, fields, api
 from markupsafe import escape
 
 
-class RiverFlowWorkflowTransition(models.Model):
+class RiverflowWorkflowTransition(models.Model):
     _name = 'riverflow.workflow.transition'
     _description = 'Workflow state transition'
     _order = "workflow_id,from_state_id,sequence,name,id"
@@ -21,14 +21,22 @@ class RiverFlowWorkflowTransition(models.Model):
     active = fields.Boolean('Active', default=True)
     from_state_id = fields.Many2one(
         'riverflow.workflow.state', 'From', help='Leave blank to define a start-transition',
-        copy=True, index=True, required=False)
+        copy=True, index=True, required=False,
+        domain="[('workflow_id', '=', workflow_id)]")  # todo: only restrict for new records, allow a way to make transitions between workflows
     to_state_id = fields.Many2one(
-        'riverflow.workflow.state', 'To', copy=True, index=True, required=True)
+        'riverflow.workflow.state', 'To', copy=True, index=True, required=True,
+        domain="[('workflow_id', '=', workflow_id)]")
     workflow_id = fields.Many2one(
         'riverflow.workflow', string='Workflow', help='Derived from the to-state, since the from-state is optional', compute='_compute_workflow_id', store=True)
+
+    model = fields.Char('Related Model', related='workflow_id.model',
+                        help="Model on which the workflow runs",
+                        index=True, store=True, readonly=True)
     action_id = fields.Many2one(
         'riverflow.workflow.transition.action',
-        'Action', copy=True)
+        'Action',
+        domain="[('model', '=', model)]",
+        copy=True)
     action_context = fields.Text("Action context",
                                  help='Configuration values for the action screen', copy=True)
     complete_name = fields.Char(
@@ -38,18 +46,18 @@ class RiverFlowWorkflowTransition(models.Model):
     #                                     ('model', '=', 'riverflow.workflow')])
     # report_id = fields.Many2one('ir.actions.report', 'Report', copy=True, domain=[
 
-    @api.depends('to_state_id.workflow_id')
+    @ api.depends('to_state_id.workflow_id')
     def _compute_workflow_id(self):
         for transition in self:
             transition.workflow_id = transition.to_state_id.workflow_id
 
-    @api.depends('name', 'from_state_id', 'from_state_id')
+    @ api.depends('name', 'from_state_id', 'from_state_id')
     def _compute_complete_name(self):
         for transition in self:
-            fromState = transition.from_state_id.name if transition.from_state_id else 'Start'
-            transition.complete_name = f"{fromState} -> ({transition.name}) -> {transition.to_state_id.name}"
+            fromState = transition.from_state_id.display_name if transition.from_state_id else 'Start'
+            transition.complete_name = f"{transition.name}: {fromState}->{transition.to_state_id.display_name}"
 
-    @api.depends('icon', "name", "action_id.icon")
+    @ api.depends('icon', "name", "action_id.icon")
     def _compute_icon_name_html(self):
         for record in self:
             icon = record.icon or record.action_id.icon

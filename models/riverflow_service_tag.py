@@ -4,7 +4,7 @@
 from odoo import fields, models
 
 
-class RiverFlowServiceTag(models.Model):
+class RiverflowServiceTag(models.Model):
     _name = 'riverflow.service.tag'
     _description = 'Service Tag'
 
