@@ -87,6 +87,7 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
                     # workaround, sometimes transition is a clone? in lookup tables or so
                     transition_id = transition.id.origin if isinstance(
                         record.id, models.NewId) else int(transition.id)
+
                     workflow_transition_buttons['buttons'].append({
                         'index': index,
                         'caption': transition.name,
@@ -119,6 +120,18 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
         # })
         # action_context['service_ids'] = self.ids # flow automatically as active_ids
         action_context['transition_id'] = transition_id
+
+        # copy each current field value to the action context, so that we
+        # can display them in the wizard
+        if (len(self.ids) == 1):
+            defaults_context = {}
+            for field_name in self._fields:
+                field = self._fields[field_name]
+                value = getattr(self, field_name)
+                converted_value = field.convert_to_cache(value, self)
+                defaults_context['default_' + field_name] = converted_value
+
+            action_context.update(defaults_context)
 
         # the wizard form (eg riverflow.view_service_transition_action_default_form)
         view = self.env.ref(transition.action_id.odoo_view)
