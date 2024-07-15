@@ -2,25 +2,45 @@ from odoo import _, fields, models, api
 import json
 
 
-class RiverFlowWorkflowStateMixin(models.AbstractModel):
+class RiverflowWorkflowStateMixin(models.AbstractModel):
     _name = "riverflow.workflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
+    # initial workflow
     workflow_id = fields.Many2one(
-        'riverflow.workflow', 'Workflow', tracking=True)
+        'riverflow.workflow',
+        domain="[('model', '=', model)]",
+        string='Workflow', tracking=True)
 
     workflow_state_id = fields.Many2one(
-        'riverflow.workflow.state', 'State',
+        'riverflow.workflow.state', 'Workflow State',
         tracking=True, index=True, help='Current workflow state')
     from_transition_ids = fields.Many2many(
         'riverflow.workflow.transition',
         compute='_compute_from_transition_ids',
     )
+
+    current_workflow_name = fields.Char(
+        'Workflow name', related='workflow_state_id.workflow_id.name', store=True, index=True)
     workflow_state_name = fields.Char(
         'State name', related='workflow_state_id.name', store=True, index=True)
-    # todo: fields.Json
     transition_buttons_json = fields.Text(
-        'Actions', compute='_compute_transition_buttons_json', store=False)
+        'State', compute='_compute_transition_buttons_json', store=False)
+
+    # = self._name, made accessible for use in the filter-domain of the workflow dropdown
+    model = fields.Char(compute='_compute_model',
+                        help="Model on which the workflow runs.")
+
+    @api.model
+    def default_get(self, fields_list):
+        res = super(RiverflowWorkflowStateMixin, self).default_get(fields_list)
+        res['model'] = self._name
+        return res
+
+    @api.model
+    def _compute_model(self):
+        for record in self:
+            record.model = record._name
 
     @api.onchange('workflow_id', 'workflow_state_id')
     def on_change_workflow_id(self):
@@ -45,10 +65,17 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
             record_id = 0 if isinstance(
                 record.id, models.NewId) else int(record.id)
 
+            wf_state_text = record.current_workflow_name or ''
+            if record.workflow_state_name:
+                wf_state_text = ' | '.join(
+                    [wf_state_text, record.workflow_state_name])
+
+            # todo: store the icon so its not a lookup
+            icon = record.workflow_state_id.workflow_id.icon or ''
+
             workflow_transition_buttons = {
-                'text': record.workflow_state_name or '',
-                # todo: store the icon so its not a lookup
-                'workflow_icon': record.workflow_state_id.workflow_id.icon or '',
+                'text': wf_state_text,
+                'workflow_icon': icon,
                 'buttons': [],
                 'record_id': record_id,
             }
@@ -93,19 +120,17 @@ class RiverFlowWorkflowStateMixin(models.AbstractModel):
         # action_context['service_ids'] = self.ids # flow automatically as active_ids
         action_context['transition_id'] = transition_id
 
-        # the wizard form
+        # the wizard form (eg riverflow.view_service_transition_action_default_form)
         view = self.env.ref(transition.action_id.odoo_view)
         # the wizard model
-        res_model = view.model
+        res_model = view.model  # riverflow.service.wizard'
 
-        # This is a workflow transition action, for now just one base wizard
         action = {
             'type': 'ir.actions.act_window',
             # Dialog title
             'name': f'{self.name}: {transition.name}',
-            'res_model': res_model,  # 'riverflow.service.wizard',
+            'res_model': res_model,
             'view_mode': 'form',
-            # ' riverflow.view_service_transition_action_default_form'
             'views': [(view.id, "form")],
             'target': 'new',
             'context': action_context,

@@ -18,6 +18,7 @@
                     </div>
                     <group>
                         <group>
+                            <field name="model_id" />
                             <field name="description" />
                             <field name="icon" on_change="1" />
                             <field name="icon_name_html" readonly="1" />
@@ -35,6 +36,7 @@
         <field name="arch" type="xml">
             <tree>
                 <field name="active" column_invisible="True" />
+                <field name="model" />
                 <field name="icon_name_html" />
                 <field name="name" optional="hide" />
                 <field name="description" />

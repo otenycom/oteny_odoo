@@ -5,10 +5,10 @@ from odoo import models, fields, api
 from markupsafe import escape
 
 
-class RiverFlowWorkflowTransitionAction(models.Model):
+class RiverflowWorkflowTransitionAction(models.Model):
     _name = 'riverflow.workflow.transition.action'
     _description = 'Workflow transition action'
-    _order = "name"
+    _order = "model,name"
 
     name = fields.Char('Action name', required=True)
     icon_name_html = fields.Html(
@@ -17,6 +17,11 @@ class RiverFlowWorkflowTransitionAction(models.Model):
     active = fields.Boolean('Active', default=True)
     icon = fields.Char(
         'Icon', help="Font awesome icon e.g. fa-tasks. If blank, the relation action's icon will be used.")
+
+    model_id = fields.Many2one('ir.model', 'Applies to')
+    model = fields.Char('Related Model', related='model_id.model',
+                        index=True, store=True, readonly=True)
+
     odoo_view = fields.Text(
         'Odoo View', help="Odoo wizard form-view")
 
