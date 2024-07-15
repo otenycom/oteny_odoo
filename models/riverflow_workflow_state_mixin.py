@@ -55,9 +55,12 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
     @api.depends('workflow_state_id', 'workflow_state_id.from_transition_ids')
     def _compute_from_transition_ids(self):
         for s in self:
-            s.from_transition_ids = self.env['riverflow.workflow.transition'].search([
-                ('from_state_id', '=', s.workflow_state_id.id),
-            ])
+            if not s.workflow_state_id:
+                s.from_transition_ids = []
+            else:
+                s.from_transition_ids = self.env['riverflow.workflow.transition'].search([
+                    ('from_state_id', '=', s.workflow_state_id.id),
+                ])
 
     def _compute_transition_buttons_json(self):
         for record in self:
