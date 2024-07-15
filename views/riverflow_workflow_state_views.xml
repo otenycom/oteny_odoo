@@ -20,7 +20,7 @@
                         <group>
                             <field name="workflow_id" readonly="1" />
                             <field name="description" />
-                            <field name="isEndState" />
+                            <field name="is_end_state" />
                         </group>
                     </group>
                     <notebook>
