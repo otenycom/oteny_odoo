@@ -108,6 +108,10 @@ class Service(models.Model):
                 # Handle the case where conversion to int fails
                 service.root_id = service.id  # Or handle as appropriate
 
+    # def compute_display_name_suffix(self, service):
+    #     # override in inherited classes
+    #     return ''
+
     @api.depends('name', 'parent_id.display_name')
     def _compute_display_name(self):
         for service in self.sudo():
@@ -116,6 +120,9 @@ class Service(models.Model):
                     service.parent_id.display_name, service.name)
             else:
                 service.display_name = service.name
+
+            # service.display_name = ' | '.join(
+            #     [service.display_name, self.compute_display_name_suffix(service)])
 
     def _compute_indent_level(self):
         for service in self.sudo():
