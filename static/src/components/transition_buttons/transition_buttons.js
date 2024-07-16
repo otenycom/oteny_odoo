@@ -67,7 +67,7 @@ export class TransitionButtons extends Component {
 
     // Save the record in this component and all its parents
     async saveRecords() {
-        this.saveRecord(this.__owl__)
+        await this.saveRecord(this.__owl__)
     }
 
     async executeTransition(button) {
