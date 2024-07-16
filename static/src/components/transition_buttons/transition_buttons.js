@@ -55,12 +55,11 @@ export class TransitionButtons extends Component {
         return this.fieldValue(this.props).text;
     }
 
-    // // hack: find a better way to get the record id
-    // recordId() {
-    //     return this.fieldValue(this.props).record_id;
-    // }
-
     async executeTransition(button) {
+        // Needed to prevent data loss due to the dialog being closed
+        // as Cancelled or due to OK and .load() being called
+        await this.props.record.save();
+
         const action = {
             type: "object",
             resId: this.props.record.resId, //this.recordId(),

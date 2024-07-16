@@ -10,7 +10,7 @@ class Service(models.Model):
     _description = 'Service'
     _parent_name = 'parent_id'
     _parent_store = True
-    _rec_name = 'complete_name'
+    _rec_name = 'display_name'  # ensure default search is on display_name
     _order = "related_project_deadline,root_id,sequence,id"
 
     DATE_FORMAT = '%d-%b-%y'  # 01-Jan-21
@@ -30,8 +30,8 @@ class Service(models.Model):
                        required=True, tracking=True)
     indented_name = fields.Char(
         'Service', compute='_compute_indented_name', store=False, recursive=True)
-    complete_name = fields.Char(
-        'Complete Name', compute='_compute_complete_name', store=True, index='trigram', recursive=True)
+    display_name = fields.Char(
+        'Display Name', compute='_compute_display_name', store=True, index='trigram', recursive=True)
     company_id = fields.Many2one('res.company', string='Company', required=True, readonly=False,
                                  default=lambda self: self.env.company, tracking=True)
     active = fields.Boolean(
@@ -108,14 +108,14 @@ class Service(models.Model):
                 # Handle the case where conversion to int fails
                 service.root_id = service.id  # Or handle as appropriate
 
-    @api.depends('name', 'parent_id.complete_name')
-    def _compute_complete_name(self):
+    @api.depends('name', 'parent_id.display_name')
+    def _compute_display_name(self):
         for service in self.sudo():
             if service.parent_id:
-                service.complete_name = '%s / %s' % (
-                    service.parent_id.complete_name, service.name)
+                service.display_name = '%s / %s' % (
+                    service.parent_id.display_name, service.name)
             else:
-                service.complete_name = service.name
+                service.display_name = service.name
 
     def _compute_indent_level(self):
         for service in self.sudo():

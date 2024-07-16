@@ -43,7 +43,7 @@
                 <field name="sequence" widget="handle" />
                 <field name="workflow_id" />
                 <field name="name" optional="hide" />
-                <field name="complete_name" optional="hide" />
+                <field name="display_name" optional="hide" />
                 <field name="icon_name_html" optional="show" />
                 <field name="icon" optional="hide" />
                 <field name="from_state_id" />
