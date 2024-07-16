@@ -9,7 +9,7 @@ class RiverflowWorkflowTransition(models.Model):
     _name = 'riverflow.workflow.transition'
     _description = 'Workflow state transition'
     _order = "workflow_id,from_state_id,sequence,name,id"
-    _rec_name = 'complete_name'
+    _rec_name = 'display_name'
 
     name = fields.Char('Transition name', required=True)
     description = fields.Text('Description', required=False)
@@ -39,8 +39,8 @@ class RiverflowWorkflowTransition(models.Model):
         copy=True)
     action_context = fields.Text("Action context",
                                  help='Configuration values for the action screen', copy=True)
-    complete_name = fields.Char(
-        'Complete Name', compute='_compute_complete_name', store=True, index='trigram')
+    display_name = fields.Char(
+        'Display Name', compute='_compute_display_name', store=True, index='trigram')
 
     # email_template_id = fields.Many2one('mail.template', 'Email Template', copy=True, domain=[
     #                                     ('model', '=', 'riverflow.workflow')])
@@ -52,10 +52,10 @@ class RiverflowWorkflowTransition(models.Model):
             transition.workflow_id = transition.to_state_id.workflow_id
 
     @ api.depends('name', 'from_state_id', 'from_state_id')
-    def _compute_complete_name(self):
+    def _compute_display_name(self):
         for transition in self:
             fromState = transition.from_state_id.display_name if transition.from_state_id else 'Start'
-            transition.complete_name = f"{transition.name}: {fromState}->{transition.to_state_id.display_name}"
+            transition.display_name = f"{transition.name}: {fromState}->{transition.to_state_id.display_name}"
 
     @ api.depends('icon', "name", "action_id.icon")
     def _compute_icon_name_html(self):
