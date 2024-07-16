@@ -56,10 +56,10 @@
                                 <tree string="Services" edit="true">
                                     <field name="timing" optional="show" />
                                     <field name="deadline_formatted" optional="hide" />
-                                    <field name="name" optional="hide" />
-                                    <field name="display_name" optional="show" />
                                     <field name="transition_buttons_json"
                                         widget="transition_buttons" />
+                                    <field name="name" optional="hide" />
+                                    <field name="display_name" optional="show" />
                                     <field name="latest_messages" />
                                 </tree>
                             </field>
