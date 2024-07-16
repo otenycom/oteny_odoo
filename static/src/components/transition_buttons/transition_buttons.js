@@ -55,10 +55,25 @@ export class TransitionButtons extends Component {
         return this.fieldValue(this.props).text;
     }
 
+    async saveRecord(node) {
+        if (node.props.record) {
+            await node.props.record.save();
+        }
+        // If we are in a Page on a notebook (tab page), we need to also save the parent record
+        // as that may also have changes that need to be saved
+        if (node.parent)
+            await this.saveRecord(node.parent);
+    }
+
+    // Save the record in this component and all its parents
+    async saveRecords() {
+        this.saveRecord(this.__owl__)
+    }
+
     async executeTransition(button) {
         // Needed to prevent data loss due to the dialog being closed
         // as Cancelled or due to OK and .load() being called
-        await this.props.record.save();
+        await this.saveRecords();
 
         const action = {
             type: "object",
