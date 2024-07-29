@@ -38,9 +38,13 @@
         <field name="name">riverflow.workflow.transition.tree</field>
         <field name="model">riverflow.workflow.transition</field>
         <field name="arch" type="xml">
+            <!-- Workaround: no sequence drag widget, as side effect  is that the transitions 
+                 can be moved around beyond the from_state that they belong to.
+                 Setting <tree default_order="workflow_id,from_state_id,sequence,name,id"> does not fix this.
+            -->
             <tree string="Transitions">
                 <field name="active" column_invisible="True" />
-                <field name="sequence" widget="handle" />
+                <!-- <field name="sequence" widget="handle" /> -->
                 <field name="workflow_id" />
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
