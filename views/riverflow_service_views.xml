@@ -54,12 +54,12 @@
                         <page string="Child Services" name="services">
                             <field name="child_ids">
                                 <tree string="Services" edit="true">
-                                    <field name="timing" optional="show" />
-                                    <field name="deadline_formatted" optional="hide" />
-                                    <field name="transition_buttons_json"
-                                        widget="transition_buttons" />
                                     <field name="name" optional="hide" />
                                     <field name="display_name" optional="show" />
+                                    <field name="transition_buttons_json"
+                                        widget="transition_buttons" />
+                                    <field name="timing" optional="show" />
+                                    <field name="deadline_formatted" optional="hide" />
                                     <field name="latest_messages" />
                                 </tree>
                             </field>
@@ -81,9 +81,9 @@
         <field name='arch' type='xml'>
             <tree string='Services' edit="true">
                 <field name="active" column_invisible="True" />
+                <field name='indented_name' />
                 <field name='timing' optional="show" />
                 <field name="deadline_formatted" optional="hide" />
-                <field name='indented_name' />
                 <field name='transition_buttons_json' widget="transition_buttons" />
                 <field name="display_name" optional="hide" />
                 <field name='latest_messages' />
@@ -143,9 +143,11 @@
         </field>
     </record>
 
-    <!-- Menu Item Definitions -->
+    <!-- Menu Item Definitions 
+    https://www.svgrepo.com/svg/455931/service-bell?edit=true 
+    -->
     <menuitem id='riverflow.service_root' name='Services'
-        web_icon='riverflow,static/description/icon.png'>
+        web_icon='riverflow,static/description/service-bell-256.png'>
         <menuitem id="riverflow.services_menu" name="Services" action="riverflow.service_action">
 
         </menuitem>
