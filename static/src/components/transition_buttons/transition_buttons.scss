@@ -14,3 +14,11 @@
 .button-separator-group button {
     margin-right: 0px;
 }
+
+.riverflow_end_state {
+    color: map-get($o-theme-text-colors, 'success');
+}
+
+.riverflow_pending_state {
+    color: map-get($o-theme-text-colors, 'danger');
+}

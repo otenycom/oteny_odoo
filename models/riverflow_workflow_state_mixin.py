@@ -64,10 +64,6 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
 
     def _compute_transition_buttons_json(self):
         for record in self:
-            # needs int, for json serialization
-            record_id = 0 if isinstance(
-                record.id, models.NewId) else int(record.id)
-
             wf_state_text = record.current_workflow_name or ''
             if record.workflow_state_name:
                 wf_state_text = ' | '.join(
@@ -75,12 +71,13 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_state_id.workflow_id.icon or ''
+            is_end_state = record.workflow_state_id.is_end_state == True
 
             workflow_transition_buttons = {
                 'text': wf_state_text,
                 'workflow_icon': icon,
+                'is_end_state': is_end_state,
                 'buttons': [],
-                'record_id': record_id,
             }
 
             transition_ids = record.from_transition_ids

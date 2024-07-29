@@ -3,10 +3,10 @@
     <t t-name="riverflow.TransitionButtons">
         <t t-if="this.iconClass()">
             <span t-att-class="this.iconClass()"></span>
-            <!-- workaround: &nbsp; does not work -->
+            <!-- workaround: &nbsp; does not work in xml -->
             <span>&#160;</span>
         </t>
-        <span t-esc="this.text()" />
+        <span t-att-class="this.stateClass()" t-esc="this.text()" />
         <div class="button-separator-group">
             <t t-set="buttons" t-value="this.buttonDefs()" />
             <t t-foreach="buttons" t-as="button" t-key="button.index">
