@@ -55,6 +55,12 @@ export class TransitionButtons extends Component {
         return this.fieldValue(this.props).text;
     }
 
+    stateClass() {
+        if (this.fieldValue(this.props).is_end_state)
+            return "riverflow_end_state";
+        else return "riverflow_pending_state";
+    }
+
     async saveRecord(node) {
         if (node.props.record) {
             await node.props.record.save();
