@@ -8,3 +8,4 @@ from . import riverflow_workflow_transition_action
 from . import riverflow_workflow_state_mixin
 from . import riverflow_service
 from . import riverflow_service_tag
+from . import riverflow_workflow_transition_mixin

@@ -1,8 +1,9 @@
 from odoo import _, fields, models, api
 import json
+from odoo.addons.riverflow.models.riverflow_workflow_transition_mixin import RiverflowWorkflowTransitionMixin  # type: ignore
 
 
-class RiverflowWorkflowStateMixin(models.AbstractModel):
+class RiverflowWorkflowStateMixin(RiverflowWorkflowTransitionMixin):
     _name = "riverflow.workflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
@@ -77,6 +78,8 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
                 'text': wf_state_text,
                 'workflow_icon': icon,
                 'is_end_state': is_end_state,
+                # this is not a start transition, so we can refresh the underlying list/form view
+                'reload_on_close': True,
                 'buttons': [],
             }
 
@@ -108,45 +111,4 @@ class RiverflowWorkflowStateMixin(models.AbstractModel):
         transition_id = self.env.context.get('transition_id')
         transition = self.env['riverflow.workflow.transition'].browse(
             transition_id)
-
-        if transition.action_context:
-            action_context = json.loads(transition.action_context) or {}
-        else:
-            action_context = {}
-        # action_context.update({
-        #     'name_readonly': False,
-        #     'latest_messages_invisible': False,
-        #     'days_relative_to_project_invisible': False,
-        # })
-        # action_context['service_ids'] = self.ids # flow automatically as active_ids
-        action_context['transition_id'] = transition_id
-
-        # copy each current field value to the action context, so that we
-        # can display them in the wizard
-        if (len(self.ids) == 1):
-            defaults_context = {}
-            for field_name in self._fields:
-                field = self._fields[field_name]
-                value = getattr(self, field_name)
-                converted_value = field.convert_to_cache(value, self)
-                defaults_context['default_' + field_name] = converted_value
-
-            action_context.update(defaults_context)
-
-        # the wizard form (eg riverflow.view_service_transition_action_default_form)
-        view = self.env.ref(transition.action_id.odoo_view)
-        # the wizard model
-        res_model = view.model  # riverflow.service.wizard'
-
-        action = {
-            'type': 'ir.actions.act_window',
-            # Dialog title
-            'name': f'{self.name}: {transition.name}',
-            'res_model': res_model,
-            'view_mode': 'form',
-            'views': [(view.id, "form")],
-            'target': 'new',
-            'context': action_context,
-        }
-
-        return action
+        return self._prepare_transition_action(transition)

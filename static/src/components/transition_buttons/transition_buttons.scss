@@ -4,15 +4,13 @@
     border-width: 0px;
 }
 
-// add the separator content between each <button> element but not the last one.
-.button-separator-group button:not(:last-child)::after {
-    content: '\00A0|';
-    margin-left: 0px;
-    margin-right: 5px;
-}
-
 .button-separator-group button {
     margin-right: 0px;
+}
+
+.button-separator {
+    margin-left: 0px;
+    margin-right: 4px;
 }
 
 .riverflow_end_state {
