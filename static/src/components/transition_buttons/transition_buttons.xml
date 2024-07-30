@@ -17,6 +17,9 @@
                     type="object">
                     <span t-esc="button.caption" />
                 </button>
+                <t t-if="button.index &lt; buttons.length - 1">
+                    <span class="button-separator">&#160;|</span>
+                </t>
             </t>
         </div>
     </t>

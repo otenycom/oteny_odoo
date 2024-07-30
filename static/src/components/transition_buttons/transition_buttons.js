@@ -55,6 +55,10 @@ export class TransitionButtons extends Component {
         return this.fieldValue(this.props).text;
     }
 
+    reloadOnClose() {
+        return this.fieldValue(this.props).reload_on_close == true;
+    }
+
     stateClass() {
         if (this.fieldValue(this.props).is_end_state)
             return "riverflow_end_state";
@@ -88,7 +92,11 @@ export class TransitionButtons extends Component {
             resModel: this.props.record.resModel,
             context: button.context,
             onClose: async () => {
-                await this.props.record.model.root.load();;
+                //await this.model.load();
+                // We don't reload the root-data source for start transitions, as that's the start transition wizard's
+                // and its closed by the time we need to reload the data
+                if (this.reloadOnClose())
+                    await this.props.record.model.root.load();;
             }
         }
         await this.action.doActionButton(action);
