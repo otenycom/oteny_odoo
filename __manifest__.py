@@ -14,6 +14,7 @@
     'data': [
         'security/ir.model.access.csv',
         'wizards/riverflow_service_wizard_view.xml',
+        'wizards/riverflow_start_service_view.xml',
         'views/riverflow_service_views.xml',
         'views/riverflow_workflow_views.xml',
         'views/riverflow_workflow_state_views.xml',
