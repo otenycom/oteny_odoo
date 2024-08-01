@@ -147,7 +147,7 @@
     https://www.svgrepo.com/svg/455931/service-bell?edit=true 
     -->
     <menuitem id='riverflow.service_root' name='Services'
-        web_icon='riverflow,static/description/service-bell-256.png'>
+        web_icon='riverflow,static/description/icon.png'>
         <menuitem id="riverflow.services_menu" name="Services" action="riverflow.service_action">
 
         </menuitem>
