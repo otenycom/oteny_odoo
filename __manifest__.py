@@ -17,7 +17,7 @@
         "wizards/riverflow_start_service_view.xml",
         "views/riverflow_service_views.xml",
         "views/riverflow_workflow_views.xml",
-        "views/riverflow_workflow_state_views.xml",
+        "views/riverflow_state_views.xml",
         "views/riverflow_transition_views.xml",
         "views/riverflow_transition_action_views.xml",
         "data/transition_action_data.xml",

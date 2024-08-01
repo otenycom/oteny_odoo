@@ -22,7 +22,7 @@ class ServiceWizard(models.TransientModel):
             transition = wizard.transition_id
             for service in wizard.service_ids:
                 # todo: check if the transition is allowed and if the service is in the right state
-                service.workflow_state_id = transition.to_state_id
+                service.state_id = transition.to_state_id
 
                 if not self.env.context.get("name_readonly"):
                     service.name = self.name

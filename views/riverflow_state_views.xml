@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id="riverflow.workflow_state_view_form" model="ir.ui.view">
-        <field name="name">riverflow.workflow.state.form</field>
-        <field name="model">riverflow.workflow.state</field>
+    <record id="riverflow.state_view_form" model="ir.ui.view">
+        <field name="name">riverflow.state.form</field>
+        <field name="model">riverflow.state</field>
         <field name="priority">1</field>
         <field name="arch" type="xml">
             <form>
@@ -48,9 +48,9 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_state_view_tree" model="ir.ui.view">
-        <field name="name">riverflow.workflow.state.tree</field>
-        <field name="model">riverflow.workflow.state</field>
+    <record id="riverflow.state_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.state.tree</field>
+        <field name="model">riverflow.state</field>
         <field name="arch" type="xml">
             <tree string="Workflows" default_order="workflow_id,sequence,name,id">
                 <field name="active" column_invisible="True" />
@@ -63,9 +63,9 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_state_action" model="ir.actions.act_window">
+    <record id="riverflow.state_action" model="ir.actions.act_window">
         <field name="name">Workflow States</field>
-        <field name="res_model">riverflow.workflow.state</field>
+        <field name="res_model">riverflow.state</field>
         <field name="view_mode">tree,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -74,8 +74,8 @@
         </field>
     </record>
 
-    <menuitem id="riverflow.services_menu_configuration_workflow_states"
+    <menuitem id="riverflow.services_menu_configuration_states"
         parent="riverflow.services_configuration_menu" sequence="30"
-        action="riverflow.workflow_state_action" />
+        action="riverflow.state_action" />
 
 </odoo>

@@ -6,7 +6,7 @@ import re
 class Service(models.Model):
     _name = "riverflow.service"
     # no activities 'mail.activity.mixin', we use workflow buttons instead
-    _inherit = ["mail.thread", "riverflow.workflow.state.mixin"]
+    _inherit = ["mail.thread", "riverflow.state.mixin"]
     _description = "Service"
     _parent_name = "parent_id"
     _parent_store = True

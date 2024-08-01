@@ -23,7 +23,7 @@ class RiverflowTransition(models.Model):
     )
     active = fields.Boolean("Active", default=True)
     from_state_id = fields.Many2one(
-        "riverflow.workflow.state",
+        "riverflow.state",
         "From",
         help="Leave blank to define a start-transition",
         copy=True,
@@ -33,7 +33,7 @@ class RiverflowTransition(models.Model):
         domain="[('workflow_id', '=', workflow_id)]",
     )
     to_state_id = fields.Many2one(
-        "riverflow.workflow.state",
+        "riverflow.state",
         "To",
         copy=True,
         index=True,

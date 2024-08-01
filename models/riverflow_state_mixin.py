@@ -4,7 +4,7 @@ from odoo.addons.riverflow.models.riverflow_transition_mixin import RiverflowTra
 
 
 class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
-    _name = "riverflow.workflow.state.mixin"
+    _name = "riverflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
     # initial workflow
@@ -15,8 +15,8 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         tracking=True,
     )
 
-    workflow_state_id = fields.Many2one(
-        "riverflow.workflow.state",
+    state_id = fields.Many2one(
+        "riverflow.state",
         "Workflow State",
         tracking=True,
         index=True,
@@ -29,12 +29,12 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     current_workflow_name = fields.Char(
         "Workflow name",
-        related="workflow_state_id.workflow_id.name",
+        related="state_id.workflow_id.name",
         store=True,
         index=True,
     )
-    workflow_state_name = fields.Char(
-        "State name", related="workflow_state_id.name", store=True, index=True
+    state_name = fields.Char(
+        "State name", related="state_id.name", store=True, index=True
     )
     transition_buttons_json = fields.Text(
         "State", compute="_compute_transition_buttons_json", store=False
@@ -56,11 +56,11 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         for record in self:
             record.model = record._name
 
-    @api.onchange("workflow_id", "workflow_state_id")
+    @api.onchange("workflow_id", "state_id")
     def on_change_workflow_id(self):
         for s in self:
-            if s.workflow_id and not s.workflow_state_id:
-                startStates = self.env["riverflow.workflow.state"].search(
+            if s.workflow_id and not s.state_id:
+                startStates = self.env["riverflow.state"].search(
                     [
                         ("workflow_id", "=", s.workflow_id.id),
                     ],
@@ -68,17 +68,17 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     order="sequence,name,id",
                 )
                 if len(startStates):
-                    s.workflow_state_id = startStates[0]
+                    s.state_id = startStates[0]
 
-    @api.depends("workflow_state_id", "workflow_state_id.from_transition_ids")
+    @api.depends("state_id", "state_id.from_transition_ids")
     def _compute_from_transition_ids(self):
         for s in self:
-            if not s.workflow_state_id:
+            if not s.state_id:
                 s.from_transition_ids = []
             else:
                 s.from_transition_ids = self.env["riverflow.transition"].search(
                     [
-                        ("from_state_id", "=", s.workflow_state_id.id),
+                        ("from_state_id", "=", s.state_id.id),
                     ],
                     order="sequence,id",
                 )
@@ -86,12 +86,12 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def _compute_transition_buttons_json(self):
         for record in self:
             wf_state_text = record.current_workflow_name or ""
-            if record.workflow_state_name:
-                wf_state_text = " | ".join([wf_state_text, record.workflow_state_name])
+            if record.state_name:
+                wf_state_text = " | ".join([wf_state_text, record.state_name])
 
             # todo: store the icon so its not a lookup
-            icon = record.workflow_state_id.workflow_id.icon or ""
-            is_end_state = record.workflow_state_id.is_end_state == True
+            icon = record.state_id.workflow_id.icon or ""
+            is_end_state = record.state_id.is_end_state == True
 
             transition_buttons = {
                 "text": wf_state_text,
