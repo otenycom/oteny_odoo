@@ -4,7 +4,7 @@ import json
 
 class RiverflowWorkflowTransitionMixin(models.AbstractModel):
     _name = "riverflow.workflow.transition.mixin"
-    _description = "Mixin to support workflow transitions"
+    _description = "Base class with function to create an action to open a transition action wizard"
 
     def _prepare_transition_action(self, transition):
         action_context = {}
@@ -22,7 +22,7 @@ class RiverflowWorkflowTransitionMixin(models.AbstractModel):
 
         isWizard = self._transient
         if not isWizard and len(self.ids) == 1:
-            # Actual entity, we copy the record fields to defaults for the transition action wizard
+            # Actual entity, such as a Service; we copy the record's fields to defaults for the transition action wizard
             defaults_context = {}
             for field_name in self._fields:
                 field = self._fields[field_name]
