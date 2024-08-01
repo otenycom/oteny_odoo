@@ -7,3 +7,4 @@ riverflow.access_riverflow_state,access_riverflow_state,riverflow.model_riverflo
 riverflow.access_riverflow_state_mixin,access_riverflow_state_mixin,riverflow.model_riverflow_state_mixin,base.group_user,1,1,1,1
 riverflow.access_riverflow_transition,access_riverflow_transition,riverflow.model_riverflow_transition,base.group_user,1,1,1,1
 riverflow.access_riverflow_transition_action,access_riverflow_transition_action,riverflow.model_riverflow_transition_action,base.group_user,1,1,1,1
+riverflow.access_riverflow_start_service,access_riverflow_start_service,riverflow.model_riverflow_start_service,base.group_user,1,1,1,1

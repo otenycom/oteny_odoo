@@ -5,14 +5,12 @@
         <field name="arch" type="xml">
             <form string="Update Service">
                 <group>
-                    <field name="service_ids" invisible="1" />
+                    <field name="record_ids" invisible="1" />
                     <field name="transition_id" invisible="1" />
                     <field name="transition_description" readonly="1" invisible="not transition_description" />
-                    <field name="new_remark" required="0"
-                        invisible="context.get('new_remark_invisible', False)" widget="html" />
-                    <field name="name" readonly="context.get('name_readonly', True)" invisible="1" required="1" />
-                    <field name="days_relative_to_project"
-                        invisible="context.get('days_relative_to_project_invisible')" />
+                    <field name="name" required="1" />
+                    <field name="new_remark" required="0" invisible="context.get('new_remark_invisible', False)" widget="html" />
+                    <field name="days_relative_to_project" invisible="context.get('days_relative_to_project_invisible')" />
                 </group>
                 <footer>
                     <button string="OK" type="object" name="action_save" class="btn-primary"
