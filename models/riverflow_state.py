@@ -5,7 +5,7 @@ from odoo import models, fields, api
 
 
 class RiverflowWorkflowState(models.Model):
-    _name = "riverflow.workflow.state"
+    _name = "riverflow.state"
     _description = "Workflow state"
     _order = "workflow_id,sequence,name,id"
     _rec_name = "display_name"

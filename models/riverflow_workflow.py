@@ -24,8 +24,8 @@ class RiverflowWorkflow(models.Model):
 
     active = fields.Boolean("Active", default=True)
 
-    workflow_state_ids = fields.One2many(
-        "riverflow.workflow.state", "workflow_id", string="Workflow states"
+    state_ids = fields.One2many(
+        "riverflow.state", "workflow_id", string="Workflow states"
     )
 
     workflow_start_transition_ids = fields.One2many(

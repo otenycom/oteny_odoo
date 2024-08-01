@@ -50,7 +50,7 @@
                                 icon="fa-plus">
                                 Add State</button>
                         </div> -->
-                            <field name="workflow_state_ids" default_order="sequence,name,id">
+                            <field name="state_ids" default_order="sequence,name,id">
                                 <tree editable="bottom" create="1" delete="1" multi_edit="1" open_form_view="True">
                                     <field name="active" column_invisible="True" />
                                     <field name="sequence" widget="handle" />
