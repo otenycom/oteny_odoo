@@ -4,101 +4,145 @@ import re
 
 
 class Service(models.Model):
-    _name = 'riverflow.service'
+    _name = "riverflow.service"
     # no activities 'mail.activity.mixin', we use workflow buttons instead
-    _inherit = ['mail.thread', 'riverflow.workflow.state.mixin']
-    _description = 'Service'
-    _parent_name = 'parent_id'
+    _inherit = ["mail.thread", "riverflow.workflow.state.mixin"]
+    _description = "Service"
+    _parent_name = "parent_id"
     _parent_store = True
-    _rec_name = 'display_name'  # ensure default search is on display_name
+    _rec_name = "display_name"  # ensure default search is on display_name
     _order = "related_project_deadline,root_id,sequence,id"
 
-    DATE_FORMAT = '%d-%b-%y'  # 01-Jan-21
+    DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
 
     # auto calculated by Odoo in the form of parent_id/parent_id/self_id/
     # see def _get_domain_locations(self)
-    parent_path = fields.Char(index='btree', unaccent=False)
+    parent_path = fields.Char(index="btree", unaccent=False)
     indent_level = fields.Integer(
-        'Indent level', compute='_compute_indent_level', store=False, recursive=True)
+        "Indent level", compute="_compute_indent_level", store=False, recursive=True
+    )
     parent_id = fields.Many2one(
-        'riverflow.service', string='Parent Service', index=True, ondelete='cascade')
+        "riverflow.service", string="Parent Service", index=True, ondelete="cascade"
+    )
     child_ids = fields.One2many(
-        'riverflow.service', 'parent_id', string='Child Services')
+        "riverflow.service", "parent_id", string="Child Services"
+    )
     root_id = fields.Many2one(
-        'riverflow.service', compute='_compute_root_id', store=True, recursive=True)
-    name = fields.Char('Service Name', index='trigram',
-                       required=True, tracking=True)
+        "riverflow.service", compute="_compute_root_id", store=True, recursive=True
+    )
+    name = fields.Char("Service Name", index="trigram", required=True, tracking=True)
     indented_name = fields.Char(
-        'Service', compute='_compute_indented_name', store=False, recursive=True)
+        "Service", compute="_compute_indented_name", store=False, recursive=True
+    )
     display_name = fields.Char(
-        'Display Name', compute='_compute_display_name', store=True, index='trigram', recursive=True)
-    company_id = fields.Many2one('res.company', string='Company', required=True, readonly=False,
-                                 default=lambda self: self.env.company, tracking=True)
+        "Display Name",
+        compute="_compute_display_name",
+        store=True,
+        index="trigram",
+        recursive=True,
+    )
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        required=True,
+        readonly=False,
+        default=lambda self: self.env.company,
+        tracking=True,
+    )
     active = fields.Boolean(
-        default=True, help="Set active to false to archive the service", tracking=True)
+        default=True, help="Set active to false to archive the service", tracking=True
+    )
     days_relative_to_project = fields.Integer(
-        'Day',
+        "Day",
         help="Number of days before or after the project deadline for this service to be completed, e.g. -1 for the day before",
-        required=False, tracking=True)
+        required=False,
+        tracking=True,
+    )
     project_deadline = fields.Date(
-        'Project deadline', help="The services are timed relative to this deadline", tracking=True)
+        "Project deadline",
+        help="The services are timed relative to this deadline",
+        tracking=True,
+    )
     related_project_deadline = fields.Date(
-        'Related deadline',
-        related='root_id.project_deadline',
+        "Related deadline",
+        related="root_id.project_deadline",
         help="Deadline of the project at the root of the tree",
         store=True,
         index=True,
-        recursive=True)
+        recursive=True,
+    )
     deadline = fields.Date(
-        'Deadline Date', compute='_compute_deadline',
+        "Deadline Date",
+        compute="_compute_deadline",
         help="Deadline based on the project deadline and the day of this service",
-        store=True, index=True, recursive=True)
+        store=True,
+        index=True,
+        recursive=True,
+    )
     deadline_formatted = fields.Char(
-        'Deadline', compute='_compute_deadline_formatted', store=False)
+        "Deadline", compute="_compute_deadline_formatted", store=False
+    )
     timing = fields.Char(
-        'Timing', compute='_compute_timing', store=False, recursive=True)
-    sequence = fields.Integer(default=1, compute='_compute_sequence',
-                              index=True, required=True, store=True, recursive=True)
+        "Timing", compute="_compute_timing", store=False, recursive=True
+    )
+    sequence = fields.Integer(
+        default=1,
+        compute="_compute_sequence",
+        index=True,
+        required=True,
+        store=True,
+        recursive=True,
+    )
     latest_messages = fields.Html(
-        string='Latest Messages',
-        compute='_compute_latest_messages',
+        string="Latest Messages",
+        compute="_compute_latest_messages",
         store=True,
         tracking=False,
-        index='trigram'
+        index="trigram",
     )
-    tag_ids = fields.Many2many('riverflow.service.tag', 'riverflow_service_ship_tag_rel',
-                               'service_tag_id', 'tag_id', 'Tags', tracking=True, copy=True)
+    tag_ids = fields.Many2many(
+        "riverflow.service.tag",
+        "riverflow_service_ship_tag_rel",
+        "service_tag_id",
+        "tag_id",
+        "Tags",
+        tracking=True,
+        copy=True,
+    )
 
-    @api.depends('message_ids.body')
+    @api.depends("message_ids.body")
     def _compute_latest_messages(self):
         for record in self:
             # this finds any edited body in the orm cache, which a direct
             # sql query would not find
-            messages = self.env['mail.message'].search(
-                [('res_id', '=', record.id), ('model', '=', self._name),
-                 ('message_type', '=', 'comment')],
-                order='date DESC',
-                limit=2
+            messages = self.env["mail.message"].search(
+                [
+                    ("res_id", "=", record.id),
+                    ("model", "=", self._name),
+                    ("message_type", "=", "comment"),
+                ],
+                order="date DESC",
+                limit=2,
             )
             # Concatenate the bodies of the latest two messages, marking them up as safe HTML
             # todo: add a css class to the <p> tag, as the default css has too big a margin
             # p {   margin-top: 0;    margin-bottom: 1rem; }
-            latest_messages = ''
+            latest_messages = ""
             for message in messages:
                 # trim the Markup wrapper class from the body value
                 body = str(message.body)
                 # Replace <p> tags with <p> tags that have inline styles
-                body = body.replace('<p>', '<p style="margin-bottom: 0rem;">')
+                body = body.replace("<p>", '<p style="margin-bottom: 0rem;">')
                 latest_messages += body
 
             record.latest_messages = latest_messages
 
-    @api.depends('parent_path')
+    @api.depends("parent_path")
     def _compute_root_id(self):
         for service in self.sudo():
             try:
                 if service.parent_path:
-                    path_parts = service.parent_path.split('/')
+                    path_parts = service.parent_path.split("/")
                     # Assign the first part of the path as the root_id
                     service.root_id = int(path_parts[0])
                 else:
@@ -112,12 +156,14 @@ class Service(models.Model):
     #     # override in inherited classes
     #     return ''
 
-    @api.depends('name', 'parent_id.display_name')
+    @api.depends("name", "parent_id.display_name")
     def _compute_display_name(self):
         for service in self.sudo():
             if service.parent_id:
-                service.display_name = '%s / %s' % (
-                    service.parent_id.display_name, service.name)
+                service.display_name = "%s / %s" % (
+                    service.parent_id.display_name,
+                    service.name,
+                )
             else:
                 service.display_name = service.name
 
@@ -128,20 +174,25 @@ class Service(models.Model):
         for service in self.sudo():
             if service.parent_path:
                 # Count the number of slashes in parent_path, subtract 1 for indent level
-                service.indent_level = service.parent_path.count('/') - 1
+                service.indent_level = service.parent_path.count("/") - 1
             else:
                 service.indent_level = 0
 
     def _compute_indented_name(self):
         for service in self.sudo():
-            service.indented_name = '%s%s' % (
-                '\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}' * service.indent_level, service.name)
+            service.indented_name = "%s%s" % (
+                "\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}"
+                * service.indent_level,
+                service.name,
+            )
 
     def isProject(record):
         # root level services are projects
         return not record.parent_id
 
-    @api.depends('project_deadline', 'related_project_deadline', 'days_relative_to_project')
+    @api.depends(
+        "project_deadline", "related_project_deadline", "days_relative_to_project"
+    )
     def _compute_deadline(self):
         for service in self:
             if Service.isProject(service):
@@ -151,39 +202,41 @@ class Service(models.Model):
                 # todo: add checkresults to the service and check for this case
                 service.deadline = False
             else:
-                service.deadline = service.related_project_deadline + \
-                    timedelta(days=service.days_relative_to_project)
+                service.deadline = service.related_project_deadline + timedelta(
+                    days=service.days_relative_to_project
+                )
 
     def _compute_timing(self):
         for service in self:
             if Service.isProject(service):
-                if (service.deadline == False):
-                    service.timing = ''
+                if service.deadline == False:
+                    service.timing = ""
                 else:
                     service.timing = service.project_deadline.strftime(
-                        Service.DATE_FORMAT)
+                        Service.DATE_FORMAT
+                    )
             else:
                 relative_days = f"{service.days_relative_to_project:+02d}d"
-                if (service.deadline == False):
+                if service.deadline == False:
                     service.timing = relative_days
                 else:
                     today = fields.Date.today()  # odoo way to get the current date
-                    days_remaining = (service.deadline -
-                                      fields.Date.today()).days
+                    days_remaining = (service.deadline - fields.Date.today()).days
 
                     service.timing = f"{relative_days} = {service.deadline.strftime(Service.DATE_FORMAT)} | in {days_remaining:02d}d"
 
     def _compute_deadline_formatted(self):
         for service in self:
-            if (service.deadline == False):
-                service.deadline_formatted = ''
+            if service.deadline == False:
+                service.deadline_formatted = ""
             else:
                 service.deadline_formatted = service.deadline.strftime(
-                    Service.DATE_FORMAT)
+                    Service.DATE_FORMAT
+                )
 
     # no need for depends on 'root_id', 'parent_id.sequence',
     # because upon parent_id change, the sequence is recalculated for the entire tree up to the root
-    @api.depends('parent_id', 'days_relative_to_project', 'name')
+    @api.depends("parent_id", "days_relative_to_project", "name")
     def _compute_sequence(self):
         if isinstance(self.id, models.NewId):
             self.sequence = 0
@@ -192,7 +245,7 @@ class Service(models.Model):
         # Retrieve all service records with the same root_id as the current record
         # we only use the sequence field of child nodes, the root nodes are sorted
         # by project_deadline.
-        services = self.sudo().search([('root_id', '=', self.root_id.id)])
+        services = self.sudo().search([("root_id", "=", self.root_id.id)])
 
         # Dictionary to hold the tree structure of services
         service_tree = {}
@@ -221,7 +274,8 @@ class Service(models.Model):
             # Check for circular references in the hierarchy
             if service_id in visited:
                 raise ValueError(
-                    f"Circular reference detected in service hierarchy involving service ID {service_id}")
+                    f"Circular reference detected in service hierarchy involving service ID {service_id}"
+                )
 
             # Add the current service ID to the set of visited nodes
             visited.add(service_id)
@@ -244,8 +298,8 @@ class Service(models.Model):
                     key=lambda child_id: (
                         service_dict[child_id].days_relative_to_project,
                         service_dict[child_id].name,
-                        service_dict[child_id].id
-                    )
+                        service_dict[child_id].id,
+                    ),
                 )
                 for child_id in sorted_children_ids:
                     # Use a copy of the visited set to avoid modifying it during recursion
@@ -257,11 +311,12 @@ class Service(models.Model):
 
             # Sort the root services by `project_deadline`, then `name`, then `id`
             root_ids = sorted(
-                service_tree[None], key=lambda root_id: (
+                service_tree[None],
+                key=lambda root_id: (
                     service_dict[root_id].project_deadline,
                     service_dict[root_id].name,
                     service_dict[root_id].id,
-                )
+                ),
             )
             for root_id in root_ids:
                 assign_sequence(root_id, visited)

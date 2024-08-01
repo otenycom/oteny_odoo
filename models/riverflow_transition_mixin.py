@@ -2,8 +2,8 @@ from odoo import models, api
 import json
 
 
-class RiverflowWorkflowTransitionMixin(models.AbstractModel):
-    _name = "riverflow.workflow.transition.mixin"
+class RiverflowTransitionMixin(models.AbstractModel):
+    _name = "riverflow.transition.mixin"
     _description = "Base class with function to create an action to open a transition action wizard"
 
     def _prepare_transition_action(self, transition):
@@ -13,22 +13,22 @@ class RiverflowWorkflowTransitionMixin(models.AbstractModel):
                 action_context = json.loads(transition.action_context) or {}
             except json.JSONDecodeError as e:
                 raise json.JSONDecodeError(
-                    f"Bad action_context '{transition.action_context}', for transition '{transition.name}': {str(e)}", # fmt: off
+                    f"Bad action_context '{transition.action_context}', for transition '{transition.name}': {str(e)}",
                     transition.action_context,
-                    e.pos
+                    e.pos,
                 ) from e
 
-        action_context['transition_id'] = transition.id
+        action_context["transition_id"] = transition.id
 
         isWizard = self._transient
         if not isWizard and len(self.ids) == 1:
-            # Actual entity, such as a Service; we copy the record's fields to defaults for the transition action wizard
+            # Actual entity, such as a Service. We copy the record's fields to defaults for the transition action wizard
             defaults_context = {}
             for field_name in self._fields:
                 field = self._fields[field_name]
                 value = getattr(self, field_name)
                 converted_value = field.convert_to_cache(value, self)
-                defaults_context['default_' + field_name] = converted_value
+                defaults_context["default_" + field_name] = converted_value
 
             action_context.update(defaults_context)
 
@@ -36,13 +36,13 @@ class RiverflowWorkflowTransitionMixin(models.AbstractModel):
         res_model = view.model
 
         action = {
-            'type': 'ir.actions.act_window',
-            'name': f'{transition.name}',
-            'res_model': res_model,
-            'view_mode': 'form',
-            'views': [(view.id, "form")],
-            'target': 'new',
-            'context': action_context,
+            "type": "ir.actions.act_window",
+            "name": f"{transition.name}",
+            "res_model": res_model,
+            "view_mode": "form",
+            "views": [(view.id, "form")],
+            "target": "new",
+            "context": action_context,
         }
 
         return action
