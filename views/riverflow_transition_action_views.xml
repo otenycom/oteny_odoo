@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id="riverflow.workflow_transition_action_view_form" model="ir.ui.view">
-        <field name="name">riverflow.workflow.transition.action.form</field>
-        <field name="model">riverflow.workflow.transition.action</field>
+    <record id="riverflow.transition_action_view_form" model="ir.ui.view">
+        <field name="name">riverflow.transition.action.form</field>
+        <field name="model">riverflow.transition.action</field>
         <field name="priority">1</field>
         <field name="arch" type="xml">
             <form>
@@ -30,9 +30,9 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_transition_action_view_tree" model="ir.ui.view">
-        <field name="name">riverflow.workflow.transition.action.tree</field>
-        <field name="model">riverflow.workflow.transition.action</field>
+    <record id="riverflow.transition_action_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.transition.action.tree</field>
+        <field name="model">riverflow.transition.action</field>
         <field name="arch" type="xml">
             <tree>
                 <field name="active" column_invisible="True" />
@@ -44,9 +44,9 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_transition_action_action" model="ir.actions.act_window">
+    <record id="riverflow.transition_action_action" model="ir.actions.act_window">
         <field name="name">Transition Actions</field>
-        <field name="res_model">riverflow.workflow.transition.action</field>
+        <field name="res_model">riverflow.transition.action</field>
         <field name="view_mode">tree,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -57,6 +57,6 @@
 
     <menuitem id="riverflow.services_menu_configuration_transition_actions"
         parent="riverflow.services_configuration_menu" sequence="50"
-        action="riverflow.workflow_transition_action_action" />
+        action="riverflow.transition_action_action" />
 
 </odoo>

@@ -7,16 +7,15 @@ from odoo.exceptions import UserError, ValidationError
 
 class ServiceWizard(models.TransientModel):
     # todo: make this a generic transition wizard, make service wizard a subclass
-    _name = 'riverflow.service.wizard'
-    _description = 'Service Wizard'
+    _name = "riverflow.service.wizard"
+    _description = "Service Wizard"
 
-    name = fields.Char('Service Name')
-    service_ids = fields.Many2many('riverflow.service')
-    new_remark = fields.Html('New Remark')
-    days_relative_to_project = fields.Integer('Days relative to project')
-    transition_id = fields.Many2one(
-        'riverflow.workflow.transition', 'Transition')
-    transition_description = fields.Text('Description')
+    name = fields.Char("Service Name")
+    service_ids = fields.Many2many("riverflow.service")
+    new_remark = fields.Html("New Remark")
+    days_relative_to_project = fields.Integer("Days relative to project")
+    transition_id = fields.Many2one("riverflow.transition", "Transition")
+    transition_description = fields.Text("Description")
 
     def action_save(self):
         for wizard in self:
@@ -25,23 +24,25 @@ class ServiceWizard(models.TransientModel):
                 # todo: check if the transition is allowed and if the service is in the right state
                 service.workflow_state_id = transition.to_state_id
 
-                if not self.env.context.get('name_readonly'):
+                if not self.env.context.get("name_readonly"):
                     service.name = self.name
-                if not self.env.context.get('new_remark_invisible'):
+                if not self.env.context.get("new_remark_invisible"):
                     if self.new_remark:
                         # post a message in the mail_message model linked to the service
-                        self.env['mail.message'].create({
-                            'body': self.new_remark,
-                            'model': 'riverflow.service',
-                            'res_id': service.id,
-                            'message_type': 'comment',
-                            # 'Note' subtype
-                            'subtype_id': self.env.ref('mail.mt_note').id,
-                        })
-                if not self.env.context.get('days_relative_to_project_invisible'):
+                        self.env["mail.message"].create(
+                            {
+                                "body": self.new_remark,
+                                "model": "riverflow.service",
+                                "res_id": service.id,
+                                "message_type": "comment",
+                                # 'Note' subtype
+                                "subtype_id": self.env.ref("mail.mt_note").id,
+                            }
+                        )
+                if not self.env.context.get("days_relative_to_project_invisible"):
                     service.days_relative_to_project = self.days_relative_to_project
 
-        action = {'type': 'ir.actions.act_window_close'}
+        action = {"type": "ir.actions.act_window_close"}
         return action
 
     @api.model
@@ -49,24 +50,25 @@ class ServiceWizard(models.TransientModel):
         defaultValues = super().default_get(form_fields)
 
         # Get the default service_ids from the action.context
-        service_ids = self.env.context.get('active_ids')
+        service_ids = self.env.context.get("active_ids")
         if not service_ids:
-            raise UserError(_('No records selected'))
+            raise UserError(_("No records selected"))
 
-        services = self.env['riverflow.service'].browse(service_ids)
+        services = self.env["riverflow.service"].browse(service_ids)
         # 6: replace the list of ids in the Many2many field
-        defaultValues['service_ids'] = [(6, 0, services.ids)]
+        defaultValues["service_ids"] = [(6, 0, services.ids)]
 
-        if (len(services) == 1):
+        if len(services) == 1:
             service = services[0]
-            defaultValues['name'] = service.name
-            defaultValues['new_remark'] = ''
-            defaultValues['days_relative_to_project'] = service['days_relative_to_project']
+            defaultValues["name"] = service.name
+            defaultValues["new_remark"] = ""
+            defaultValues["days_relative_to_project"] = service[
+                "days_relative_to_project"
+            ]
 
-        transition_id = self.env.context.get('transition_id')
-        defaultValues['transition_id'] = transition_id
-        transition = self.env['riverflow.workflow.transition'].browse(
-            transition_id)
-        defaultValues['transition_description'] = transition.description
+        transition_id = self.env.context.get("transition_id")
+        defaultValues["transition_id"] = transition_id
+        transition = self.env["riverflow.transition"].browse(transition_id)
+        defaultValues["transition_description"] = transition.description
 
         return defaultValues

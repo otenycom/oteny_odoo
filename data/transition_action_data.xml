@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <odoo>
     <data noupdate="0">
-        <record id="riverflow.transition_action_default" model="riverflow.workflow.transition.action">
+        <record id="riverflow.transition_action_default" model="riverflow.transition.action">
             <field name="name">Default Transition Action</field>
             <field name="description">Optionally prompts for new remark</field>
             <field name="odoo_view">riverflow.view_service_transition_action_default_form</field>
