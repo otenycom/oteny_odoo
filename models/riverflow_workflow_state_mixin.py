@@ -61,7 +61,7 @@ class RiverflowWorkflowStateMixin(RiverflowWorkflowTransitionMixin):
             else:
                 s.from_transition_ids = self.env['riverflow.workflow.transition'].search([
                     ('from_state_id', '=', s.workflow_state_id.id),
-                ])
+                ], order='sequence,id')
 
     def _compute_transition_buttons_json(self):
         for record in self:
