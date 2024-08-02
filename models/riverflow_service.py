@@ -10,7 +10,7 @@ class Service(models.Model):
     _description = "Service"
     _parent_name = "parent_id"
     _parent_store = True
-    _rec_name = "display_name"  # ensure default search is on display_name
+    _rec_name = "display_name"  # ensure default search is on display_name.
     # Services are a recursive tree, and in order to show the tree correctly in the flat
     # list view, we assign a sequence numer for all child services. For performance, we don't
     # set the sequence field to all services on any service update, so the root services are not sorted
