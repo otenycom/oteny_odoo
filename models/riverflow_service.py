@@ -11,7 +11,11 @@ class Service(models.Model):
     _parent_name = "parent_id"
     _parent_store = True
     _rec_name = "display_name"  # ensure default search is on display_name
-    _order = "related_project_deadline,root_id,sequence,id"
+    # Services are a recursive tree, and in order to show the tree correctly in the flat
+    # list view, we assign a sequence numer for all child services. For performance, we don't
+    # set the sequence field to all services on any service update, so the root services are not sorted
+    # by sequence, but by name.
+    _order = "root_name,sequence"
 
     DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
 
@@ -29,6 +33,14 @@ class Service(models.Model):
     )
     root_id = fields.Many2one(
         "riverflow.service", compute="_compute_root_id", store=True, recursive=True
+    )
+    root_name = fields.Char(
+        "Root service name",
+        compute="_compute_root_name",
+        help="Name of the root node, for sorting the list of services",
+        store=True,
+        index=True,
+        recursive=True,
     )
     name = fields.Char("Service Name", index="trigram", required=True, tracking=True)
     indented_name = fields.Char(
@@ -58,6 +70,18 @@ class Service(models.Model):
         required=False,
         tracking=True,
     )
+
+    use_project_deadline_from = fields.Selection(
+        [
+            ("self", "Self"),
+            ("root", "Root Service"),
+        ],
+        string="Project Deadline From",
+        required=True,
+        tracking=True,
+        default="self",
+    )
+
     project_deadline = fields.Date(
         "Project deadline",
         help="The services are timed relative to this deadline",
@@ -67,7 +91,7 @@ class Service(models.Model):
         "Related deadline",
         related="root_id.project_deadline",
         help="Deadline of the project at the root of the tree",
-        store=True,
+        store=False,
         index=True,
         recursive=True,
     )
@@ -109,6 +133,14 @@ class Service(models.Model):
         tracking=True,
         copy=True,
     )
+
+    @api.depends("root_id", "root_id.name", "name")
+    def _compute_root_name(self):
+        for service in self:
+            if service.root_id.id == service.id:
+                service.root_name = service.name
+            else:
+                service.root_name = service.root_id.name
 
     @api.depends("message_ids.body")
     def _compute_latest_messages(self):
@@ -186,44 +218,59 @@ class Service(models.Model):
                 service.name,
             )
 
-    def isProject(record):
-        # root level services are projects
-        return not record.parent_id
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            self._set_project_deadline(vals)
+        records = super().create(vals_list)
+        return records
 
-    @api.depends(
-        "project_deadline", "related_project_deadline", "days_relative_to_project"
-    )
+    def write(self, vals):
+        self._set_project_deadline(vals)
+        result = super().write(vals)
+        return result
+
+    def _set_project_deadline(self, vals):
+        use_project_deadline_from = (
+            vals.get("use_project_deadline_from") or self.use_project_deadline_from
+        )
+        if use_project_deadline_from == "self":
+            project_deadline = vals.get("project_deadline") or self.project_deadline
+            vals["project_deadline"] = project_deadline
+        elif use_project_deadline_from == "root":
+            vals["project_deadline"] = self.root_id.project_deadline
+
+    @api.depends("project_deadline", "days_relative_to_project")
     def _compute_deadline(self):
         for service in self:
-            if Service.isProject(service):
-                service.deadline = service.project_deadline
-                service.days_relative_to_project = False
-            elif not service.related_project_deadline:
-                # todo: add checkresults to the service and check for this case
+            vals = {}
+            self._set_project_deadline(vals)
+            project_deadline = vals.get("project_deadline")
+            if not project_deadline:
                 service.deadline = False
             else:
-                service.deadline = service.related_project_deadline + timedelta(
+                service.deadline = project_deadline + timedelta(
                     days=service.days_relative_to_project
                 )
 
+    @api.depends("deadline")
     def _compute_timing(self):
         for service in self:
-            if Service.isProject(service):
-                if service.deadline == False:
-                    service.timing = ""
-                else:
-                    service.timing = service.project_deadline.strftime(
-                        Service.DATE_FORMAT
-                    )
-            else:
-                relative_days = f"{service.days_relative_to_project:+02d}d"
-                if service.deadline == False:
-                    service.timing = relative_days
-                else:
-                    today = fields.Date.today()  # odoo way to get the current date
-                    days_remaining = (service.deadline - fields.Date.today()).days
+            if service.deadline == False:
+                service.timing = ""
+                continue
 
-                    service.timing = f"{relative_days} = {service.deadline.strftime(Service.DATE_FORMAT)} | in {days_remaining:02d}d"
+            relative_days = ""
+            if (
+                self.use_project_deadline_from != "self"
+                and service.days_relative_to_project
+            ):
+                relative_days = f"{service.days_relative_to_project:+02d}d = "
+
+            today = fields.Date.today()  # odoo way to get the current date
+            days_remaining = (service.deadline - fields.Date.today()).days
+
+            service.timing = f"{relative_days}{service.deadline.strftime(Service.DATE_FORMAT)} | in {days_remaining:02d}d"
 
     def _compute_deadline_formatted(self):
         for service in self:
@@ -236,10 +283,23 @@ class Service(models.Model):
 
     # no need for depends on 'root_id', 'parent_id.sequence',
     # because upon parent_id change, the sequence is recalculated for the entire tree up to the root
-    @api.depends("parent_id", "days_relative_to_project", "name")
+    # TODO: figureout why an endless recompute is happening when we add depends project_deadline or deadline
+    @api.depends(
+        "parent_id",
+        "days_relative_to_project",
+        "name",
+        "use_project_deadline_from",
+        "root_id",
+        "root_id.name",
+    )
     def _compute_sequence(self):
+        if not self.parent_id:
+            # root services are sorted by name, and to make identically named services
+            # sort consistently, we use the id as a tiebreaker
+            self.sequence = self.id
+            return
+
         if isinstance(self.id, models.NewId):
-            self.sequence = 0
             return
 
         # Retrieve all service records with the same root_id as the current record
@@ -292,11 +352,11 @@ class Service(models.Model):
             # If the current service has children, sort them by `days_relative_to_project` and recursively assign sequences to them
             if service_id in service_tree:
                 children_ids = service_tree[service_id]
-                # Sort children based on `days_relative_to_project`, then `name`, then `id`
+                # Sort children based on `deadline`, then `name`, then `id`
                 sorted_children_ids = sorted(
                     children_ids,
                     key=lambda child_id: (
-                        service_dict[child_id].days_relative_to_project,
+                        service_dict[child_id].deadline,
                         service_dict[child_id].name,
                         service_dict[child_id].id,
                     ),
@@ -309,11 +369,10 @@ class Service(models.Model):
         if None in service_tree:
             visited = set()
 
-            # Sort the root services by `project_deadline`, then `name`, then `id`
+            # Sort the root services by `name`, then `id`
             root_ids = sorted(
                 service_tree[None],
                 key=lambda root_id: (
-                    service_dict[root_id].project_deadline,
                     service_dict[root_id].name,
                     service_dict[root_id].id,
                 ),
@@ -340,6 +399,7 @@ class Service(models.Model):
             "context": {
                 "default_parent_id": self.id,
                 "default_company_id": self.company_id.id,
+                "default_use_project_deadline_from": "root",
             },
             "target": "new",
         }

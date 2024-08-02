@@ -27,11 +27,12 @@
                             <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
                             <field name="tag_ids" widget="many2many_tags"
                                 options="{'color_field': 'color', 'no_create_edit': True}" />
-                            <field name="project_deadline" invisible="parent_id" on_change="1" />
-                            <field name="related_project_deadline" invisible="not parent_id" />
-                            <field name="days_relative_to_project" invisible="not parent_id"
+                            <field name="use_project_deadline_from" required="1" />
+                            <field name="project_deadline" invisible="use_project_deadline_from != 'self'" on_change="1" />
+                            <field name="related_project_deadline" invisible="use_project_deadline_from != 'root'" />
+                            <field name="days_relative_to_project" invisible="use_project_deadline_from == 'self'"
                                 on_change="1" />
-                            <field name="timing" invisible="not parent_id" />
+                            <field name="timing" />
                             <field name='transition_buttons_json' widget="transition_buttons" />
                             <field name="latest_messages" invisible="1" />
                             <field name="state_name" invisible="1" on_change="1" />
