@@ -20,17 +20,22 @@ class RiverflowTransitionMixin(models.AbstractModel):
 
         action_context["transition_id"] = transition.id
 
+        defaults_context = {}
         isWizard = self._transient
-        if not isWizard and len(self.ids) == 1:
+        if isWizard:
+            # start transition selection wizard; carry over the default field values passed in by the caller
+            for key, value in self.env.context.items():
+                if key.startswith("default_"):
+                    defaults_context[key] = value
+        elif len(self.ids) == 1:
             # Actual entity, such as a Service. We copy the record's fields to defaults for the transition action wizard
-            defaults_context = {}
             for field_name in self._fields:
                 field = self._fields[field_name]
                 value = getattr(self, field_name)
                 converted_value = field.convert_to_cache(value, self)
                 defaults_context["default_" + field_name] = converted_value
 
-            action_context.update(defaults_context)
+        action_context.update(defaults_context)
 
         view = self.env.ref(transition.action_id.odoo_view)
         res_model = view.model

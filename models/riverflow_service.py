@@ -160,7 +160,7 @@ class Service(models.Model):
     def _compute_display_name(self):
         for service in self.sudo():
             if service.parent_id:
-                service.display_name = "%s / %s" % (
+                service.display_name = "%s | %s" % (
                     service.parent_id.display_name,
                     service.name,
                 )
@@ -320,3 +320,26 @@ class Service(models.Model):
             )
             for root_id in root_ids:
                 assign_sequence(root_id, visited)
+
+    def action_view_parent_service(self):
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "riverflow.service",
+            "res_id": self.parent_id.id,
+            "view_mode": "form",
+            "target": "current",
+        }
+
+    def add_child_service(self):
+        # Select a start transition for a new service
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Add Service to: " + self.name,
+            "view_mode": "form",
+            "res_model": "riverflow.start.service",
+            "context": {
+                "default_parent_id": self.id,
+                "default_company_id": self.company_id.id,
+            },
+            "target": "new",
+        }

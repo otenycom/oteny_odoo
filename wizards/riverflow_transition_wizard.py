@@ -10,7 +10,7 @@ class TransitionWizard(models.AbstractModel):
 
     transition_id = fields.Many2one("riverflow.transition", "Transition")
     transition_description = fields.Text("Description")
-    record_ids = fields.Many2many(_workflow_model)
+    # record_ids = fields.Many2many(_workflow_model)
 
     def action_save(self):
         for wizard in self:
