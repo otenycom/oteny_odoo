@@ -14,7 +14,19 @@ class ServiceWizard(models.TransientModel):
 
     # from service record
     name = fields.Char("Service Name")
-    days_relative_to_project = fields.Integer("Days relative to project")
+    use_project_deadline_from = fields.Selection(
+        [
+            ("self", "Self"),
+            ("root", "Root Service"),
+        ],
+        string="Project Deadline From",
+        required=False,
+    )
+    project_deadline = fields.Date(
+        "Project deadline",
+        help="The services are timed relative to this deadline",
+    )
+    days_relative_to_project = fields.Integer("Days relative to project-deadline")
 
     # new chatter remark (todo: move to the base class)
     new_remark = fields.Html("New Remark")
@@ -25,6 +37,8 @@ class ServiceWizard(models.TransientModel):
 
         if not self.env.context.get("days_relative_to_project_invisible"):
             service.days_relative_to_project = self.days_relative_to_project
+
+        service.use_project_deadline_from = self.use_project_deadline_from
 
     def create_related_records(self, service):
         if not self.env.context.get("new_remark_invisible") and self.new_remark:
