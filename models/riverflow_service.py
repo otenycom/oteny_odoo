@@ -293,11 +293,11 @@ class Service(models.Model):
         "root_id.name",
     )
     def _compute_sequence(self):
-        if not self.parent_id:
-            # root services are sorted by name, and to make identically named services
-            # sort consistently, we use the id as a tiebreaker
-            self.sequence = self.id
-            return
+        # if not self.parent_id:
+        #     # root services are sorted by name, and to make identically named services
+        #     # sort consistently, we use the id as a tiebreaker
+        #     self.sequence = self.id
+        #     return
 
         if isinstance(self.id, models.NewId):
             return
