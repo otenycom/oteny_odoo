@@ -8,7 +8,7 @@ from odoo.addons.riverflow.models.riverflow_transition_mixin import (
 
 class StartWizard(RiverflowTransitionMixin):
     _name = "riverflow.start.wizard"
-    _description = "Base Start Transition Wizard"
+    _description = "Base Start Transition selection Wizard"
 
     def _default_start_transition_ids(self):
         domain = [("from_state_id", "=", False), ("model", "=", self._workflow_model)]
@@ -33,6 +33,13 @@ class StartWizard(RiverflowTransitionMixin):
                 "buttons": [],
             }
 
+            # copy over all default values from fields, such as the the default parent FK,
+            # from env.context into context for the new action
+            defaults_context = {}
+            for key, value in self.env.context.items():
+                if key.startswith("default_"):
+                    defaults_context[key] = value
+
             for index, transition in enumerate(wizard.start_transition_ids):
                 transition_id = (
                     transition.id.origin
@@ -40,15 +47,15 @@ class StartWizard(RiverflowTransitionMixin):
                     else int(transition.id)
                 )
 
+                button_context = defaults_context.copy()
+                button_context["transition_id"] = transition_id
                 transition_buttons["buttons"].append(
                     {
                         "index": index,
                         "caption": transition.name,
                         "help": transition.description,
                         "action": "action_start_transition",
-                        "context": {
-                            "transition_id": transition_id,
-                        },
+                        "context": button_context,
                     }
                 )
 
