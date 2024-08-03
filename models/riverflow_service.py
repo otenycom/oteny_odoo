@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from datetime import timedelta, date
+import json
 import re
 
 
@@ -135,6 +136,12 @@ class Service(models.Model):
     timing = fields.Char(
         "Timing", compute="_compute_timing", store=False, recursive=True
     )
+    timing_widget_json = fields.Char(
+        "Timing Widget JSON",
+        compute="_compute_timing_widget_json",
+        store=False,
+        recursive=True,
+    )
     sequence = fields.Integer(
         default=1,
         compute="_compute_sequence",
@@ -253,35 +260,75 @@ class Service(models.Model):
         # this is a flag method specifying the user is allowed to store the project_deadline
         pass
 
-    @api.depends("project_deadline", "days_relative_to_project")
+    @api.depends(
+        "project_deadline", "days_relative_to_project", "use_project_deadline_from"
+    )
     def _compute_deadline(self):
         for service in self:
             project_deadline = self.project_deadline
             if not project_deadline:
                 service.deadline = False
             else:
-                service.deadline = project_deadline + timedelta(
-                    days=service.days_relative_to_project
-                )
+                if self.use_project_deadline_from == "self":
+                    service.deadline = project_deadline
+                else:
+                    service.deadline = project_deadline + timedelta(
+                        days=service.days_relative_to_project
+                    )
 
     @api.depends("deadline")
-    def _compute_timing(self):
+    def _compute_timing_widget_json(self):
         for service in self:
-            if service.deadline == False:
-                service.timing = ""
+            if not service.deadline:
+                service.timing_widget_json = False
                 continue
 
             relative_days = ""
             if (
-                self.use_project_deadline_from != "self"
+                service.use_project_deadline_from != "self"
                 and service.days_relative_to_project
             ):
-                relative_days = f"{service.days_relative_to_project:+02d}d = "
 
-            today = fields.Date.today()  # odoo way to get the current date
-            days_remaining = (service.deadline - fields.Date.today()).days
+                relative_days = f"{self.relative_to_project_days_prefix()}{service.days_relative_to_project:+02d}d = "
 
-            service.timing = f"{relative_days}{service.deadline.strftime(Service.DATE_FORMAT)} | in {days_remaining:02d}d"
+            today = fields.Date.today()
+            days_remaining = (service.deadline - today).days
+            date_str = service.deadline.strftime(Service.DATE_FORMAT)
+
+            is_past = service.deadline < today
+            is_today = service.deadline == today
+
+            service.timing_widget_json = json.dumps(
+                {
+                    "relative_days": relative_days,
+                    "date": date_str,
+                    "days_remaining": days_remaining,
+                    "is_past": is_past,
+                    "is_today": is_today,
+                }
+            )
+
+    def relative_to_project_days_prefix(self):
+        if self.use_project_deadline_from == "self":
+            return ""
+        elif self.use_project_deadline_from == "root":
+            return self.root_name
+        else:
+            return "(unknown use_project_deadline_from value)"
+
+    @api.depends("timing_widget_json")
+    def _compute_timing(self):
+        for service in self:
+            if not service.timing_widget_json:
+                service.timing = ""
+                continue
+
+            timing_data = json.loads(service.timing_widget_json)
+            relative_days = timing_data.get("relative_days", "")
+            days_remaining = timing_data.get("days_remaining", 0)
+            date_str = timing_data.get("date", "")
+
+            service.timing = f"{relative_days}{date_str} | in {days_remaining:02d}d"
 
     @api.depends("deadline")
     def _compute_deadline_formatted(self):

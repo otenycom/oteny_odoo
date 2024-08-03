@@ -1,0 +1,7 @@
+.riverflow_is_past {
+    color: map-get($o-theme-text-colors, 'danger');
+}
+
+.riverflow_is_today {
+    color: map-get($o-theme-text-colors, 'warning');
+}
