@@ -141,7 +141,7 @@ class ServiceDeadlineTestCase(TransactionCase):
             grandchild_3_2_2,
         )
 
-    def test_service_tree_structure(self):
+    def test_service_tree_deadlines(self):
         (
             root_1,
             root_2,
@@ -394,26 +394,25 @@ class ServiceDeadlineTestCase(TransactionCase):
         # |         Grandchild 3.2.2   | 2024-03-03 |
         # |     Child 3.1              | 2024-02-29 |
 
-        # Change the use_project_deadline_from for Child 3.2
         child_3_2.write(
             {"use_project_deadline_from": "self", "project_deadline": False}
         )
-
-        # Verify the deadline for Child 3.2
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
         # refetch
         child_3_2 = self.env["riverflow.service"].search(
             [("name", "=", f"{self.TEST_PREFIX}Child 3.2")]
         )
-
-        # Verify the deadline for Child 3.2
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
     def test_create_service_with_deadline(self):
-        # top level service, with its own deadline
+        # Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
         services = self.env["riverflow.service"].create(
-            {"name": "Service 1", "project_deadline": "2024-01-01"},
+            {
+                "name": "Service 1",
+                "project_deadline": "2024-01-02",
+                "days_relative_to_project": -1,
+            },
         )
 
         self.assertRecordValues(
@@ -421,16 +420,10 @@ class ServiceDeadlineTestCase(TransactionCase):
             [
                 {
                     "name": "Service 1",
-                    "project_deadline": date(2024, 1, 1),
-                    "days_relative_to_project": 0,
+                    "use_project_deadline_from": "self",
+                    "project_deadline": date(2024, 1, 2),
+                    "days_relative_to_project": -1,
                     "deadline": date(2024, 1, 1),
                 }
             ],
         )
-
-    # todo tests:
-    # 1. Test service tree structure: Ensure children are listed in the correct order
-    # 2. Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
-    # 3. Test deadline derivation from root: Verify deadline is set correctly when use_project_deadline_from is 'root'
-    # 4. Test deadline derivation from log_entry_start: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_start'
-    # 5. Test deadline derivation from log_entry_end: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_end'
