@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from datetime import timedelta
+from datetime import timedelta, date
 import re
 
 
@@ -31,6 +31,26 @@ class Service(models.Model):
     child_ids = fields.One2many(
         "riverflow.service", "parent_id", string="Child Services"
     )
+    descendant_ids = fields.One2many(
+        "riverflow.service",
+        "parent_id",
+        string="Descendant Services",
+        compute="_compute_descendant_ids",
+        store=False,
+    )
+
+    @api.depends("child_ids")
+    def _compute_descendant_ids(self):
+        for service in self:
+            descendants = self.env["riverflow.service"].search(
+                [
+                    ("parent_path", "like", f"{service.parent_path}%"),
+                    ("id", "!=", service.id),
+                ],
+                order="root_name, sequence",
+            )
+            service.descendant_ids = descendants
+
     root_id = fields.Many2one(
         "riverflow.service", compute="_compute_root_id", store=True, recursive=True
     )
@@ -82,10 +102,15 @@ class Service(models.Model):
         default="self",
     )
 
+    # This field is either set manually (if use_project_deadline_from is set to 'self')
+    # or it is set to the project_deadline of the root service, or some other related entity in an inherited class
     project_deadline = fields.Date(
         "Project deadline",
         help="The services are timed relative to this deadline",
         tracking=True,
+        compute="_compute_project_deadline",
+        inverse="_inverse_project_deadline",
+        store=True,
     )
     related_project_deadline = fields.Date(
         "Related deadline",
@@ -98,7 +123,7 @@ class Service(models.Model):
     deadline = fields.Date(
         "Deadline Date",
         compute="_compute_deadline",
-        help="Deadline based on the project deadline and the day of this service",
+        help="Deadline based on the project-deadline and the relative day of this service",
         store=True,
         index=True,
         recursive=True,
@@ -218,34 +243,23 @@ class Service(models.Model):
                 service.name,
             )
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        for vals in vals_list:
-            self._set_project_deadline(vals)
-        records = super().create(vals_list)
-        return records
+    @api.depends("use_project_deadline_from", "root_id.project_deadline")
+    def _compute_project_deadline(self):
+        for service in self:
+            use_project_deadline_from = service.use_project_deadline_from
+            if use_project_deadline_from == "self":
+                service.project_deadline = service.project_deadline
+            elif use_project_deadline_from == "root":
+                service.project_deadline = service.root_id.project_deadline
 
-    def write(self, vals):
-        self._set_project_deadline(vals)
-        result = super().write(vals)
-        return result
-
-    def _set_project_deadline(self, vals):
-        use_project_deadline_from = (
-            vals.get("use_project_deadline_from") or self.use_project_deadline_from
-        )
-        if use_project_deadline_from == "self":
-            project_deadline = vals.get("project_deadline") or self.project_deadline
-            vals["project_deadline"] = project_deadline
-        elif use_project_deadline_from == "root":
-            vals["project_deadline"] = self.root_id.project_deadline
+    def _inverse_project_deadline(self):
+        # this is a flag method specifying the user is allowed to store the project_deadline
+        pass
 
     @api.depends("project_deadline", "days_relative_to_project")
     def _compute_deadline(self):
         for service in self:
-            vals = {}
-            self._set_project_deadline(vals)
-            project_deadline = vals.get("project_deadline")
+            project_deadline = self.project_deadline
             if not project_deadline:
                 service.deadline = False
             else:
@@ -281,6 +295,14 @@ class Service(models.Model):
                     Service.DATE_FORMAT
                 )
 
+    def print_compute_sequence_counter(self):
+        if not hasattr(self.__class__, "_compute_sequence_counter"):
+            self.__class__._compute_sequence_counter = 0
+        print(
+            f"_compute_sequence counter: {self.__class__._compute_sequence_counter} - {self.display_name}"
+        )
+        self.__class__._compute_sequence_counter += 1
+
     # no need for depends on 'root_id', 'parent_id.sequence',
     # because upon parent_id change, the sequence is recalculated for the entire tree up to the root
     # TODO: figureout why an endless recompute is happening when we add depends project_deadline or deadline
@@ -298,6 +320,8 @@ class Service(models.Model):
         #     # sort consistently, we use the id as a tiebreaker
         #     self.sequence = self.id
         #     return
+
+        self.print_compute_sequence_counter()
 
         if isinstance(self.id, models.NewId):
             return
@@ -356,7 +380,7 @@ class Service(models.Model):
                 sorted_children_ids = sorted(
                     children_ids,
                     key=lambda child_id: (
-                        service_dict[child_id].deadline,
+                        service_dict[child_id].deadline or date.max,
                         service_dict[child_id].name,
                         service_dict[child_id].id,
                     ),

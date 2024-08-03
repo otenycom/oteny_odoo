@@ -365,12 +365,50 @@ class ServiceDeadlineTestCase(TransactionCase):
             "Children of Child 3.2 are not in the correct order",
         )
 
-    # todo tests:
-    # 1. Test service tree structure: Ensure children are listed in the correct order
-    # 2. Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
-    # 3. Test deadline derivation from root: Verify deadline is set correctly when use_project_deadline_from is 'root'
-    # 4. Test deadline derivation from log_entry_start: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_start'
-    # 5. Test deadline derivation from log_entry_end: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_end'
+    def test_change_use_project_deadline_from(self):
+        (
+            root_1,
+            root_2,
+            root_3,
+            child_2_1,
+            child_2_2,
+            child_2_3,
+            child_3_1,
+            child_3_2,
+            child_3_3,
+            grandchild_3_2_1,
+            grandchild_3_2_2,
+        ) = self.create_service_tree()
+
+        # | indented_name              | deadline   |
+        # |----------------------------|------------|
+        # | Root Service 1             | 2024-01-01 |
+        # | Root Service 2             | 2024-02-01 |
+        # |     Child 2.3              | 2024-01-29 |
+        # |     Child 2.2              | 2024-01-30 |
+        # |     Child 2.1              | 2024-01-31 |
+        # | Root Service 3             | 2024-03-01 |
+        # |     Child 3.3              | 2024-02-27 |
+        # |     Child 3.2              | 2024-02-28 |
+        # |         Grandchild 3.2.1   | 2024-03-02 |
+        # |         Grandchild 3.2.2   | 2024-03-03 |
+        # |     Child 3.1              | 2024-02-29 |
+
+        # Change the use_project_deadline_from for Child 3.2
+        child_3_2.write(
+            {"use_project_deadline_from": "self", "project_deadline": False}
+        )
+
+        # Verify the deadline for Child 3.2
+        self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
+
+        # refetch
+        child_3_2 = self.env["riverflow.service"].search(
+            [("name", "=", f"{self.TEST_PREFIX}Child 3.2")]
+        )
+
+        # Verify the deadline for Child 3.2
+        self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
     def test_create_service_with_deadline(self):
         # top level service, with its own deadline
@@ -389,3 +427,10 @@ class ServiceDeadlineTestCase(TransactionCase):
                 }
             ],
         )
+
+    # todo tests:
+    # 1. Test service tree structure: Ensure children are listed in the correct order
+    # 2. Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
+    # 3. Test deadline derivation from root: Verify deadline is set correctly when use_project_deadline_from is 'root'
+    # 4. Test deadline derivation from log_entry_start: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_start'
+    # 5. Test deadline derivation from log_entry_end: Verify deadline is set correctly when use_project_deadline_from is 'log_entry_end'
