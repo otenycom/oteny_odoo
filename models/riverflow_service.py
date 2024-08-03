@@ -44,7 +44,7 @@ class Service(models.Model):
         for service in self:
             descendants = self.env["riverflow.service"].search(
                 [
-                    ("parent_path", "like", f"{service.parent_path}%"),
+                    ("parent_path", "=like", f"{service.parent_path}%"),
                     ("id", "!=", service.id),
                 ],
                 order="root_name, sequence",
@@ -111,6 +111,7 @@ class Service(models.Model):
         compute="_compute_project_deadline",
         inverse="_inverse_project_deadline",
         store=True,
+        recursive=True,
     )
     related_project_deadline = fields.Date(
         "Related deadline",
@@ -209,10 +210,6 @@ class Service(models.Model):
                 # Handle the case where conversion to int fails
                 service.root_id = service.id  # Or handle as appropriate
 
-    # def compute_display_name_suffix(self, service):
-    #     # override in inherited classes
-    #     return ''
-
     @api.depends("name", "parent_id.display_name")
     def _compute_display_name(self):
         for service in self.sudo():
@@ -286,6 +283,7 @@ class Service(models.Model):
 
             service.timing = f"{relative_days}{service.deadline.strftime(Service.DATE_FORMAT)} | in {days_remaining:02d}d"
 
+    @api.depends("deadline")
     def _compute_deadline_formatted(self):
         for service in self:
             if service.deadline == False:
@@ -303,32 +301,20 @@ class Service(models.Model):
         )
         self.__class__._compute_sequence_counter += 1
 
-    # no need for depends on 'root_id', 'parent_id.sequence',
-    # because upon parent_id change, the sequence is recalculated for the entire tree up to the root
-    # TODO: figureout why an endless recompute is happening when we add depends project_deadline or deadline
     @api.depends(
         "parent_id",
-        "days_relative_to_project",
-        "name",
-        "use_project_deadline_from",
-        "root_id",
-        "root_id.name",
+        "root_name",
+        "deadline",
     )
     def _compute_sequence(self):
-        # if not self.parent_id:
-        #     # root services are sorted by name, and to make identically named services
-        #     # sort consistently, we use the id as a tiebreaker
-        #     self.sequence = self.id
-        #     return
-
         self.print_compute_sequence_counter()
 
         if isinstance(self.id, models.NewId):
             return
 
         # Retrieve all service records with the same root_id as the current record
-        # we only use the sequence field of child nodes, the root nodes are sorted
-        # by project_deadline.
+        # we only set the sequence field of child nodes, the root nodes are sorted
+        # by name; as it would become very slow to sequence the entire list of services
         services = self.sudo().search([("root_id", "=", self.root_id.id)])
 
         # Dictionary to hold the tree structure of services
@@ -373,7 +359,6 @@ class Service(models.Model):
             # Increment the sequence number for the next service
             sequence += 1
 
-            # If the current service has children, sort them by `days_relative_to_project` and recursively assign sequences to them
             if service_id in service_tree:
                 children_ids = service_tree[service_id]
                 # Sort children based on `deadline`, then `name`, then `id`
@@ -386,8 +371,7 @@ class Service(models.Model):
                     ),
                 )
                 for child_id in sorted_children_ids:
-                    # Use a copy of the visited set to avoid modifying it during recursion
-                    assign_sequence(child_id, visited.copy())
+                    assign_sequence(child_id, visited)
 
         # Assign sequence numbers to root services (those without parents) and their children
         if None in service_tree:
