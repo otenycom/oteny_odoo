@@ -116,7 +116,7 @@ class Service(models.Model):
     )
     related_project_deadline = fields.Date(
         "Related deadline",
-        related="root_id.project_deadline",
+        related="root_id.deadline",
         help="Deadline of the project at the root of the tree",
         store=False,
         index=True,
@@ -247,14 +247,14 @@ class Service(models.Model):
                 service.name,
             )
 
-    @api.depends("use_project_deadline_from", "root_id.project_deadline")
+    @api.depends("use_project_deadline_from", "project_deadline", "root_id.deadline")
     def _compute_project_deadline(self):
         for service in self:
             use_project_deadline_from = service.use_project_deadline_from
             if use_project_deadline_from == "self":
                 service.project_deadline = service.project_deadline
             elif use_project_deadline_from == "root":
-                service.project_deadline = service.root_id.project_deadline
+                service.project_deadline = service.root_id.deadline
 
     def _inverse_project_deadline(self):
         # this is a flag method specifying the user is allowed to store the project_deadline
@@ -314,7 +314,7 @@ class Service(models.Model):
         elif self.use_project_deadline_from == "root":
             return self.root_name
         else:
-            return "(unknown use_project_deadline_from value)"
+            return "(unknown: use_project_deadline_from)"
 
     @api.depends("timing_widget_json")
     def _compute_timing(self):
