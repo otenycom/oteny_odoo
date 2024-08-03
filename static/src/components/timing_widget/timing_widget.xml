@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="riverflow.TimingWidget">
+        <span>
+            <t t-esc="relativedays"/>
+
+            <span t-att-class="dateClass">
+                <t t-esc="date"/>
+            </span>
+
+            <t t-if="daysRemaining">
+                | in 
+                <span t-att-class="dateClass">
+                    <t t-esc="daysRemaining"/>d
+                </span>
+            </t>
+        </span>
+    </t>
+</templates>
