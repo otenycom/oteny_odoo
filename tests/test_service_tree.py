@@ -399,11 +399,26 @@ class ServiceDeadlineTestCase(TransactionCase):
         )
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
-        # refetch
-        child_3_2 = self.env["riverflow.service"].search(
-            [("name", "=", f"{self.TEST_PREFIX}Child 3.2")]
+        services = self.env["riverflow.service"].search(
+            [("name", "like", f"{self.TEST_PREFIX}%")]
+        )
+        self.dump_services_to_console(services)
+        child_3_2 = services.filtered(
+            lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2"
         )
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
+        root_3 = services.filtered(
+            lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3"
+        )
+
+        last_child_id = None
+        for service in root_3.child_ids:
+            last_child_id = service.id
+        self.assertEqual(
+            last_child_id,
+            child_3_2.id,
+            "Child 3.2 should be the last child of Root Service 3",
+        )
 
     def test_create_service_with_deadline(self):
         # Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
