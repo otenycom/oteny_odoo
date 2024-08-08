@@ -6,8 +6,7 @@
             <form string="New Log-Entry">
                 <sheet>
                     <field name="start_transition_ids" invisible="1" />
-                    <field name="transition_buttons" widget="transition_buttons" />
-                    <field name="transition_buttons_json" invisible="1" />
+                    <field name="transition_buttons_json" widget="transition_buttons" />
                 </sheet>
                 <footer>
                     <button string="Cancel" class="btn-secondary" special="cancel" />

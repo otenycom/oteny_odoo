@@ -18,14 +18,12 @@ export class TimingWidget extends Component {
     }
 
     timingData() {
-        // hack: get the timing data from the timing_json field
-        // by binding the widget to the normal timing field, we ensure the popup tooltip shows the normal text  
-        const jsonValue = this.props.record.data[this.props.name + "_json"];
+        const value = this.props.record.data[this.props.name];
 
-        if (jsonValue === undefined || jsonValue === "") {
+        if (!value) {
             return {};
         }
-        return JSON.parse(jsonValue);
+        return value;
     }
 
     get relativedays() {
@@ -49,7 +47,7 @@ export class TimingWidget extends Component {
 
 export const timingWidget = {
     component: TimingWidget,
-    supportedTypes: ["char"],
+    supportedTypes: ["json"],
 };
 
 registry.category("fields").add("timing_widget", timingWidget);

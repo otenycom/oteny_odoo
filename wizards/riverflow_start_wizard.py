@@ -1,6 +1,5 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
-import json
 from odoo.addons.riverflow.models.riverflow_transition_mixin import (
     RiverflowTransitionMixin,
 )
@@ -18,17 +17,7 @@ class StartWizard(RiverflowTransitionMixin):
         "riverflow.transition", default=_default_start_transition_ids
     )
 
-    # dummy field to suppress the tooltip on the transition buttons, which would otherwise show the
-    # json dataq of the transition buttons
-    transition_buttons = fields.Char(
-        "Transition buttons", compute="_compute_transition_buttons", store=False
-    )
-
-    def _compute_transition_buttons(self):
-        for record in self:
-            record.transition_buttons = ""  # blank to suppress tooltip
-
-    transition_buttons_json = fields.Text(
+    transition_buttons_json = fields.Json(
         "Start Transitions", compute="_compute_transition_buttons_json", store=False
     )
 
@@ -69,7 +58,7 @@ class StartWizard(RiverflowTransitionMixin):
                     }
                 )
 
-            wizard.transition_buttons_json = json.dumps(transition_buttons)
+            wizard.transition_buttons_json = transition_buttons
 
     def action_start_transition(self):
         self.ensure_one()

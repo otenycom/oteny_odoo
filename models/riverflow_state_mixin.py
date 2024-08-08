@@ -37,12 +37,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         "State name", related="state_id.name", store=True, index=True
     )
 
-    # dummy field to suppress the tooltip on the transition buttons, which would otherwise show the
-    # json dataq of the transition buttons
-    transition_buttons = fields.Char(
-        "Transition buttons", compute="_compute_transition_buttons", store=False
-    )
-    transition_buttons_json = fields.Text(
+    transition_buttons_json = fields.Json(
         "State", compute="_compute_transition_buttons_json", store=False
     )
 
@@ -89,10 +84,6 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     order="sequence,id",
                 )
 
-    def _compute_transition_buttons(self):
-        for record in self:
-            record.transition_buttons = ""  # blank to suppress tooltip
-
     def _compute_transition_buttons_json(self):
         for record in self:
             wf_state_text = record.current_workflow_name or ""
@@ -137,7 +128,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     )
                     index += 1
 
-            record.transition_buttons_json = json.dumps(transition_buttons)
+            record.transition_buttons_json = transition_buttons
 
     def action_button_click(self):
         transition_id = self.env.context.get("transition_id")

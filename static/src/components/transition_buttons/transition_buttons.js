@@ -20,16 +20,14 @@ export class TransitionButtons extends Component {
     }
 
     fieldValue(props) {
-        // hack: to suppress the tooltip on the transition buttons, which would otherwise show the
-        // computed field name, we use transition_buttons_json
-        const jsonValue = props.record.data[props.name + "_json"];
-        if (jsonValue === undefined || jsonValue === "") {
+        const value = props.record.data[props.name];
+        if (!value) {
             return {
                 buttons: [],
                 text: "",
             };
         }
-        return JSON.parse(jsonValue);
+        return value;
     }
 
     buttonDefs() {
@@ -97,7 +95,7 @@ export class TransitionButtons extends Component {
 export const transitionButtons = {
     component: TransitionButtons,
     displayName: "Transition Buttons",
-    supportedTypes: ["char", "text"],
+    supportedTypes: ["json"],
 };
 
 registry.category("fields").add("transition_buttons", transitionButtons);
