@@ -11,8 +11,7 @@ export class TimingWidget extends Component {
     };
 
     setup() {
-        //this.timingDataState = this.timingData();
-
+        this.timingDataState = {};
         onWillRender(() => {
             this.timingDataState = this.timingData();
         });

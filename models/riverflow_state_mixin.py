@@ -1,6 +1,6 @@
 from odoo import _, fields, models, api
-import json
 from odoo.addons.riverflow.models.riverflow_transition_mixin import RiverflowTransitionMixin  # type: ignore
+import json
 
 
 class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
@@ -35,6 +35,12 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     )
     state_name = fields.Char(
         "State name", related="state_id.name", store=True, index=True
+    )
+
+    # dummy field to suppress the tooltip on the transition buttons, which would otherwise show the
+    # json dataq of the transition buttons
+    transition_buttons = fields.Char(
+        "Transition buttons", compute="_compute_transition_buttons", store=False
     )
     transition_buttons_json = fields.Text(
         "State", compute="_compute_transition_buttons_json", store=False
@@ -82,6 +88,10 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     ],
                     order="sequence,id",
                 )
+
+    def _compute_transition_buttons(self):
+        for record in self:
+            record.transition_buttons = ""  # blank to suppress tooltip
 
     def _compute_transition_buttons_json(self):
         for record in self:

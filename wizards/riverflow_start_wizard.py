@@ -18,6 +18,16 @@ class StartWizard(RiverflowTransitionMixin):
         "riverflow.transition", default=_default_start_transition_ids
     )
 
+    # dummy field to suppress the tooltip on the transition buttons, which would otherwise show the
+    # json dataq of the transition buttons
+    transition_buttons = fields.Char(
+        "Transition buttons", compute="_compute_transition_buttons", store=False
+    )
+
+    def _compute_transition_buttons(self):
+        for record in self:
+            record.transition_buttons = ""  # blank to suppress tooltip
+
     transition_buttons_json = fields.Text(
         "Start Transitions", compute="_compute_transition_buttons_json", store=False
     )
