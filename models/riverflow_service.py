@@ -136,9 +136,9 @@ class Service(models.Model):
     timing = fields.Char(
         "Timing", compute="_compute_timing", store=False, recursive=True
     )
-    timing_widget_json = fields.Char(
+    timing_json = fields.Char(
         "Timing Widget JSON",
-        compute="_compute_timing_widget_json",
+        compute="_compute_timing_json",
         store=False,
         recursive=True,
     )
@@ -277,10 +277,10 @@ class Service(models.Model):
                     )
 
     @api.depends("deadline")
-    def _compute_timing_widget_json(self):
+    def _compute_timing_json(self):
         for service in self:
             if not service.deadline:
-                service.timing_widget_json = False
+                service.timing_json = False
                 continue
 
             relative_days = ""
@@ -298,7 +298,7 @@ class Service(models.Model):
             is_past = service.deadline < today
             is_today = service.deadline == today
 
-            service.timing_widget_json = json.dumps(
+            service.timing_json = json.dumps(
                 {
                     "relative_days": relative_days,
                     "date": date_str,
@@ -316,14 +316,14 @@ class Service(models.Model):
         else:
             return "(unknown: use_project_deadline_from)"
 
-    @api.depends("timing_widget_json")
+    @api.depends("timing_json")
     def _compute_timing(self):
         for service in self:
-            if not service.timing_widget_json:
+            if not service.timing_json:
                 service.timing = ""
                 continue
 
-            timing_data = json.loads(service.timing_widget_json)
+            timing_data = json.loads(service.timing_json)
             relative_days = timing_data.get("relative_days", "")
             days_remaining = timing_data.get("days_remaining", 0)
             date_str = timing_data.get("date", "")

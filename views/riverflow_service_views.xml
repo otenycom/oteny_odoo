@@ -48,7 +48,7 @@
                             <field name="days_relative_to_project" invisible="use_project_deadline_from == 'self'"
                                 on_change="1" />
                             <field name="timing" widget="timing_widget" />
-                            <field name="timing_widget_json" invisible="1" />
+                            <field name="timing_json" invisible="1" />
 
                         </group>
                     </group>
@@ -70,7 +70,7 @@
                                     <field name="transition_buttons_json"
                                         widget="transition_buttons" />
                                     <field name="timing" widget="timing_widget" optional="show" />
-                                    <field name="timing_widget_json" column_invisible="True" />
+                                    <field name="timing_json" column_invisible="True" />
                                     <field name="deadline_formatted" optional="hide" />
                                     <field name="latest_messages" />
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
@@ -97,7 +97,7 @@
                 <field name="active" column_invisible="True" />
                 <field name='indented_name' />
                 <field name="timing" widget="timing_widget" optional="show" />
-                <field name="timing_widget_json" column_invisible="True" />
+                <field name="timing_json" column_invisible="True" />
                 <field name="deadline_formatted" optional="hide" />
                 <field name='transition_buttons' widget="transition_buttons" />
                 <field name="transition_buttons_json" column_invisible="1" />
