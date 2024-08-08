@@ -133,11 +133,8 @@ class Service(models.Model):
     deadline_formatted = fields.Char(
         "Deadline", compute="_compute_deadline_formatted", store=False
     )
-    timing = fields.Char(
-        "Timing", compute="_compute_timing", store=False, recursive=True
-    )
-    timing_json = fields.Char(
-        "Timing Widget JSON",
+    timing_json = fields.Json(
+        "Timing",
         compute="_compute_timing_json",
         store=False,
         recursive=True,
@@ -298,15 +295,13 @@ class Service(models.Model):
             is_past = service.deadline < today
             is_today = service.deadline == today
 
-            service.timing_json = json.dumps(
-                {
-                    "relative_days": relative_days,
-                    "date": date_str,
-                    "days_remaining": days_remaining,
-                    "is_past": is_past,
-                    "is_today": is_today,
-                }
-            )
+            service.timing_json = {
+                "relative_days": relative_days,
+                "date": date_str,
+                "days_remaining": days_remaining,
+                "is_past": is_past,
+                "is_today": is_today,
+            }
 
     def relative_to_project_days_prefix(self):
         if self.use_project_deadline_from == "self":
@@ -315,20 +310,6 @@ class Service(models.Model):
             return self.root_name
         else:
             return "(unknown: use_project_deadline_from)"
-
-    @api.depends("timing_json")
-    def _compute_timing(self):
-        for service in self:
-            if not service.timing_json:
-                service.timing = ""
-                continue
-
-            timing_data = json.loads(service.timing_json)
-            relative_days = timing_data.get("relative_days", "")
-            days_remaining = timing_data.get("days_remaining", 0)
-            date_str = timing_data.get("date", "")
-
-            service.timing = f"{relative_days}{date_str} | in {days_remaining:02d}d"
 
     @api.depends("deadline")
     def _compute_deadline_formatted(self):
