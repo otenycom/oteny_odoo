@@ -2,35 +2,27 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, useState, onWillUpdateProps } from "@odoo/owl";
+import { Component, onWillRender } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 export class TransitionButtons extends Component {
-    // Consider refactoring this class similar to hr_expense.ListButtons
-    // or wrap the buttons in a popover, to fit an unlimited number of buttons
     static template = "riverflow.TransitionButtons";
     static props = {
         ...standardFieldProps,
     };
 
     setup() {
-        //this.updateStateFromProps(this.props);
-        //onWillUpdateProps((props) => this.updateStateFromProps(props));
-
         this.orm = useService("orm");
         this.action = useService("action");
+        onWillRender(() => {
+            this.fieldValueState = this.fieldValue(this.props);
+        });
     }
 
-    // updateStateFromProps(props) {
-    //     this.state = useState({
-    //         fieldValue: fieldValue(props),
-    //     });
-    // }
-
-    // returns 'transition_buttons_json' field value
     fieldValue(props) {
-        const jsonValue = props.record.data[props.name];
-
+        // hack: to suppress the tooltip on the transition buttons, which would otherwise show the
+        // computed field name, we use transition_buttons_json
+        const jsonValue = props.record.data[props.name + "_json"];
         if (jsonValue === undefined || jsonValue === "") {
             return {
                 buttons: [],
@@ -41,26 +33,25 @@ export class TransitionButtons extends Component {
     }
 
     buttonDefs() {
-        //return this.state.fieldValue.buttons;
-        return this.fieldValue(this.props).buttons;
+        return this.fieldValueState.buttons;
     }
 
     iconClass() {
-        if (this.fieldValue(this.props).workflow_icon)
-            return "fa " + this.fieldValue(this.props).workflow_icon;
+        if (this.fieldValueState.workflow_icon)
+            return "fa " + this.fieldValueState.workflow_icon;
         else return "";
     }
 
     text() {
-        return this.fieldValue(this.props).text;
+        return this.fieldValueState.text;
     }
 
     reloadOnClose() {
-        return this.fieldValue(this.props).reload_on_close == true;
+        return this.fieldValueState.reload_on_close == true;
     }
 
     stateClass() {
-        if (this.fieldValue(this.props).is_end_state)
+        if (this.fieldValueState.is_end_state)
             return "riverflow_end_state";
         else return "riverflow_pending_state";
     }
@@ -87,27 +78,26 @@ export class TransitionButtons extends Component {
 
         const action = {
             type: "object",
-            resId: this.props.record.resId, //this.recordId(),
+            resId: this.props.record.resId,
             name: button.action,
             resModel: this.props.record.resModel,
             context: button.context,
             onClose: async () => {
-                //await this.model.load();
-                // We don't reload the root-data source for start transitions, as that's the start transition wizard's
+                // We don't reload the root-data source for start transitions, 
+                // as that's the start transition wizard's
                 // and its closed by the time we need to reload the data
                 if (this.reloadOnClose())
-                    await this.props.record.model.root.load();;
+                    await this.props.record.model.root.load();
             }
         }
         await this.action.doActionButton(action);
     }
 }
 
-// see event_icon_selection
 export const transitionButtons = {
     component: TransitionButtons,
     displayName: "Transition Buttons",
-    supportedTypes: ["char", "text", "selection"],
+    supportedTypes: ["char", "text"],
 };
 
 registry.category("fields").add("transition_buttons", transitionButtons);
