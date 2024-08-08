@@ -19,7 +19,7 @@ class TransitionWizard(models.AbstractModel):
             if not transition:
                 raise exceptions.ValidationError("Workflow Transition not specified")
 
-            services = wizard.record_ids
+            records = wizard.record_ids
 
             createNewRecord = len(wizard.record_ids) == 0
             if createNewRecord:
@@ -29,7 +29,7 @@ class TransitionWizard(models.AbstractModel):
                     }
                 )
 
-                services = [new_record]
+                records = [new_record]
 
                 action = {
                     "type": "ir.actions.act_window",
@@ -43,10 +43,13 @@ class TransitionWizard(models.AbstractModel):
             else:
                 action = {"type": "ir.actions.act_window_close"}
 
-            # Set the property values
-            for service in services:
-                self.set_property_values(service)
-                service.state_id = transition.to_state_id.id
+            # Collect the property values that need to be updated and pass
+            # them in one go write(), so that the validations @api.constrains
+            # get triggered on a record with all the new property values
+            for record in records:
+                vals = {"state_id": transition.to_state_id.id}
+                self.updated_property_values(record, vals)
+                record.write(vals)
 
             if createNewRecord:
                 # Save the record to the database, and pass the actual id to the action that opens the form
@@ -54,12 +57,12 @@ class TransitionWizard(models.AbstractModel):
                 new_record = self.env[self._workflow_model].create(
                     new_record._convert_to_write(new_record._cache)
                 )
-                services = [new_record]
+                records = [new_record]
                 action["res_id"] = new_record.id
 
             # Now create related records, such as chatter remarks, based on the actual ID of the root record
-            for service in services:
-                self.create_related_records(service)
+            for record in records:
+                self.create_related_records(record)
 
         return action
 
@@ -95,5 +98,5 @@ class TransitionWizard(models.AbstractModel):
     def create_related_records(self, record):
         pass
 
-    def set_property_values(self, record):
+    def updated_property_values(self, record, vals):
         pass

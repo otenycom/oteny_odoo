@@ -31,14 +31,14 @@ class ServiceWizard(models.TransientModel):
     # new chatter remark (todo: move to the base class)
     new_remark = fields.Html("New Remark")
 
-    def set_property_values(self, service):
+    def updated_property_values(self, service, vals):
         if not self.env.context.get("name_readonly"):
-            service.name = self.name
+            vals["name"] = self.name
 
         if not self.env.context.get("days_relative_to_project_invisible"):
-            service.days_relative_to_project = self.days_relative_to_project
+            vals["days_relative_to_project"] = self.days_relative_to_project
 
-        service.use_project_deadline_from = self.use_project_deadline_from
+        vals["use_project_deadline_from"] = self.use_project_deadline_from
 
     def create_related_records(self, service):
         if not self.env.context.get("new_remark_invisible") and self.new_remark:
