@@ -18,9 +18,9 @@ export class TimingWidget extends Component {
     }
 
     timingData() {
-        // hack: get the timing data from the timing_widget_json field
+        // hack: get the timing data from the timing_json field
         // by binding the widget to the normal timing field, we ensure the popup tooltip shows the normal text  
-        const jsonValue = this.props.record.data[this.props.name + "_widget_json"];
+        const jsonValue = this.props.record.data[this.props.name + "_json"];
 
         if (jsonValue === undefined || jsonValue === "") {
             return {};
