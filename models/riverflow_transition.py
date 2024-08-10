@@ -48,6 +48,19 @@ class RiverflowTransition(models.Model):
         store=True,
     )
 
+    workflow_name = fields.Char(
+        string="Workflow Name",
+        compute="_compute_workflow_name",
+        store=True,
+    )
+
+    @api.depends("workflow_id")
+    def _compute_workflow_name(self):
+        for transition in self:
+            transition.workflow_name = (
+                transition.workflow_id.name if transition.workflow_id else False
+            )
+
     model = fields.Char(
         "Related Model",
         related="workflow_id.model",
@@ -73,10 +86,14 @@ class RiverflowTransition(models.Model):
     #                                     ('model', '=', 'riverflow.workflow')])
     # report_id = fields.Many2one('ir.actions.report', 'Report', copy=True, domain=[
 
-    @api.depends("to_state_id.workflow_id")
+    @api.depends("from_state_id.workflow_id", "to_state_id.workflow_id")
     def _compute_workflow_id(self):
         for transition in self:
-            transition.workflow_id = transition.to_state_id.workflow_id
+            if transition.from_state_id:
+                transition.workflow_id = transition.from_state_id.workflow_id
+            else:
+                # start transition
+                transition.workflow_id = transition.to_state_id.workflow_id
 
     @api.depends("name", "from_state_id", "from_state_id")
     def _compute_display_name(self):
