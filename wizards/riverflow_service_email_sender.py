@@ -61,7 +61,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.template_id.body_html,
             service._name,
             [service.id],
-            engine="inline_template",
+            engine="qweb",
             add_context=render_context,
             options={
                 "preserve_comments": True,
