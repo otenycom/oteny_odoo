@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_service_email_sender_form" model="ir.ui.view">
+        <field name="name">riverflow.service.email.sender.wizard.form</field>
+        <field name="model">riverflow.service.email.sender.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Send Email">
+                <group>
+                    <field name="record_ids" invisible="1" />
+                    <field name="transition_id" invisible="1" />
+                    <field name="template_id" options="{'no_create': True, 'no_open': True}" />
+                    <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}" />
+                    <field name="subject" required="1" />
+                    <field name="body" widget="html" required="1" />
+                </group>
+                <footer>
+                    <button string="Send" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

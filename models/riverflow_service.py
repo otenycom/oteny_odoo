@@ -147,9 +147,9 @@ class Service(models.Model):
         store=True,
         recursive=True,
     )
-    latest_messages = fields.Html(
-        string="Latest Messages",
-        compute="_compute_latest_messages",
+    latest_notes = fields.Html(
+        string="Latest Notes",
+        compute="_compute_latest_notes",
         store=True,
         tracking=False,
         index="trigram",
@@ -173,7 +173,7 @@ class Service(models.Model):
                 service.root_name = service.root_id.name
 
     @api.depends("message_ids.body")
-    def _compute_latest_messages(self):
+    def _compute_latest_notes(self):
         for record in self:
             # this finds any edited body in the orm cache, which a direct
             # sql query would not find
@@ -189,15 +189,15 @@ class Service(models.Model):
             # Concatenate the bodies of the latest two messages, marking them up as safe HTML
             # todo: add a css class to the <p> tag, as the default css has too big a margin
             # p {   margin-top: 0;    margin-bottom: 1rem; }
-            latest_messages = ""
+            latest_notes = ""
             for message in messages:
                 # trim the Markup wrapper class from the body value
                 body = str(message.body)
                 # Replace <p> tags with <p> tags that have inline styles
                 body = body.replace("<p>", '<p style="margin-bottom: 0rem;">')
-                latest_messages += body
+                latest_notes += body
 
-            record.latest_messages = latest_messages
+            record.latest_notes = latest_notes
 
     @api.depends("parent_path")
     def _compute_root_id(self):

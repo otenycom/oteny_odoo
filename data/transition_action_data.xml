@@ -8,5 +8,13 @@
             <field name="model_id" ref="riverflow.model_riverflow_service" />
             <!-- <field name="icon" /> -->
         </record>
+
+        <record id="riverflow.transition_action_email_sender" model="riverflow.transition.action">
+            <field name="name">Send Email Action</field>
+            <field name="description">Sends an email related to the service</field>
+            <field name="odoo_view">riverflow.view_service_email_sender_form</field>
+            <field name="model_id" ref="riverflow.model_riverflow_service" />
+            <!-- <field name="icon" /> -->
+        </record>
     </data>
 </odoo>

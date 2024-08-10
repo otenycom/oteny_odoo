@@ -15,12 +15,14 @@
         "security/ir.model.access.csv",
         "wizards/riverflow_service_wizard_view.xml",
         "wizards/riverflow_start_service_view.xml",
+        "wizards/riverflow_service_email_sender_view.xml",
         "views/riverflow_service_views.xml",
         "views/riverflow_workflow_views.xml",
         "views/riverflow_state_views.xml",
         "views/riverflow_transition_views.xml",
         "views/riverflow_transition_action_views.xml",
         "data/transition_action_data.xml",
+        "data/service_email_workflow.xml",
     ],
     "assets": {
         "web.assets_backend": [
