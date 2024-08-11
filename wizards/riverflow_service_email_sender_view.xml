@@ -5,14 +5,18 @@
         <field name="model">riverflow.service.email.sender.wizard</field>
         <field name="arch" type="xml">
             <form string="Send Email">
-                <group>
-                    <field name="record_ids" invisible="1" />
-                    <field name="transition_id" invisible="1" />
-                    <field name="template_id" options="{'no_create': True, 'no_open': True}" />
-                    <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}" />
-                    <field name="subject" required="1" />
-                    <field name="body" widget="html" required="1" />
-                </group>
+                <sheet>
+                    <group>
+                        <field name="template_id" options="{'no_create': True, 'no_open': True}" />
+                        <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}" />
+                        <field name="subject" required="1" />
+                    </group>
+                    <notebook>
+                        <page string="Content" name="content">
+                            <field name="body" widget="html" options="{'style-inline': true, 'codeview': true, 'dynamic_placeholder': true}" />
+                        </page>
+                    </notebook>
+                </sheet>
                 <footer>
                     <button string="Send" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />

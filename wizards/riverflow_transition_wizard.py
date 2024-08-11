@@ -78,21 +78,24 @@ class TransitionWizard(models.AbstractModel):
         isStartTransition = transition.from_state_id.id == False
         if isStartTransition:
             defaultValues["record_ids"] = [Command.set([])]
+            records = self.env[self._workflow_model]
         else:
             record_ids = self.env.context.get("active_ids")
             if record_ids:
-                services = self.env["riverflow.service"].browse(record_ids)
-                defaultValues["record_ids"] = [Command.set(services.ids)]
+                records = self.env[self._workflow_model].browse(record_ids)
+                defaultValues["record_ids"] = [Command.set(records.ids)]
+            else:
+                records = self.env[self._workflow_model]
 
-                # if len(services) == 1:
-                #     service = services[0]
-                #     defaultValues["name"] = service.name
-                #     defaultValues["new_remark"] = ""
-                #     defaultValues["days_relative_to_project"] = service[
-                #         "days_relative_to_project"
-                #     ]
-
+        self.default_get_by_records(form_fields, records, defaultValues)
         return defaultValues
+
+    def default_get_by_records(self, form_fields, records, defaultValues):
+        """
+        Abstract method to be implemented by inherited classes.
+        This method allows for populating defaults based on the given records.
+        """
+        pass
 
     # abstract methods
     def create_related_records(self, record):
