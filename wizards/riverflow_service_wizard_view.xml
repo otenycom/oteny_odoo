@@ -5,7 +5,7 @@
         <field name="arch" type="xml">
             <form string="Update Service">
                 <group>
-                    <field name="record_ids" invisible="1" />
+                    <field name="records_to_transition_ids" invisible="1" />
                     <field name="transition_id" invisible="1" />
                     <field name="transition_description" readonly="1" invisible="not transition_description" />
                     <field name="name" required="1" />

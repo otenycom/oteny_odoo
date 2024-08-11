@@ -426,7 +426,8 @@ class Service(models.Model):
         }
 
     def add_child_service(self):
-        # Select a start transition for a new service
+        # Select a start transition for a new service. Can be overridden by child modules
+        # to set more default field values
         return {
             "type": "ir.actions.act_window",
             "name": "Add Service to: " + self.name,

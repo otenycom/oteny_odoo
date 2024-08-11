@@ -10,7 +10,7 @@ class TransitionWizard(models.AbstractModel):
 
     transition_id = fields.Many2one("riverflow.transition", "Transition")
     transition_description = fields.Text("Description")
-    # record_ids = fields.Many2many(_workflow_model)
+    # records_to_transition_ids = fields.Many2many(_workflow_model)
 
     def action_save(self):
         for wizard in self:
@@ -19,9 +19,9 @@ class TransitionWizard(models.AbstractModel):
             if not transition:
                 raise exceptions.ValidationError("Workflow Transition not specified")
 
-            records = wizard.record_ids
+            recordsToTransition = wizard.records_to_transition_ids
 
-            createNewRecord = len(wizard.record_ids) == 0
+            createNewRecord = len(recordsToTransition) == 0
             if createNewRecord:
                 new_record = self.env[self._workflow_model].new(
                     {
@@ -29,7 +29,7 @@ class TransitionWizard(models.AbstractModel):
                     }
                 )
 
-                records = [new_record]
+                recordsToTransition = [new_record]
 
                 action = {
                     "type": "ir.actions.act_window",
@@ -46,7 +46,7 @@ class TransitionWizard(models.AbstractModel):
             # Collect the property values that need to be updated and pass
             # them in one go write(), so that the validations @api.constrains
             # get triggered on a record with all the new property values
-            for record in records:
+            for record in recordsToTransition:
                 vals = {"state_id": transition.to_state_id.id}
                 self.updated_property_values(record, vals)
                 record.write(vals)
@@ -57,11 +57,11 @@ class TransitionWizard(models.AbstractModel):
                 new_record = self.env[self._workflow_model].create(
                     new_record._convert_to_write(new_record._cache)
                 )
-                records = [new_record]
+                recordsToTransition = [new_record]
                 action["res_id"] = new_record.id
 
             # Now create related records, such as chatter remarks, based on the actual ID of the root record
-            for record in records:
+            for record in recordsToTransition:
                 self.create_related_records(record)
 
         return action
@@ -83,6 +83,9 @@ class TransitionWizard(models.AbstractModel):
                 records_to_transition = records_to_transition.browse(
                     records_to_transition_ids
                 )
+
+        if records_to_transition.ids:
+            defaultValues["records_to_transition_ids"] = records_to_transition.ids
 
         self.default_get_using_records(defaultValues, records_to_transition)
 

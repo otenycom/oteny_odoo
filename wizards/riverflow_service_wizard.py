@@ -10,7 +10,7 @@ class ServiceWizard(models.TransientModel):
     _description = "Service Wizard"
 
     _workflow_model = "riverflow.service"
-    record_ids = fields.Many2many("riverflow.service")
+    records_to_transition_ids = fields.Many2many("riverflow.service")
 
     # from service record
     name = fields.Char("Service Name")
