@@ -1,5 +1,4 @@
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
 from odoo.addons.riverflow.models.riverflow_transition_mixin import (
     RiverflowTransitionMixin,
 )
@@ -63,11 +62,5 @@ class StartWizard(RiverflowTransitionMixin):
             wizard.transition_buttons_json = transition_buttons
 
     def action_start_transition(self):
-        self.ensure_one()
-        transition_id = self.env.context.get("transition_id")
-        transition = self.env["riverflow.transition"].browse(transition_id)
 
-        if not transition:
-            raise UserError(_("No transition selected."))
-
-        return self._prepare_transition_action(transition)
+        return self._prepare_transition_action()
