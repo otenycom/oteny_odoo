@@ -7,8 +7,10 @@
             <form string="Send Email">
                 <sheet>
                     <group>
-                        <field name="template_id" options="{'no_create': True, 'no_open': True}" />
-                        <field name="partner_ids" widget="many2many_tags" options="{'no_create': True}" />
+                        <field name="records_to_transition_ids" invisible="1" />
+                        <field name="transition_id" invisible="1" />
+                        <field name="template_id" options="{'no_create': False, 'no_open': False}" />
+                        <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" />
                         <field name="subject" required="1" />
                     </group>
                     <notebook>

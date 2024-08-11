@@ -12,9 +12,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     _description = "Riverflow Service Email Sender Wizard"
 
     _workflow_model = "riverflow.service"
-    record_ids = fields.Many2many("riverflow.service")
+    records_to_transition_ids = fields.Many2many("riverflow.service")
 
-    partner_ids = fields.Many2many("res.partner", string="Recipients")
+    recipient_partner_ids = fields.Many2many("res.partner", string="Recipients")
     subject = fields.Char(string="Subject")
     body = fields.Html(
         string="Body",
@@ -59,8 +59,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         super(RiverflowServiceEmailSenderWizard, self).updated_property_values(
             service, vals
         )
-
-        if not vals.get("name"):
+        # new services are automatically assigned a name equal to the email subject
+        isNewService = isinstance(service.id, models.NewId)
+        if isNewService and not vals.get("name"):
             subject_rendered = self._get_rendered_subject(service)
             default_name = self._generate_default_name(subject_rendered)
             vals["name"] = default_name
@@ -70,7 +71,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         self._send_email(service)
 
     def _send_email(self, service):
-        if not self.partner_ids:
+        if not self.recipient_partner_ids:
             raise UserError(_("Please select at least one recipient."))
 
         render_context = self._get_render_context(service)
@@ -92,7 +93,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         service.message_post(
             message_type="email",
             subject=subject_rendered,
-            partner_ids=self.partner_ids.ids,
+            partner_ids=self.recipient_partner_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
         )
