@@ -1,4 +1,6 @@
-from odoo import models, api
+from odoo import models, _
+from odoo.exceptions import UserError
+
 import json
 
 
@@ -6,7 +8,12 @@ class RiverflowTransitionMixin(models.AbstractModel):
     _name = "riverflow.transition.mixin"
     _description = "Base class with function to create an action to open a transition action wizard"
 
-    def _prepare_transition_action(self, transition):
+    def _prepare_transition_action(self):
+        transition_id = self.env.context.get("transition_id")
+        transition = self.env["riverflow.transition"].browse(transition_id)
+        if not transition:
+            raise UserError(_("No transition selected."))
+
         action_context = {}
         if transition.action_context:
             try:

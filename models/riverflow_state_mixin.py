@@ -131,6 +131,5 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             record.transition_buttons_json = transition_buttons
 
     def action_button_click(self):
-        transition_id = self.env.context.get("transition_id")
-        transition = self.env["riverflow.transition"].browse(transition_id)
-        return self._prepare_transition_action(transition)
+
+        return self._prepare_transition_action()
