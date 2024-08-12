@@ -1,7 +1,6 @@
 from odoo import models, _
 from odoo.exceptions import UserError
-
-import json
+import ast
 
 
 class RiverflowTransitionMixin(models.AbstractModel):
@@ -14,17 +13,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
         if not transition:
             raise UserError(_("No transition selected."))
 
-        action_context = {}
-        if transition.action_context:
-            try:
-                action_context = json.loads(transition.action_context) or {}
-            except json.JSONDecodeError as e:
-                raise json.JSONDecodeError(
-                    f"Bad action_context '{transition.action_context}', for transition '{transition.name}': {str(e)}",
-                    transition.action_context,
-                    e.pos,
-                ) from e
-
+        action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
 
         defaults_context = {}
@@ -58,3 +47,48 @@ class RiverflowTransitionMixin(models.AbstractModel):
         }
 
         return action
+
+    def _prepare_action_context(self, transition):
+        action_context = {}
+        if transition.action_context:
+            try:
+                action_context = ast.literal_eval(transition.action_context) or {}
+            except (ValueError, SyntaxError) as e:
+                raise UserError(
+                    _(
+                        f"Bad action_context '{transition.action_context}', for transition '{transition.name}': {str(e)}"
+                    )
+                ) from e
+            action_context = self._process_references(transition, action_context)
+        return action_context
+
+    def _process_references(self, transition, action_context):
+        updated_context = {}
+        for key, value in action_context.items():
+            if key.endswith("_id_ref"):
+                full_xml_id = value
+                transition_xml_id = transition.get_external_id().get(transition.id, "")
+                if not transition_xml_id:
+                    raise UserError(
+                        _(f"No external ID found for transition '{transition.name}'")
+                    )
+                if "." not in value and "." in transition_xml_id:
+                    module_name = transition_xml_id.split(".")[0]
+                    full_xml_id = f"{module_name}.{value}"
+
+                try:
+                    referenced_record = self.env.ref(full_xml_id)
+                    referenced_id = referenced_record.id
+                except ValueError as e:
+                    raise UserError(
+                        _(
+                            f"Invalid XML ID '{full_xml_id}' for field '{key}' in transition '{transition.name}': {str(e)}"
+                        )
+                    ) from e
+
+                new_key = key[:-4]  # strip the trailing '_ref' from the key name
+                updated_context[new_key] = referenced_id
+            else:
+                updated_context[key] = value
+
+        return updated_context
