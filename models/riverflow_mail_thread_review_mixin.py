@@ -1,6 +1,9 @@
 from odoo import api, fields, models
 from odoo.tools import html2plaintext
 from odoo.addons.riverflow.util import is_neutralized_or_development  # type: ignore
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class MailThreadReviewMixin(models.AbstractModel):
@@ -113,16 +116,21 @@ class MailThreadReviewMixin(models.AbstractModel):
         """
         for record in self:
             if is_neutralized_or_development():
+                _logger.warning(
+                    "Running in development or neutralized mode, skipping external sender filtering"
+                )
                 record.message_from_external_sender_ids = record.external_message_ids
             else:
-                record.message_from_external_sender_ids = (
-                    record.external_message_ids.filtered(
-                        lambda m: not m.author_id
-                        or not m.author_id.user_ids.filtered(
-                            lambda u: u.has_group("base.group_user")
-                        )
+                _logger.info(
+                    "Running in production mode, filtering external sender messages"
+                )
+                filtered_messages = record.external_message_ids.filtered(
+                    lambda m: not m.author_id
+                    or not m.author_id.user_ids.filtered(
+                        lambda u: u.has_group("base.group_user")
                     )
                 )
+                record.message_from_external_sender_ids = filtered_messages
 
     def _format_message_body(self, body, max_length=100):
         # Convert body to string, remove Markup wrapper if present, and convert to plain text

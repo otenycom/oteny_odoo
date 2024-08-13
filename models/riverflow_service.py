@@ -295,9 +295,9 @@ class Service(models.Model):
     def print_compute_sequence_counter(self):
         if not hasattr(self.__class__, "_compute_sequence_counter"):
             self.__class__._compute_sequence_counter = 0
-        print(
-            f"_compute_sequence counter: {self.__class__._compute_sequence_counter} - {self.display_name}"
-        )
+        # print(
+        #     f"_compute_sequence counter: {self.__class__._compute_sequence_counter} - {self.display_name}"
+        # )
         self.__class__._compute_sequence_counter += 1
 
     @api.depends(
