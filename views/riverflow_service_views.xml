@@ -121,8 +121,8 @@
                 <field name="transition_buttons_json" widget="transition_buttons" />
                 <field name="display_name" optional="hide" />
                 <field name='internal_notes_summary' />
-                <field name="unreviewed_message_count" />
                 <field name="external_messages_summary" />
+                <field name="unreviewed_message_count" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                     readonly="1" />
 
