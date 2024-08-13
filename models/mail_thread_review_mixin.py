@@ -59,7 +59,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_unreviewed_message_count",
         store=True,
     )
-    external_messages_summary = fields.Char(
+    external_messages_summary = fields.Html(
         string="Top 3 External Messages",
         compute="_compute_external_messages_summary",
         store=False,
@@ -124,43 +124,37 @@ class MailThreadReviewMixin(models.AbstractModel):
                     )
                 )
 
+    def _format_message_body(self, body, max_length=100):
+        # Convert body to string, remove Markup wrapper if present, and convert to plain text
+        body_str = html2plaintext(str(body))
+        # Remove line breaks and extra whitespace
+        body_str = " ".join(body_str.split())
+        # Truncate if necessary
+        if len(body_str) > max_length:
+            body_str = body_str[:max_length] + "..."
+        # Wrap in a styled <p> tag
+        return f'<p style="margin-bottom: 0rem;">{body_str}</p>'
+
     @api.depends("internal_note_ids.body")
     def _compute_latest_internal_notes(self):
         for record in self:
-            # Concatenate the bodies of the latest two messages, marking them up as safe HTML
-            # todo: add a css class to the <p> tag, as the default css has too big a margin
-            # p {   margin-top: 0;    margin-bottom: 1rem; }
-            internal_notes_summary = ""
-            for message in record.internal_note_ids:
-                # trim the Markup wrapper class from the body value
-                body = str(message.body)
-                # Replace <p> tags with <p> tags that have inline styles
-                body = body.replace("<p>", '<p style="margin-bottom: 0rem;">')
-                internal_notes_summary += body
-
-            record.internal_notes_summary = internal_notes_summary
+            formatted_notes = [
+                self._format_message_body(message.body)
+                for message in record.internal_note_ids[:3]
+            ]
+            record.internal_notes_summary = "".join(formatted_notes)
 
     @api.depends("external_message_ids")
     def _compute_external_messages_summary(self):
         for record in self:
-            summary = []
-            for message in record.external_message_ids.sorted(
+            sorted_messages = record.external_message_ids.sorted(
                 key=lambda m: m.date, reverse=True
-            )[
-                :3
-            ]:  # Get the 3 most recent external messages
-                # Convert HTML to plain text and remove any line breaks
-                content = html2plaintext(message.body or message.subject or "").replace(
-                    "\n", " "
-                )
-                # This works because replace('\n', ' ') removes all newline characters,
-                # effectively making the content a single line of text
-                truncated_content = (
-                    content[:100] + "..." if len(content) > 100 else content
-                )
-                summary.append(truncated_content.strip())
-
-            record.external_messages_summary = " | ".join(summary) if summary else ""
+            )[:3]
+            formatted_messages = [
+                self._format_message_body(message.body or message.subject or "")
+                for message in sorted_messages
+            ]
+            record.external_messages_summary = "".join(formatted_messages)
 
     @api.depends("external_message_ids", "last_external_message_review_time")
     def _compute_unreviewed_message_ids(self):
