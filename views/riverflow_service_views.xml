@@ -90,7 +90,7 @@
                         </page>
                         <page string="External Messages" name="all_external_messages">
                             <span>Messages visible to third parties (customers, vendors, etc.),
-                                or received from third parties</span>
+                                or received from third partie.</span>
                             <group>
                                 <field name="external_message_ids" />
                             </group>
