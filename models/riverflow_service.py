@@ -7,7 +7,11 @@ import re
 class Service(models.Model):
     _name = "riverflow.service"
     # no activities 'mail.activity.mixin', we use workflow buttons instead
-    _inherit = ["mail.thread", "riverflow.state.mixin"]
+    _inherit = [
+        # "mail.thread",
+        "riverflow.mail.thread.review.mixin",
+        "riverflow.state.mixin",
+    ]
     _description = "Service"
     _parent_name = "parent_id"
     _parent_store = True
@@ -147,13 +151,7 @@ class Service(models.Model):
         store=True,
         recursive=True,
     )
-    latest_notes = fields.Html(
-        string="Latest Notes",
-        compute="_compute_latest_notes",
-        store=True,
-        tracking=False,
-        index="trigram",
-    )
+
     tag_ids = fields.Many2many(
         "riverflow.service.tag",
         "riverflow_service_ship_tag_rel",
@@ -171,33 +169,6 @@ class Service(models.Model):
                 service.root_name = service.name
             else:
                 service.root_name = service.root_id.name
-
-    @api.depends("message_ids.body")
-    def _compute_latest_notes(self):
-        for record in self:
-            # this finds any edited body in the orm cache, which a direct
-            # sql query would not find
-            messages = self.env["mail.message"].search(
-                [
-                    ("res_id", "=", record.id),
-                    ("model", "=", self._name),
-                    ("message_type", "=", "comment"),
-                ],
-                order="date DESC",
-                limit=2,
-            )
-            # Concatenate the bodies of the latest two messages, marking them up as safe HTML
-            # todo: add a css class to the <p> tag, as the default css has too big a margin
-            # p {   margin-top: 0;    margin-bottom: 1rem; }
-            latest_notes = ""
-            for message in messages:
-                # trim the Markup wrapper class from the body value
-                body = str(message.body)
-                # Replace <p> tags with <p> tags that have inline styles
-                body = body.replace("<p>", '<p style="margin-bottom: 0rem;">')
-                latest_notes += body
-
-            record.latest_notes = latest_notes
 
     @api.depends("parent_path")
     def _compute_root_id(self):

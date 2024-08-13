@@ -28,7 +28,7 @@
                             <field name="tag_ids" widget="many2many_tags"
                                 options="{'color_field': 'color', 'no_create_edit': True}" />
                             <field name="transition_buttons_json" widget="transition_buttons" />
-                            <field name="latest_notes" invisible="1" />
+                            <field name="internal_notes_summary" invisible="1" />
                             <field name="state_name" invisible="1" on_change="1" />
                             <field name="state_id" on_change="1" invisible="1" />
                         </group>
@@ -49,6 +49,7 @@
                             <field name="timing_json" widget="timing_widget" />
 
                         </group>
+
                     </group>
                     <notebook>
                         <page string="Child Services" name="services">
@@ -68,11 +69,34 @@
                                     <field name="transition_buttons_json" widget="transition_buttons" />
                                     <field name="timing_json" widget="timing_widget" optional="show" />
                                     <field name="deadline_formatted" optional="hide" />
-                                    <field name="latest_notes" />
+                                    <field name="internal_notes_summary" />
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                                         readonly="1" />
                                 </tree>
                             </field>
+                        </page>
+                        <page string="Unreviewed External Messages" name="unreviewed_messages">
+                            <div>
+                                <p>Review the External Messages in the Chatter,
+                                    and once done and followup is complete, mark them as Reviewed</p>
+                                <button name="action_mark_external_messages_reviewed" type="object" class="oe_link"
+                                    string="Mark as Reviewed" icon="fa-check" />
+                                <field name="last_external_message_review_time" />
+                            </div>
+                            <group>
+                                <field name="external_messages_summary" />
+                                <field name="unreviewed_message_count" />
+                            </group>
+                        </page>
+                        <page string="External Messages" name="all_external_messages">
+                            <span>Messages visible to third parties (customers, vendors, etc.),
+                                or received from third parties</span>
+                            <group>
+                                <field name="external_message_ids" />
+                            </group>
+                        </page>
+                        <page string="Internal Notes" name="internal_notes">
+                            <field name="internal_note_ids" />
                         </page>
                     </notebook>
                 </sheet>
@@ -96,7 +120,9 @@
                 <field name="deadline_formatted" optional="hide" />
                 <field name="transition_buttons_json" widget="transition_buttons" />
                 <field name="display_name" optional="hide" />
-                <field name='latest_notes' />
+                <field name='internal_notes_summary' />
+                <field name="unreviewed_message_count" />
+                <field name="external_messages_summary" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                     readonly="1" />
 
