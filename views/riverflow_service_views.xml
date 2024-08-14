@@ -84,14 +84,16 @@
                                 <field name="last_external_message_review_time" />
                             </div>
                             <group>
-                                <field name="external_messages_summary" />
                                 <field name="unreviewed_message_count" />
+                                <field name="message_from_external_sender_ids" />
                             </group>
                         </page>
                         <page string="External Messages" name="all_external_messages">
                             <span>Messages visible to third parties (customers, vendors, etc.),
                                 or received from third party.</span>
                             <group>
+                                <field name="external_messages_summary" />
+
                                 <field name="external_message_ids" />
                             </group>
                         </page>
