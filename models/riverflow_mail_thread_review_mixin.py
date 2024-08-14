@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, tools
 from odoo.tools import html2plaintext
 from odoo.addons.riverflow.util import is_neutralized_or_development  # type: ignore
 import logging
@@ -24,7 +24,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     internal_notes_summary = fields.Html(
         string="Top 3 Internal Notes",
         compute="_compute_latest_internal_notes",
-        store=False,
+        store=True,
         tracking=False,
         index="trigram",
     )
@@ -65,7 +65,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     external_messages_summary = fields.Html(
         string="Top 3 External Messages",
         compute="_compute_external_messages_summary",
-        store=False,
+        store=True,
         index="trigram",
     )
 
@@ -78,7 +78,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         "message_id",
         string="Messages from External Senders",
         compute="_compute_message_from_external_sender_ids",
-        store=True,
+        store=False,
     )
 
     def _get_filtered_messages(self, select_internal):
@@ -108,14 +108,33 @@ class MailThreadReviewMixin(models.AbstractModel):
                 select_internal=False
             )
 
+    @tools.ormcache()
+    def _get_system_user_id(self):
+        return self.env.ref("base.user_root").id  # always id 1, login name __system__
+
     @api.depends("external_message_ids")
     def _compute_message_from_external_sender_ids(self):
         """
         Compute method for message_from_external_sender_ids.
         This field contains messages that have a sender who is not an internal user of the system.
         """
+
+        def _is_from_external_sender(message):
+            # Also tried this, but if a reply is made from an email address linked to a user,
+            #  it will not be considered an external message, which is not helpful for testing
+            # return not message.author_id or not any(
+            #     user.has_group("base.group_user")
+            #     for user in message.author_id.user_ids
+            # )
+
+            # the inbound message robot posts customer messages as the system user
+            is_created_by_system_user = (
+                message.create_uid.id == self._get_system_user_id()
+            )
+            return is_created_by_system_user
+
         for record in self:
-            if is_neutralized_or_development():
+            if False and is_neutralized_or_development():
                 _logger.warning(
                     "Running in development or neutralized mode, skipping external sender filtering"
                 )
@@ -124,23 +143,19 @@ class MailThreadReviewMixin(models.AbstractModel):
                 _logger.info(
                     "Running in production mode, filtering external sender messages"
                 )
-                filtered_messages = record.external_message_ids.filtered(
-                    lambda m: not m.author_id
-                    or not m.author_id.user_ids.filtered(
-                        lambda u: u.has_group("base.group_user")
-                    )
-                )
-                record.message_from_external_sender_ids = filtered_messages
+                messages_from_external_senders = self.env["mail.message"]
+                for message in record.external_message_ids:
+                    if _is_from_external_sender(message):
+                        messages_from_external_senders |= message
+
+                record.message_from_external_sender_ids = messages_from_external_senders
 
     def _format_message_body(self, body, max_length=100):
         # Convert body to string, remove Markup wrapper if present, and convert to plain text
         body_str = html2plaintext(str(body))
-        # Remove line breaks and extra whitespace
         body_str = " ".join(body_str.split())
-        # Truncate if necessary
         if len(body_str) > max_length:
             body_str = body_str[:max_length] + "..."
-        # Wrap in a styled <p> tag
         return f'<p style="margin-bottom: 0rem;">{body_str}</p>'
 
     @api.depends("internal_note_ids.body")
@@ -164,12 +179,16 @@ class MailThreadReviewMixin(models.AbstractModel):
             ]
             record.external_messages_summary = "".join(formatted_messages)
 
-    @api.depends("external_message_ids", "last_external_message_review_time")
+    @api.depends(
+        "message_from_external_sender_ids", "last_external_message_review_time"
+    )
     def _compute_unreviewed_message_ids(self):
         for record in self:
-            record.unreviewed_message_ids = record.external_message_ids.filtered(
-                lambda m: not record.last_external_message_review_time
-                or m.date > record.last_external_message_review_time
+            record.unreviewed_message_ids = (
+                record.message_from_external_sender_ids.filtered(
+                    lambda m: not record.last_external_message_review_time
+                    or m.date > record.last_external_message_review_time
+                )
             )
 
     @api.depends("external_message_ids")
