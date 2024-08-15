@@ -70,6 +70,8 @@
                                     <field name="timing_json" widget="timing_widget" optional="show" />
                                     <field name="deadline_formatted" optional="hide" />
                                     <field name="internal_notes_summary" />
+                                    <field name="external_messages_summary" />
+                                    <field name="unreviewed_message_count" />
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                                         readonly="1" />
                                 </tree>
