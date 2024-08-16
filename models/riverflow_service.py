@@ -173,7 +173,7 @@ class Service(models.Model):
         ]
 
     # the container of the service (log_entry, employee, etc)
-    res_id = fields.Integer(string="Subject of Service ID", required=False, default=-1)
+    res_id = fields.Integer(string="Subject of Service ID", required=False)
     res_model = fields.Char(
         string="Subject of Service Model Name",
     )

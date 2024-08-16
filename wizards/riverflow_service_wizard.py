@@ -28,7 +28,7 @@ class ServiceWizard(models.TransientModel):
     )
     days_relative_to_project = fields.Integer("Days relative to project-deadline")
     # the container of the service (log_entry, employee, etc)
-    res_id = fields.Integer(string="Subject of Service ID", required=False, default=-1)
+    res_id = fields.Integer(string="Subject of Service ID", required=False)
     res_model = fields.Char(
         string="Subject of Service Model Name",
     )
