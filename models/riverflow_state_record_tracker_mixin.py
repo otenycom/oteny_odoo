@@ -2,7 +2,7 @@ from odoo import _, fields, models, api
 from odoo.addons.riverflow.models.riverflow_transition_mixin import RiverflowTransitionMixin  # type: ignore
 
 """
-This mixin maintains a global state view through the RiverflowStateRecord model.
+This mixin maintains a global view of services and their parent entities through the RiverflowStateRecord model.
 
 Key features:
 - Automatic synchronization of the current model with a global state record 

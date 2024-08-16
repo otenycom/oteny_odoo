@@ -162,6 +162,83 @@ class Service(models.Model):
         copy=True,
     )
 
+    # related entity (similar to the one in the mail_message.py in odoo)
+    # content fields such as display_name of the related document can be looked
+    # up in the riverflow.state.record model
+    @api.model
+    def _selection_target_model(self):
+        return [
+            (model.model, model.name)
+            for model in self.env["ir.model"].sudo().search([])
+        ]
+
+    # the container of the service (log_entry, employee, etc)
+    res_id = fields.Integer(string="Subject of Service ID", required=False, default=-1)
+    res_model = fields.Char(
+        string="Subject of Service Model Name",
+    )
+    res_name = fields.Char(
+        string="Subject of Service",
+        compute="_compute_res_name",
+        store=True,
+        index="trigram",
+    )
+    resource_ref = fields.Reference(
+        string="Subject of Service",
+        selection="_selection_target_model",
+        compute="_compute_resource_ref",
+        inverse="_set_resource_ref",
+    )
+
+    @api.depends("res_model", "res_id")  # , "is_unlinked")
+    def _compute_resource_ref(self):
+        for service in self:
+            if not service.res_model or not service.res_id:
+                service.resource_ref = False
+            else:
+                service.resource_ref = "%s,%s" % (
+                    service.res_model,
+                    service.res_id or 0,
+                )
+
+    def _set_resource_ref(self):
+        for service in self:
+            if service.resource_ref:
+                service.res_id = service.resource_ref.id
+
+    res_id_computed = fields.Integer(
+        "Computed Service Subject ID",
+        compute="_compute_res_id_computed",
+        store=False,
+        recursive=True,
+        help="Syncs the service's subject reference (ref_id) with the root service. All decendending services reference the same subject.",
+    )
+
+    @api.depends("root_id.res_id", "root_id.res_model")
+    def _compute_res_id_computed(self):
+        for service in self:
+            service.res_id_computed = service.root_id.res_id
+
+            isRootService = service.id == service.root_id.id
+            if not isRootService:
+                service.res_id = service.root_id.res_id
+                service.res_model = service.root_id.res_model
+
+    @api.depends("res_model", "res_id")
+    def _compute_res_name(self):
+        for service in self:
+            if not service.res_id or not service.res_model:
+                continue
+            if service.res_model not in self.env:
+                # Skip if the container model is not yet loaded in the environment
+                #  (during upgrades of the module, when the container is a module dependent on riverflow)
+                continue
+            record = self.env[service.res_model].sudo().browse(service.res_id)
+            if not record.exists():
+                continue
+            name = record.display_name
+            service.res_name = name if name else f"{service.res_model}/{service.res_id}"
+
     @api.depends("root_id", "root_id.name", "name")
     def _compute_root_name(self):
         for service in self:
@@ -408,6 +485,31 @@ class Service(models.Model):
                 "default_parent_id": self.id,
                 "default_company_id": self.company_id.id,
                 "default_use_project_deadline_from": "root",
+                "default_res_model": self.res_model,
+                "default_res_id": self.res_id,
             },
             "target": "new",
         }
+
+    @api.onchange("parent_id")
+    def _onchange_parent_id(self):
+        if self.parent_id:
+            self.res_model = self.parent_id.res_model
+            self.res_id = self.parent_id.res_id
+
+    @api.model
+    def create(self, vals):
+        record = super(Service, self).create(vals)
+        if record.parent_id and not record.res_id:
+            record.res_id = record.parent_id.res_id
+            record.res_model = record.parent_id.res_model
+        return record
+
+    def write(self, vals):
+        result = super(Service, self).write(vals)
+        if "parent_id" in vals:
+            for record in self:
+                if record.parent_id and not record.res_id:
+                    record.res_id = record.parent_id.res_id
+                    record.res_model = record.parent_id.res_model
+        return result

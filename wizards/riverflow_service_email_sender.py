@@ -8,7 +8,10 @@ _logger = logging.getLogger(__name__)
 
 class RiverflowServiceEmailSenderWizard(models.TransientModel):
     _name = "riverflow.service.email.sender.wizard"
-    _inherit = ["riverflow.transition.wizard", "mail.render.mixin"]
+    _inherit = [
+        "riverflow.service.wizard",
+        "mail.render.mixin",
+    ]
     _description = "Riverflow Service Email Sender Wizard"
 
     _workflow_model = "riverflow.service"
@@ -30,15 +33,18 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.subject = self.template_id.subject
             self.body = self.template_id.body_html
 
-    def _get_render_context(self, service):
+    def _get_render_context(self, service, vals):
+        res_id = vals.get("res_id") or service.res_id
+        if res_id:
+            log_entry_id = self.env["rivermen.log.entry"].browse(res_id)
         return {
             "service": service,
-            "log_entry": service.log_entry_id,
+            "log_entry": log_entry_id,
             "company": service.company_id,
         }
 
-    def _get_rendered_subject(self, service):
-        render_context = self._get_render_context(service)
+    def _get_rendered_subject(self, service, vals):
+        render_context = self._get_render_context(service, vals)
         subject_rendered = self._render_template(
             self.subject or "",
             "riverflow.service",
@@ -62,7 +68,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         # new services are automatically assigned a name equal to the email subject
         isNewService = isinstance(service.id, models.NewId)
         if isNewService and not vals.get("name"):
-            subject_rendered = self._get_rendered_subject(service)
+            subject_rendered = self._get_rendered_subject(service, vals)
             default_name = self._generate_default_name(subject_rendered)
             vals["name"] = default_name
 
@@ -74,8 +80,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if not self.recipient_partner_ids:
             raise UserError(_("Please select at least one recipient."))
 
-        render_context = self._get_render_context(service)
-        subject_rendered = self._get_rendered_subject(service)
+        vals = {}  # uncommitted new property values
+        render_context = self._get_render_context(service, vals)
+        subject_rendered = self._get_rendered_subject(service, vals)
 
         body_rendered = self._render_template(
             self.body,

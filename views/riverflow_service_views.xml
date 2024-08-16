@@ -123,6 +123,8 @@
                 <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="deadline_formatted" optional="hide" />
                 <field name="transition_buttons_json" widget="transition_buttons" />
+                <field name="res_name" optional="show" />
+                <!-- <field name="resource_ref" /> -->
                 <field name="display_name" optional="hide" />
                 <field name='internal_notes_summary' />
                 <field name="external_messages_summary" />

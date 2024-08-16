@@ -13,6 +13,8 @@
                     <field name="use_project_deadline_from" required="1" />
                     <field name="project_deadline" invisible="use_project_deadline_from != 'self'" />
                     <field name="days_relative_to_project" invisible="context.get('days_relative_to_project_invisible')" />
+                    <field name="res_id" invisible="1"></field>
+                    <field name="res_model" invisible="1"></field>
                 </group>
                 <footer>
                     <button string="OK" type="object" name="action_save" class="btn-primary"
