@@ -58,7 +58,7 @@
                                     icon="fa-plus">
                                     Add Child Service</button>
                             </div>
-                            <field name="descendant_ids">
+                            <field name="descendant_ids" invisible="not descendant_ids">
                                 <!-- Workaround: tree view click opens a popup of the child service, instead of the form view.
                                  To ensure the form view opens for the child service, we set open_form_view="True". This requires the user 
                                  to click the 'view' button on the child service to open the form vie, so its not very user friendly. -->
