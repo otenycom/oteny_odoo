@@ -184,7 +184,7 @@ class Service(models.Model):
         index="trigram",
     )
     resource_ref = fields.Reference(
-        string="Subject of Service",
+        string="Subject Reference",
         selection="_selection_target_model",
         compute="_compute_resource_ref",
         inverse="_set_resource_ref",
