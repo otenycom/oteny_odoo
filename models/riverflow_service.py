@@ -11,6 +11,7 @@ class Service(models.Model):
         # "mail.thread",
         "riverflow.mail.thread.review.mixin",
         "riverflow.state.mixin",
+        "riverflow.state.record.tracker.mixin",
     ]
     _description = "Service"
     _parent_name = "parent_id"
@@ -20,7 +21,7 @@ class Service(models.Model):
     # list view, we assign a sequence numer for all child services. For performance, we don't
     # set the sequence field to all services on any service update, so the root services are not sorted
     # by sequence, but by name.
-    _order = "root_name,sequence"
+    _order = "root_name,root_id,sequence"
 
     DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
 
@@ -28,7 +29,7 @@ class Service(models.Model):
     # see def _get_domain_locations(self)
     parent_path = fields.Char(index="btree", unaccent=False)
     indent_level = fields.Integer(
-        "Indent level", compute="_compute_indent_level", store=False, recursive=True
+        "Indent level", compute="_compute_indent_level", store=True, recursive=True
     )
     parent_id = fields.Many2one(
         "riverflow.service", string="Parent Service", index=True, ondelete="cascade"
@@ -52,7 +53,7 @@ class Service(models.Model):
                     ("parent_path", "=like", f"{service.parent_path}%"),
                     ("id", "!=", service.id),
                 ],
-                order="root_name, sequence",
+                order="root_name,root_id,sequence",
             )
             service.descendant_ids = descendants
 
@@ -198,13 +199,17 @@ class Service(models.Model):
             else:
                 service.resource_ref = "%s,%s" % (
                     service.res_model,
-                    service.res_id or 0,
+                    service.res_id,
                 )
 
     def _set_resource_ref(self):
         for service in self:
             if service.resource_ref:
                 service.res_id = service.resource_ref.id
+                service.res_model = service.resource_ref.model
+            else:
+                service.res_id = False
+                service.res_model = False
 
     res_id_computed = fields.Integer(
         "Computed Service Subject ID",
@@ -224,10 +229,12 @@ class Service(models.Model):
                 service.res_id = service.root_id.res_id
                 service.res_model = service.root_id.res_model
 
+    # inheriting classes can override this method to add their own dependencies, "resource_ref.display_name"
     @api.depends("res_model", "res_id")
     def _compute_res_name(self):
         for service in self:
             if not service.res_id or not service.res_model:
+                service.res_name = False
                 continue
             if service.res_model not in self.env:
                 # Skip if the container model is not yet loaded in the environment
@@ -235,6 +242,7 @@ class Service(models.Model):
                 continue
             record = self.env[service.res_model].sudo().browse(service.res_id)
             if not record.exists():
+                service.res_name = False
                 continue
             name = record.display_name
             service.res_name = name if name else f"{service.res_model}/{service.res_id}"
@@ -276,6 +284,7 @@ class Service(models.Model):
             # service.display_name = ' | '.join(
             #     [service.display_name, self.compute_display_name_suffix(service)])
 
+    @api.depends("parent_path")
     def _compute_indent_level(self):
         for service in self.sudo():
             if service.parent_path:
@@ -314,12 +323,9 @@ class Service(models.Model):
             if not project_deadline:
                 service.deadline = False
             else:
-                if self.use_project_deadline_from == "self":
-                    service.deadline = project_deadline
-                else:
-                    service.deadline = project_deadline + timedelta(
-                        days=service.days_relative_to_project
-                    )
+                service.deadline = project_deadline + timedelta(
+                    days=service.days_relative_to_project
+                )
 
     @api.depends("deadline")
     def _compute_timing_json(self):
@@ -513,3 +519,8 @@ class Service(models.Model):
                     record.res_id = record.parent_id.res_id
                     record.res_model = record.parent_id.res_model
         return result
+
+    def unlink(self):
+        for service in self:
+            service.child_ids.unlink()
+        return super(Service, self).unlink()

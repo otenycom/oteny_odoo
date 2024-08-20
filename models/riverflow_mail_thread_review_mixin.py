@@ -135,14 +135,14 @@ class MailThreadReviewMixin(models.AbstractModel):
 
         for record in self:
             if False and is_neutralized_or_development():
-                _logger.warning(
-                    "Running in development or neutralized mode, skipping external sender filtering"
-                )
+                # _logger.warning(
+                #     "Running in development or neutralized mode, skipping external sender filtering"
+                # )
                 record.message_from_external_sender_ids = record.external_message_ids
             else:
-                _logger.info(
-                    "Running in production mode, filtering external sender messages"
-                )
+                # _logger.info(
+                #     "Running in production mode, filtering external sender messages"
+                # )
                 messages_from_external_senders = self.env["mail.message"]
                 for message in record.external_message_ids:
                     if _is_from_external_sender(message):

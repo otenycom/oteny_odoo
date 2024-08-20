@@ -33,8 +33,8 @@ class ServiceWizard(models.TransientModel):
         string="Subject of Service Model Name",
     )
 
-    # new chatter remark (todo: move to the base class)
-    new_remark = fields.Html("New Remark")
+    # new chatter internal note
+    new_remark = fields.Html("New Internal Note")
 
     def updated_property_values(self, service, vals):
         if not self.env.context.get("name_readonly"):
