@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="riverflow.state_record_view_form" model="ir.ui.view">
+        <field name="name">riverflow.state.record.form</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="active" invisible="True" />
+                            <field name="name" class="w-100" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="display_name" />
+                            <field name="indented_name" />
+                            <field name="master_model" />
+                            <field name="master_res_id" />
+                            <field name="master_record_reference" />
+                            <field name="res_model" />
+                            <field name="res_id" />
+                            <field name="res_name" />
+                        </group>
+                        <group>
+                            <field name="root_id" />
+                            <field name="root_name" />
+                            <field name="deadline" />
+                            <field name="deadline_formatted" />
+                            <field name="sequence" />
+                            <field name="workflow_id" />
+                            <field name="state_id" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Tags" name="tags">
+                            <field name="tag_ids" widget="many2many_tags" />
+                        </page>
+                        <page string="Timing" name="timing">
+                            <field name="timing_json" widget="json_widget" />
+                        </page>
+                        <page string="Transitions" name="transitions">
+                            <field name="transition_buttons_json" widget="json_widget" />
+                        </page>
+                        <page string="Messages" name="messages">
+                            <group>
+                                <field name="internal_notes_summary" />
+                                <field name="external_messages_summary" />
+                                <field name="unreviewed_message_count" />
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="riverflow.state_record_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.state.record.tree</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <tree string="Global Status" create="false" editable="bottom" delete="0" open_form_view="false">
+                <field name="active" column_invisible="True" />
+                <field name="sequence" column_invisible="True" />
+                <field name="root_id" column_invisible="True" />
+                <field name="root_name" column_invisible="True" />
+                <field name="name" optional="hide" />
+                <field name="display_name" optional="hide" />
+                <field name="indented_name" />
+                <field name="timing_json" widget="timing_widget" />
+                <field name="res_model" optional="hide" />
+                <field name="res_id" optional="hide" />
+                <field name="res_name" optional="hide" />
+                <field name="deadline" optional="hide" />
+                <field name="transition_buttons_json" widget="transition_buttons" />
+
+                <field name="state_id" optional="hide" />
+                <field name="unreviewed_message_count" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="riverflow.state_record_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.state.record.calendar</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <calendar string="State Records" date_start="deadline" color="state_id">
+                <field name="display_name" />
+                <field name="deadline" />
+            </calendar>
+        </field>
+    </record>
+
+    <record id="riverflow.state_record_action" model="ir.actions.act_window">
+        <field name="name">Global Status</field>
+        <field name="res_model">riverflow.state.record</field>
+        <field name="view_mode">tree,form,calendar</field>
+        <!-- todo: override ListRenderer so that the default click action opens the master record
+                then, we can make the list properly read-only
+           -->
+        <field name="context">{'edit': true}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new state record!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="riverflow.services_menu_state_records"
+        parent="riverflow.service_root" sequence="15"
+        action="riverflow.state_record_action" />
+
+</odoo>

@@ -27,9 +27,14 @@ class ServiceWizard(models.TransientModel):
         help="The services are timed relative to this deadline",
     )
     days_relative_to_project = fields.Integer("Days relative to project-deadline")
+    # the container of the service (log_entry, employee, etc)
+    res_id = fields.Integer(string="Subject of Service ID", required=False)
+    res_model = fields.Char(
+        string="Subject of Service Model Name",
+    )
 
-    # new chatter remark (todo: move to the base class)
-    new_remark = fields.Html("New Remark")
+    # new chatter internal note
+    new_remark = fields.Html("New Internal Note")
 
     def updated_property_values(self, service, vals):
         if not self.env.context.get("name_readonly"):
@@ -39,6 +44,8 @@ class ServiceWizard(models.TransientModel):
             vals["days_relative_to_project"] = self.days_relative_to_project
 
         vals["use_project_deadline_from"] = self.use_project_deadline_from
+        vals["res_id"] = self.res_id
+        vals["res_model"] = self.res_model
 
     def create_related_records(self, service):
         if not self.env.context.get("new_remark_invisible") and self.new_remark:

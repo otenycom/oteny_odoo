@@ -12,6 +12,8 @@
                         <field name="template_id" options="{'no_create': False, 'no_open': False}" />
                         <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" />
                         <field name="subject" required="1" />
+                        <field name="res_id" invisible="1"></field>
+                        <field name="res_model" invisible="1"></field>
                     </group>
                     <notebook>
                         <page string="Content" name="content">

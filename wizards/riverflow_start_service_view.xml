@@ -3,7 +3,7 @@
         <field name="name">riverflow.start.service.form</field>
         <field name="model">riverflow.start.service</field>
         <field name="arch" type="xml">
-            <form string="New Log-Entry">
+            <form string="New Service">
                 <sheet>
                     <field name="start_transition_ids" invisible="1" />
                     <field name="transition_buttons_json" widget="transition_buttons" />
