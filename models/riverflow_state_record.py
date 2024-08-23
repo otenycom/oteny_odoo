@@ -1,4 +1,5 @@
 from odoo import models, fields, api, _
+from collections import defaultdict
 
 # Define the date format constant here instead of relying on Service class
 DATE_FORMAT = "%d/%m/%Y"
@@ -116,56 +117,87 @@ class RiverflowStateRecord(models.Model):
 
     # fields from MailThreadReviewMixin
     internal_notes_summary = fields.Html(
-        string="Internal Notes", compute="_compute_internal_notes_summary"
+        string="Internal Notes",
+        compute="_compute_internal_notes_summary",
+        index=True,
+        store=True,
     )
     external_messages_summary = fields.Html(
-        string="External Messages", compute="_compute_external_messages_summary"
+        string="External Messages",
+        compute="_compute_external_messages_summary",
+        index=True,
+        store=True,
     )
     unreviewed_message_count = fields.Integer(
-        string="Review", compute="_compute_unreviewed_message_count"
+        string="Review",
+        compute="_compute_unreviewed_message_count",
+        index=True,
+        store=True,
     )
 
-    @api.depends("master_record_reference")
+    def _fetch_master_records(self):
+        """Fetch all master records in a single query."""
+        records_by_model = defaultdict(set)
+
+        for record in self:
+            if record.res_model not in self.env:
+                # Skip if the master model is not yet loaded in the environment
+                #  (during upgrades of the module, when the container is a module dependent on riverflow)
+                continue
+            records_by_model[record.master_model].add(record.master_res_id)
+
+        master_records = {}
+        for model, ids in records_by_model.items():
+            records = self.env[model].browse(ids)
+            master_records.update({(model, r.id): r for r in records})
+
+        return master_records
+
+    @api.depends("master_model", "master_res_id")
     def _compute_indented_name(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = self.env[slave.master_model].browse(slave.master_res_id)
-            if hasattr(master, "indented_name"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "indented_name"):
                 slave.indented_name = (
                     "\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}"
                     + master.indented_name
                 )
             else:
-                slave.indented_name = master.name
+                slave.indented_name = master.name if master else ""
 
-    @api.depends("master_record_reference")
+    @api.depends("master_model", "master_res_id")
     def _compute_internal_notes_summary(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = self.env[slave.master_model].browse(slave.master_res_id)
-            if hasattr(master, "internal_notes_summary"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "internal_notes_summary"):
                 slave.internal_notes_summary = master.internal_notes_summary
             else:
                 slave.internal_notes_summary = False
 
-    @api.depends("master_record_reference")
+    @api.depends("master_model", "master_res_id")
     def _compute_external_messages_summary(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = self.env[slave.master_model].browse(slave.master_res_id)
-            # Check if the master record has the 'external_messages_summary' attribute
-            if hasattr(master, "external_messages_summary"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "external_messages_summary"):
                 slave.external_messages_summary = master.external_messages_summary
             else:
-                # If the attribute doesn't exist, set a default value or handle accordingly
                 slave.external_messages_summary = False
 
-    @api.depends("master_record_reference")
+    @api.depends("master_model", "master_res_id")
     def _compute_unreviewed_message_count(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = self.env[slave.master_model].browse(slave.master_res_id)
-            # Check if the master record has the 'unreviewed_message_count' attribute
-            if hasattr(master, "unreviewed_message_count"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "unreviewed_message_count"):
                 slave.unreviewed_message_count = master.unreviewed_message_count
             else:
-                # If the attribute doesn't exist, set a default value or handle accordingly
                 slave.unreviewed_message_count = 0
 
     def init(self):
@@ -178,10 +210,13 @@ class RiverflowStateRecord(models.Model):
             % self._table
         )
 
+    @api.depends("master_model", "master_res_id")
     def _compute_state_json(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = slave.master_record_reference
-            if hasattr(master, "state_json"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "state_json"):
                 json = master.state_json
 
                 json["buttons"] = [
@@ -209,19 +244,24 @@ class RiverflowStateRecord(models.Model):
 
         return action
 
-    @api.depends("deadline")
+    @api.depends("master_model", "master_res_id")
     def _compute_deadline_formatted(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = self.env[slave.master_model].browse(slave.master_res_id)
-            if hasattr(master, "deadline_formatted"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "deadline_formatted"):
                 slave.deadline_formatted = master.deadline_formatted
             else:
                 slave.deadline_formatted = False
 
+    @api.depends("master_model", "master_res_id")
     def _compute_timing_json(self):
+        master_records = self._fetch_master_records()
+
         for slave in self:
-            master = slave.master_record_reference
-            if hasattr(master, "timing_json"):
+            master = master_records.get((slave.master_model, slave.master_res_id))
+            if master and hasattr(master, "timing_json"):
                 slave.timing_json = master.timing_json
             else:
                 slave.timing_json = False
@@ -239,8 +279,4 @@ class RiverflowStateRecord(models.Model):
         Override unlink method to clear res_model and res_id before deletion.
         This ensures that any potential references are cleaned up.
         """
-        # self.write({
-        #     'master_model': False,
-        #     'master_res_id': False,
-        # })
         return super(RiverflowStateRecord, self).unlink()

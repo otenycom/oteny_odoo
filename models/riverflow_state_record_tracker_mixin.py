@@ -112,6 +112,16 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                     record.res_name if hasattr(record, "res_name") else record.name
                 ),
                 # New fields from MailThreadReviewMixin
+                "internal_notes_summary": (
+                    record.internal_notes_summary
+                    if hasattr(record, "internal_notes_summary")
+                    else False
+                ),
+                "external_messages_summary": (
+                    record.external_messages_summary
+                    if hasattr(record, "external_messages_summary")
+                    else False
+                ),
                 "unreviewed_message_count": (
                     record.unreviewed_message_count
                     if hasattr(record, "unreviewed_message_count")
@@ -147,6 +157,8 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                     "res_model",
                     "res_name",
                     # fields from MailThreadReviewMixin
+                    "internal_notes_summary",
+                    "external_messages_summary",
                     "unreviewed_message_count",
                 ]
 
