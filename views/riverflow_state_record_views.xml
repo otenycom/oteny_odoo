@@ -60,11 +60,14 @@
         <field name="name">riverflow.state.record.tree</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
-            <tree string="Global Status" create="false" editable="bottom" delete="0" open_form_view="false">
+            <tree string="Global Status" action="row_click" type="object"
+                create="0" edit="0" delete="0"
+                decoration-bf="is_subject">
                 <field name="active" column_invisible="True" />
                 <field name="sequence" column_invisible="True" />
                 <field name="root_id" column_invisible="True" />
                 <field name="root_name" column_invisible="True" />
+                <field name="is_subject" column_invisible="True" />
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
                 <field name="indented_name" />

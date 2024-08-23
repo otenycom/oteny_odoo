@@ -218,31 +218,9 @@ class RiverflowStateRecord(models.Model):
             master = master_records.get((slave.master_model, slave.master_res_id))
             if master and hasattr(master, "state_json"):
                 json = master.state_json
-
-                json["buttons"] = [
-                    {
-                        "index": 0,
-                        "caption": "View",
-                        "help": "",
-                        "action": "action_view_master_record",
-                    }
-                ]
                 slave.state_json = json
             else:
                 slave.state_json = False
-
-    def action_view_master_record(self):
-        master = self.master_record_reference
-        action = {
-            "name": "View " + self.name,
-            "type": "ir.actions.act_window",
-            "res_model": self.master_model,
-            "res_id": self.master_res_id,
-            "target": "current",
-            "view_mode": "form",
-        }
-
-        return action
 
     @api.depends("master_model", "master_res_id")
     def _compute_deadline_formatted(self):
@@ -266,17 +244,16 @@ class RiverflowStateRecord(models.Model):
             else:
                 slave.timing_json = False
 
-    def action_button_click(self):
-        master = self.master_record_reference
-        action = master.action_button_click()
-        action["res_model"] = self.master_model
-        action["res_id"] = self.master_res_id
-        action["target"] = "current"
+    def action_view_master_record(self):
+        action = {
+            "name": "View " + self.name,
+            "type": "ir.actions.act_window",
+            "res_model": self.master_model,
+            "res_id": self.master_res_id,
+            "target": "current",
+            "view_mode": "form",
+        }
         return action
 
-    def unlink(self):
-        """
-        Override unlink method to clear res_model and res_id before deletion.
-        This ensures that any potential references are cleaned up.
-        """
-        return super(RiverflowStateRecord, self).unlink()
+    def row_click(self):
+        return self.action_view_master_record()
