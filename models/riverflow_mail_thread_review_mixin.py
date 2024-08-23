@@ -12,40 +12,48 @@ class MailThreadReviewMixin(models.AbstractModel):
     _inherit = ["mail.thread"]
 
     internal_note_ids = fields.Many2many(
-        "mail.message",
-        "mail_message_internal_rel",
-        "res_id",
-        "message_id",
+        comodel_name="mail.message",
+        column1="res_id",
+        column2="message_id",
         string="Internal Notes",
         compute="_compute_internal_note_ids",
-        store=True,
+        store=False,
     )
 
+    external_message_ids = fields.Many2many(
+        comodel_name="mail.message",
+        column1="res_id",
+        column2="message_id",
+        string="External Messages",
+        compute="_compute_external_message_ids",
+        store=False,
+    )
+    unreviewed_message_ids = fields.Many2many(
+        comodel_name="mail.message",
+        column1="res_id",
+        column2="message_id",
+        string="Unreviewed Messages",
+        compute="_compute_unreviewed_message_ids",
+        store=False,
+    )
+    # field to store messages specifically from external senders, which
+    # will trigger a needs review flag
+    message_from_external_sender_ids = fields.Many2many(
+        comodel_name="mail.message",
+        column1="res_id",
+        column2="message_id",
+        string="Messages from External Senders",
+        compute="_compute_message_from_external_sender_ids",
+        store=False,
+    )
+
+    # todo: make this a JSON field and render the summaries properly, maybe with a custom widget and a popover
     internal_notes_summary = fields.Html(
         string="Top 3 Internal Notes",
         compute="_compute_latest_internal_notes",
         store=True,
         tracking=False,
         index="trigram",
-    )
-
-    external_message_ids = fields.Many2many(
-        "mail.message",
-        "mail_message_external_rel",
-        "res_id",
-        "message_id",
-        string="External Messages",
-        compute="_compute_external_message_ids",
-        store=True,
-    )
-    unreviewed_message_ids = fields.Many2many(
-        "mail.message",
-        "mail_message_unreviewed_rel",
-        "res_id",
-        "message_id",
-        string="Unreviewed Messages",
-        compute="_compute_unreviewed_message_ids",
-        store=True,
     )
     last_external_message_review_time = fields.Datetime(
         string="External Messages Reviewed",
@@ -67,18 +75,6 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_external_messages_summary",
         store=True,
         index="trigram",
-    )
-
-    # field to store messages specifically from external senders, which
-    # will trigger a needs review flag
-    message_from_external_sender_ids = fields.Many2many(
-        "mail.message",
-        "mail_message_external_sender_rel",
-        "res_id",
-        "message_id",
-        string="Messages from External Senders",
-        compute="_compute_message_from_external_sender_ids",
-        store=False,
     )
 
     def _get_filtered_messages(self, select_internal):
@@ -112,7 +108,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     def _get_system_user_id(self):
         return self.env.ref("base.user_root").id  # always id 1, login name __system__
 
-    @api.depends("external_message_ids")
+    @api.depends("message_ids", "external_message_ids")
     def _compute_message_from_external_sender_ids(self):
         """
         Compute method for message_from_external_sender_ids.
@@ -158,16 +154,19 @@ class MailThreadReviewMixin(models.AbstractModel):
             body_str = body_str[:max_length] + "..."
         return f'<p style="margin-bottom: 0rem;">{body_str}</p>'
 
-    @api.depends("internal_note_ids.body")
+    @api.depends("message_ids.body")
     def _compute_latest_internal_notes(self):
         for record in self:
             formatted_notes = [
                 self._format_message_body(message.body)
                 for message in record.internal_note_ids[:3]
             ]
-            record.internal_notes_summary = "".join(formatted_notes)
+            if len(formatted_notes) > 0:
+                record.internal_notes_summary = "".join(formatted_notes)
+            else:
+                record.internal_notes_summary = False  # needed for Odoo search
 
-    @api.depends("external_message_ids")
+    @api.depends("message_ids.body")
     def _compute_external_messages_summary(self):
         for record in self:
             sorted_messages = record.external_message_ids.sorted(
@@ -177,11 +176,12 @@ class MailThreadReviewMixin(models.AbstractModel):
                 self._format_message_body(message.body or message.subject or "")
                 for message in sorted_messages
             ]
-            record.external_messages_summary = "".join(formatted_messages)
+            if len(formatted_messages) > 0:
+                record.external_messages_summary = "".join(formatted_messages)
+            else:
+                record.external_messages_summary = False  # needed for Odoo search
 
-    @api.depends(
-        "message_from_external_sender_ids", "last_external_message_review_time"
-    )
+    @api.depends("message_ids", "last_external_message_review_time")
     def _compute_unreviewed_message_ids(self):
         for record in self:
             record.unreviewed_message_ids = (
@@ -191,7 +191,7 @@ class MailThreadReviewMixin(models.AbstractModel):
                 )
             )
 
-    @api.depends("external_message_ids")
+    @api.depends("message_ids", "external_message_ids")
     def _compute_external_message_count(self):
         for record in self:
             record.external_message_count = len(record.external_message_ids)

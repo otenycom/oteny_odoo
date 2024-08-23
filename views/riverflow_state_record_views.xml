@@ -114,29 +114,25 @@
                 <field name="internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" string="External Messages" />
 
-                <filter string="Active" name="active" domain="[('active', '=', True)]" />
-                <filter string="Archived" name="inactive" domain="[('active', '=', False)]" />
-
                 <separator />
-                <filter string="Is Subject" name="is_subject" domain="[('is_subject', '=', True)]" />
-
+                <filter string="Workflow Pending" name="pending" domain="[('state_id.is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('state_id.is_end_state', '=', True)]" />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <separator />
+                <filter string="Deadline" name="deadline" date="deadline" />
                 <separator />
                 <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
                 <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d'))]" />
                 <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
-
                 <separator />
-                <filter string="Has Internal Notes" name="has_internal_notes" domain="[('internal_notes_summary', '!=', False)]" />
-                <filter string="Has External Messages" name="has_external_messages" domain="[('external_messages_summary', '!=', False)]" />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
-
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
                 <group expand="0" string="Group By">
-                    <filter string="Master Model" name="group_by_master_model" context="{'group_by': 'master_model'}" />
-                    <filter string="Subject Model" name="group_by_res_model" context="{'group_by': 'res_model'}" />
-                    <filter string="Root" name="group_by_root" context="{'group_by': 'root_name'}" />
                     <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
                     <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
-                    <filter string="Unreviewed Messages" name="group_by_unreviewed" context="{'group_by': 'unreviewed_message_count'}" />
                 </group>
             </search>
         </field>
