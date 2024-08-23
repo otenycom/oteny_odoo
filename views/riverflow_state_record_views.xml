@@ -28,13 +28,9 @@
                             <field name="res_name" />
                         </group>
                         <group>
-                            <field name="root_id" />
                             <field name="root_name" />
-                            <field name="deadline" />
-                            <field name="deadline_formatted" />
-                            <field name="sequence" />
-                            <field name="workflow_id" />
-                            <field name="state_id" />
+                            <field name="timing_json" widget="timing_widget" />
+                            <field name="state_json" widget="json_widget" />
                         </group>
                     </group>
                     <notebook>
@@ -44,8 +40,8 @@
                         <page string="Timing" name="timing">
                             <field name="timing_json" widget="json_widget" />
                         </page>
-                        <page string="Transitions" name="transitions">
-                            <field name="transition_buttons_json" widget="json_widget" />
+                        <page string="State" name="state">
+
                         </page>
                         <page string="Messages" name="messages">
                             <group>
@@ -77,9 +73,11 @@
                 <field name="res_id" optional="hide" />
                 <field name="res_name" optional="hide" />
                 <field name="deadline" optional="hide" />
-                <field name="transition_buttons_json" widget="transition_buttons" />
+                <field name="state_json" widget="transition_buttons" />
 
                 <field name="state_id" optional="hide" />
+                <field name='internal_notes_summary' />
+                <field name="external_messages_summary" />
                 <field name="unreviewed_message_count" />
             </tree>
         </field>

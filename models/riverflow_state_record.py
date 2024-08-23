@@ -108,21 +108,21 @@ class RiverflowStateRecord(models.Model):
         readonly=True,
         index=True,
     )
-    transition_buttons_json = fields.Json(
-        string="Transition Buttons",
+    state_json = fields.Json(
+        string="State",
         readonly=True,
-        compute="_compute_transition_buttons_json",
+        compute="_compute_state_json",
     )
 
     # fields from MailThreadReviewMixin
-    internal_notes_summary = fields.Char(
-        string="Internal Notes Summary", compute="_compute_internal_notes_summary"
+    internal_notes_summary = fields.Html(
+        string="Internal Notes", compute="_compute_internal_notes_summary"
     )
-    external_messages_summary = fields.Char(
-        string="External Messages Summary", compute="_compute_external_messages_summary"
+    external_messages_summary = fields.Html(
+        string="External Messages", compute="_compute_external_messages_summary"
     )
     unreviewed_message_count = fields.Integer(
-        string="Unreviewed Message Count", compute="_compute_unreviewed_message_count"
+        string="Review", compute="_compute_unreviewed_message_count"
     )
 
     @api.depends("master_record_reference")
@@ -178,11 +178,11 @@ class RiverflowStateRecord(models.Model):
             % self._table
         )
 
-    def _compute_transition_buttons_json(self):
+    def _compute_state_json(self):
         for slave in self:
             master = slave.master_record_reference
-            if hasattr(master, "transition_buttons_json"):
-                json = master.transition_buttons_json
+            if hasattr(master, "state_json"):
+                json = master.state_json
 
                 json["buttons"] = [
                     {
@@ -192,9 +192,9 @@ class RiverflowStateRecord(models.Model):
                         "action": "action_view_master_record",
                     }
                 ]
-                slave.transition_buttons_json = json
+                slave.state_json = json
             else:
-                slave.transition_buttons_json = False
+                slave.state_json = False
 
     def action_view_master_record(self):
         master = self.master_record_reference
