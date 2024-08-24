@@ -128,10 +128,13 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                 )
 
         # Post the message
-        service.message_post(
+        service.with_context(
+            mail_post_autofollow=False, mail_create_nosubscribe=True
+        ).message_post(
             message_type="email",
             subject=subject_rendered,
             partner_ids=self.recipient_partner_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
+            email_add_signature=False,
         )

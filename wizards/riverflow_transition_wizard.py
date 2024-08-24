@@ -53,8 +53,13 @@ class TransitionWizard(models.AbstractModel):
             if createNewRecord:
                 # Save the record to the database, and pass the actual id to the action that opens the form
                 # also allows to place remarks in the chatter of the new record
-                new_record = self.env[self._workflow_model].create(
-                    new_record._convert_to_write(new_record._cache)
+                new_record = (
+                    self.env[self._workflow_model]
+                    .with_context(
+                        mail_create_nosubscribe=True,  # individual team members are not subscribed to the record thread
+                        mail_auto_subscribe_no_notify=True,  # individual team members are not notified of the record thread
+                    )
+                    .create(new_record._convert_to_write(new_record._cache))
                 )
                 recordsToTransition = [new_record]
                 action["res_id"] = new_record.id
