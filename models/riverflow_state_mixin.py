@@ -37,8 +37,11 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         "State name", related="state_id.name", store=True, index=True
     )
 
+    state_json = fields.Json(string="State", compute="_compute_state_json", store=False)
     transition_buttons_json = fields.Json(
-        "State", compute="_compute_transition_buttons_json", store=False
+        string="Workflow Actions",
+        compute="_compute_transition_buttons_json",
+        store=False,
     )
 
     # = self._name, made accessible for use in the filter-domain of the workflow dropdown
@@ -84,7 +87,8 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     order="sequence,id",
                 )
 
-    def _compute_transition_buttons_json(self):
+    def _compute_state_json(self):
+        # for rendering just the state name and workflow name
         for record in self:
             wf_state_text = record.current_workflow_name or ""
             if record.state_name:
@@ -94,7 +98,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             icon = record.state_id.workflow_id.icon or ""
             is_end_state = record.state_id.is_end_state == True
 
-            transition_buttons = {
+            state_json = {
                 "text": wf_state_text,
                 "workflow_icon": icon,
                 "is_end_state": is_end_state,
@@ -103,6 +107,13 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 "buttons": [],
             }
 
+            record.state_json = state_json
+
+    @api.depends("state_json")
+    def _compute_transition_buttons_json(self):
+        # for rendering the transition buttons below the state name
+        for record in self:
+            transition_buttons = record.state_json
             transition_ids = record.from_transition_ids
             if transition_ids:
                 index = 0

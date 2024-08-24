@@ -28,13 +28,9 @@
                             <field name="res_name" />
                         </group>
                         <group>
-                            <field name="root_id" />
                             <field name="root_name" />
-                            <field name="deadline" />
-                            <field name="deadline_formatted" />
-                            <field name="sequence" />
-                            <field name="workflow_id" />
-                            <field name="state_id" />
+                            <field name="timing_json" widget="timing_widget" />
+                            <field name="state_json" widget="json_widget" />
                         </group>
                     </group>
                     <notebook>
@@ -44,8 +40,8 @@
                         <page string="Timing" name="timing">
                             <field name="timing_json" widget="json_widget" />
                         </page>
-                        <page string="Transitions" name="transitions">
-                            <field name="transition_buttons_json" widget="json_widget" />
+                        <page string="State" name="state">
+
                         </page>
                         <page string="Messages" name="messages">
                             <group>
@@ -64,11 +60,14 @@
         <field name="name">riverflow.state.record.tree</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
-            <tree string="Global Status" create="false" editable="bottom" delete="0" open_form_view="false">
+            <tree string="Global Status" action="row_click" type="object"
+                create="0" edit="0" delete="0"
+                decoration-bf="is_subject">
                 <field name="active" column_invisible="True" />
                 <field name="sequence" column_invisible="True" />
                 <field name="root_id" column_invisible="True" />
                 <field name="root_name" column_invisible="True" />
+                <field name="is_subject" column_invisible="True" />
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
                 <field name="indented_name" />
@@ -77,9 +76,11 @@
                 <field name="res_id" optional="hide" />
                 <field name="res_name" optional="hide" />
                 <field name="deadline" optional="hide" />
-                <field name="transition_buttons_json" widget="transition_buttons" />
+                <field name="state_json" widget="transition_buttons" />
 
                 <field name="state_id" optional="hide" />
+                <field name='internal_notes_summary' />
+                <field name="external_messages_summary" />
                 <field name="unreviewed_message_count" />
             </tree>
         </field>
@@ -96,10 +97,52 @@
         </field>
     </record>
 
+    <record id="riverflow.state_record_view_search" model="ir.ui.view">
+        <field name="name">riverflow.state.record.search</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <search string="Search State Records">
+                <field name="name" string="Name" filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="indented_name" string="Record" />
+                <field name="master_model" />
+                <field name="res_model" />
+                <field name="res_name" />
+                <field name="root_name" />
+                <field name="state_id" />
+                <field name="tag_ids" />
+                <field name="deadline" />
+                <field name="internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" string="External Messages" />
+
+                <separator />
+                <filter string="Workflow Pending" name="pending" domain="[('state_id.is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('state_id.is_end_state', '=', True)]" />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <separator />
+                <filter string="Deadline" name="deadline" date="deadline" />
+                <separator />
+                <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
+                <separator />
+                <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
+                <group expand="0" string="Group By">
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                    <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="riverflow.state_record_action" model="ir.actions.act_window">
         <field name="name">Global Status</field>
         <field name="res_model">riverflow.state.record</field>
         <field name="view_mode">tree,form,calendar</field>
+        <field name="search_view_id" ref="riverflow.state_record_view_search" />
         <!-- todo: override ListRenderer so that the default click action opens the master record
                 then, we can make the list properly read-only
            -->
