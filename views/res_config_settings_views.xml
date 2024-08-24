@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.riverflow</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="70" />
+        <field name="inherit_id" ref="base.res_config_settings_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Riverflow" string="Riverflow" name="riverflow" groups="base.group_user">
+                    <h2>Riverflow Settings</h2>
+                    <div class="row mt16 o_settings_container" name="riverflow_setting_container">
+                        <div class="col-12 col-lg-12 o_setting_box">
+                            <div class="o_setting_left_pane" />
+                            <div class="o_setting_right_pane">
+                                <label for="restrict_email_recipients_to" string="Email Domain Restriction" />
+                                <div class="text-muted">
+                                    Set allowed email domains for recipients
+                                </div>
+                                <div class="content-group">
+                                    <div class="mt16">
+                                        <field name="restrict_email_recipients_to" class="o_field_char oe_inline" style="width: 100%;" />
+                                    </div>
+                                    <div class="text-muted mt8">
+                                        Comma-separated list of allowed email domains (e.g., cuneus.eu,vriend.com)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>
