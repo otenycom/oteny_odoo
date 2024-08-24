@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "1.17",
+    "version": "1.18",
     "depends": [
         "base",
         "mail",
@@ -22,6 +22,7 @@
         "views/riverflow_transition_views.xml",
         "views/riverflow_transition_action_views.xml",
         "views/riverflow_state_record_views.xml",
+        "views/res_config_settings_views.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
     ],

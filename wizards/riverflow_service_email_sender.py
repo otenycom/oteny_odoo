@@ -96,6 +96,37 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         # Sanitize the rendered body
         safe_body = tools.html_sanitize(body_rendered)
 
+        allowed_domains = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("riverflow.restrict_email_recipients_to", "")
+            .split(",")
+        )
+        allowed_domains = [
+            domain.strip().lower() for domain in allowed_domains if domain.strip()
+        ]
+
+        if allowed_domains:
+            invalid_recipients = self.recipient_partner_ids.filtered(
+                lambda partner: partner.email
+                and not any(
+                    partner.email.lower().endswith(f"@{domain}")
+                    for domain in allowed_domains
+                )
+            )
+
+            if invalid_recipients:
+                raise UserError(
+                    _(
+                        "Email sending is restricted to specific domains (%s). "
+                        "The following recipients have invalid email domains: %s"
+                    )
+                    % (
+                        ", ".join(allowed_domains),
+                        ", ".join(invalid_recipients.mapped("name")),
+                    )
+                )
+
         # Post the message
         service.message_post(
             message_type="email",
