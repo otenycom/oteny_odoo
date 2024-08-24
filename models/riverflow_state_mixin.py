@@ -37,9 +37,11 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         "State name", related="state_id.name", store=True, index=True
     )
 
-    state_json = fields.Json("State", compute="_compute_state_json", store=False)
+    state_json = fields.Json(string="State", compute="_compute_state_json", store=False)
     transition_buttons_json = fields.Json(
-        "State", compute="_compute_transition_buttons_json", store=False
+        string="Workflow Actions",
+        compute="_compute_transition_buttons_json",
+        store=False,
     )
 
     # = self._name, made accessible for use in the filter-domain of the workflow dropdown

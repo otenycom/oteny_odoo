@@ -503,13 +503,14 @@ class Service(models.Model):
             self.res_model = self.parent_id.res_model
             self.res_id = self.parent_id.res_id
 
-    @api.model
-    def create(self, vals):
-        record = super(Service, self).create(vals)
-        if record.parent_id and not record.res_id:
-            record.res_id = record.parent_id.res_id
-            record.res_model = record.parent_id.res_model
-        return record
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(Service, self).create(vals_list)
+        for record in records:
+            if record.parent_id and not record.res_id:
+                record.res_id = record.parent_id.res_id
+                record.res_model = record.parent_id.res_model
+        return records
 
     def write(self, vals):
         result = super(Service, self).write(vals)
@@ -519,8 +520,3 @@ class Service(models.Model):
                     record.res_id = record.parent_id.res_id
                     record.res_model = record.parent_id.res_model
         return result
-
-    def unlink(self):
-        for service in self:
-            service.child_ids.unlink()
-        return super(Service, self).unlink()
