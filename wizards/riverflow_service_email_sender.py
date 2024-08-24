@@ -137,4 +137,5 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=False,
+            email_layout_xmlid=self.template_id.email_layout_xmlid,
         )
