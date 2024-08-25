@@ -51,10 +51,22 @@ class MailThreadReviewMixin(models.AbstractModel):
     internal_notes_summary = fields.Html(
         string="Top 3 Internal Notes",
         compute="_compute_latest_internal_notes",
+        inverse="_inverse_internal_notes_summary",
         store=True,
         tracking=False,
         index="trigram",
     )
+
+    def _inverse_internal_notes_summary(self):
+        for record in self:
+            if record.internal_notes_summary:
+                plain_text = record.internal_notes_summary
+                record.message_post(
+                    body=plain_text,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
+
     last_external_message_review_time = fields.Datetime(
         string="External Messages Reviewed",
         tracking=True,
