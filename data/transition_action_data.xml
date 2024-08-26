@@ -1,20 +1,18 @@
 <?xml version="1.0"?>
-<odoo>
-    <data noupdate="0">
-        <record id="riverflow.transition_action_default" model="riverflow.transition.action">
-            <field name="name">Default Transition Action</field>
-            <field name="description">Optionally prompts for new remark</field>
-            <field name="odoo_view">riverflow.view_service_transition_action_default_form</field>
-            <field name="model_id" ref="riverflow.model_riverflow_service" />
-            <!-- <field name="icon" /> -->
-        </record>
+<odoo noupdate="0">
+    <record id="transition_action_default" model="riverflow.transition.action">
+        <field name="name">Default Transition Action</field>
+        <field name="description">Optionally prompts for new remark</field>
+        <field name="odoo_view">view_service_transition_action_default_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <!-- <field name="icon" /> -->
+    </record>
 
-        <record id="riverflow.transition_action_email_sender" model="riverflow.transition.action">
-            <field name="name">Send Email Action</field>
-            <field name="description">Sends an email related to the service</field>
-            <field name="odoo_view">riverflow.view_service_email_sender_form</field>
-            <field name="model_id" ref="riverflow.model_riverflow_service" />
-            <!-- <field name="icon" /> -->
-        </record>
-    </data>
+    <record id="transition_action_email_sender" model="riverflow.transition.action">
+        <field name="name">Send Email Action</field>
+        <field name="description">Sends an email related to the service</field>
+        <field name="odoo_view">view_service_email_sender_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <!-- <field name="icon" /> -->
+    </record>
 </odoo>

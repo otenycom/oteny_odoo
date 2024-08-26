@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id="riverflow.transition_view_form" model="ir.ui.view">
+    <record id="transition_view_form" model="ir.ui.view">
         <field name="name">riverflow.transition.form</field>
         <field name="model">riverflow.transition</field>
         <field name="priority">1</field>
@@ -34,7 +34,7 @@
         </field>
     </record>
 
-    <record id="riverflow.transition_view_tree" model="ir.ui.view">
+    <record id="transition_view_tree" model="ir.ui.view">
         <field name="name">riverflow.transition.tree</field>
         <field name="model">riverflow.transition</field>
         <field name="arch" type="xml">
@@ -42,7 +42,7 @@
                  can be moved around beyond the from_state that they belong to.
                  Setting <tree default_order="workflow_id,from_state_id,sequence,name,id"> does not fix this.
             -->
-            <tree string="Transitions">
+            <tree>
                 <field name="active" column_invisible="True" />
                 <!-- <field name="sequence" widget="handle" /> -->
                 <field name="workflow_id" />
@@ -58,7 +58,7 @@
         </field>
     </record>
 
-    <record id="riverflow.transition_action" model="ir.actions.act_window">
+    <record id="transition_action" model="ir.actions.act_window">
         <field name="name">Transitions</field>
         <field name="res_model">riverflow.transition</field>
         <field name="view_mode">tree,form</field>

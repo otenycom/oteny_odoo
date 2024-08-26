@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id='riverflow.view_service_form' model='ir.ui.view'>
+    <record id='view_service_form' model='ir.ui.view'>
         <field name="name">riverflow.service.form</field>
         <field name="model">riverflow.service</field>
         <field name="priority">1</field>
@@ -112,11 +112,11 @@
         </field>
     </record>
 
-    <record id='riverflow.service_view_tree' model='ir.ui.view'>
+    <record id='service_view_tree' model='ir.ui.view'>
         <field name='name'>riverflow.service.tree</field>
         <field name='model'>riverflow.service</field>
         <field name='arch' type='xml'>
-            <tree string='Services' create="false">
+            <tree create="false">
                 <field name="active" column_invisible="True" />
                 <field name='indented_name' />
                 <field name="timing_json" widget="timing_widget" optional="show" />
@@ -138,7 +138,7 @@
         </field>
     </record>
 
-    <record id='riverflow.service_action' model='ir.actions.act_window'>
+    <record id='service_action' model='ir.actions.act_window'>
         <field name='name'>Services</field>
         <field name='res_model'>riverflow.service</field>
         <field name="view_mode">tree,form</field>
@@ -149,7 +149,7 @@
         </field>
     </record>
 
-    <record id="riverflow.service_tag_view_view_form" model="ir.ui.view">
+    <record id="service_tag_view_view_form" model="ir.ui.view">
         <field name="name">riverflow.service.tag.form</field>
         <field name="model">riverflow.service.tag</field>
         <field name="arch" type="xml">
@@ -163,18 +163,18 @@
         </field>
     </record>
 
-    <record id="riverflow.service_tag_view_view_tree" model="ir.ui.view">
+    <record id="service_tag_view_view_tree" model="ir.ui.view">
         <field name="name">riverflow.service.tag.tree</field>
         <field name="model">riverflow.service.tag</field>
         <field name="arch" type="xml">
-            <tree string="Service Tags" editable="bottom">
+            <tree editable="bottom">
                 <field name="name" />
                 <field name="color" widget="color_picker" />
             </tree>
         </field>
     </record>
 
-    <record id="riverflow.service_tag_action" model="ir.actions.act_window">
+    <record id="service_tag_action" model="ir.actions.act_window">
         <field name="name">Service Tags</field>
         <field name="res_model">riverflow.service.tag</field>
         <field name="help" type="html">
