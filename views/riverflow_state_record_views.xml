@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <record id="riverflow.state_record_view_form" model="ir.ui.view">
+    <record id="state_record_view_form" model="ir.ui.view">
         <field name="name">riverflow.state.record.form</field>
         <field name="model">riverflow.state.record</field>
         <field name="priority">1</field>
@@ -56,11 +56,11 @@
         </field>
     </record>
 
-    <record id="riverflow.state_record_view_tree" model="ir.ui.view">
+    <record id="state_record_view_tree" model="ir.ui.view">
         <field name="name">riverflow.state.record.tree</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
-            <tree string="Global Status" action="row_click" type="object"
+            <tree action="row_click" type="object"
                 create="0" edit="0" delete="0"
                 decoration-bf="is_subject">
                 <field name="active" column_invisible="True" />
@@ -86,7 +86,7 @@
         </field>
     </record>
 
-    <record id="riverflow.state_record_view_calendar" model="ir.ui.view">
+    <record id="state_record_view_calendar" model="ir.ui.view">
         <field name="name">riverflow.state.record.calendar</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
@@ -97,7 +97,7 @@
         </field>
     </record>
 
-    <record id="riverflow.state_record_view_search" model="ir.ui.view">
+    <record id="state_record_view_search" model="ir.ui.view">
         <field name="name">riverflow.state.record.search</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
@@ -138,7 +138,7 @@
         </field>
     </record>
 
-    <record id="riverflow.state_record_action" model="ir.actions.act_window">
+    <record id="state_record_action" model="ir.actions.act_window">
         <field name="name">Global Status</field>
         <field name="res_model">riverflow.state.record</field>
         <field name="view_mode">tree,form,calendar</field>

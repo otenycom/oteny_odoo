@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <record id="riverflow.workflow_view_form" model="ir.ui.view">
+    <record id="workflow_view_form" model="ir.ui.view">
         <field name="name">riverflow.workflow.form</field>
         <field name="model">riverflow.workflow</field>
         <field name="priority">1</field>
@@ -71,11 +71,11 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_view_tree" model="ir.ui.view">
+    <record id="workflow_view_tree" model="ir.ui.view">
         <field name="name">riverflow.workflow.tree</field>
         <field name="model">riverflow.workflow</field>
         <field name="arch" type="xml">
-            <tree string="Workflows">
+            <tree>
                 <field name="active" column_invisible="True" />
                 <field name="model" optional="show" />
                 <field name="icon_name_html" />
@@ -85,7 +85,7 @@
         </field>
     </record>
 
-    <record id="riverflow.workflow_action" model="ir.actions.act_window">
+    <record id="workflow_action" model="ir.actions.act_window">
         <field name="name">Workflows</field>
         <field name="res_model">riverflow.workflow</field>
         <field name="view_mode">tree,form</field>
