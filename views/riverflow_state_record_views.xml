@@ -70,18 +70,17 @@
                 <field name="is_subject" column_invisible="True" />
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
-                <field name="indented_name" />
-                <field name="timing_json" widget="timing_widget" />
+                <field name="indented_name" optional="show" />
+                <field name="master_model" optional="hide" />
+                <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="res_model" optional="hide" />
-                <field name="res_id" optional="hide" />
                 <field name="res_name" optional="hide" />
                 <field name="deadline" optional="hide" />
-                <field name="state_json" widget="transition_buttons" />
-
+                <field name="state_json" widget="transition_buttons" optional="show" />
                 <field name="state_id" optional="hide" />
-                <field name='internal_notes_summary' />
-                <field name="external_messages_summary" />
-                <field name="unreviewed_message_count" />
+                <field name='internal_notes_summary' optional="show" />
+                <field name="external_messages_summary" optional="show" />
+                <field name="unreviewed_message_count" optional="show" />
             </tree>
         </field>
     </record>
@@ -102,7 +101,8 @@
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
             <search string="Search State Records">
-                <field name="name" string="Name" filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="name" string="Name"
+                    filter_domain="['|', ('res_name', 'ilike', self), ('display_name', 'ilike', self)]" />
                 <field name="indented_name" string="Record" />
                 <field name="master_model" />
                 <field name="res_model" />
