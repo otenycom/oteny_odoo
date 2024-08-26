@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.64",
+    "version": "17.0.1.66",
     "depends": [
         "base",
         "mail",
