@@ -232,13 +232,14 @@ class MailThreadReviewMixin(models.AbstractModel):
             action["context"]["default_res_id"] = self.id
         return action
 
-    def _message_create(self, values_list):
-        messages = super()._message_create(values_list)
-        self.invalidate_recordset(
-            [
-                "external_message_ids",
-                "unreviewed_message_ids",
-                "external_messages_summary",
-            ]
-        )
-        return messages
+    # rely on  @api.depends decorators
+    # def _message_create(self, values_list):
+    #     messages = super()._message_create(values_list)
+    #     self.invalidate_recordset(
+    #         [
+    #             "external_message_ids",
+    #             "unreviewed_message_ids",
+    #             "external_messages_summary",
+    #         ]
+    #     )
+    #     return messages

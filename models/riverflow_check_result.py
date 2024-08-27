@@ -37,3 +37,22 @@ class CheckResult(models.Model):
                 record.color = 1  # Red
             else:
                 record.color = 0  # Gray (default)
+
+    def compare_base(self, other):
+        """
+        Base compare method for check results.
+        Compare basic fields common to all check results.
+        """
+        if isinstance(other, dict):
+            return (
+                self.check_type == other.get("check_type")
+                and self.description == other.get("description")
+                and self.severity == other.get("severity")
+            )
+        elif isinstance(other, type(self)):
+            return (
+                self.check_type == other.check_type
+                and self.description == other.description
+                and self.severity == other.severity
+            )
+        return False
