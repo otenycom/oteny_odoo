@@ -27,7 +27,9 @@ export class TimingWidget extends Component {
     }
 
     get relativedays() {
-        return this.timingDataState.relative_days || "";
+        if (!this.timingDataState.is_end_state)
+            return this.timingDataState.relative_days || "";
+        return undefined;
     }
 
     get date() {
@@ -35,12 +37,16 @@ export class TimingWidget extends Component {
     }
 
     get daysRemaining() {
-        return this.timingDataState.days_remaining;
+        if (!this.timingDataState.is_end_state)
+            return this.timingDataState.days_remaining;
+        return undefined;
     }
 
     get dateClass() {
-        if (this.timingDataState.is_past) return "riverflow_is_past";
-        if (this.timingDataState.is_today) return "riverflow_is_today";
+        if (!this.timingDataState.is_end_state) {
+            if (this.timingDataState.is_past) return "riverflow_is_past";
+            if (this.timingDataState.is_today) return "riverflow_is_today";
+        }
         return "";
     }
 }
