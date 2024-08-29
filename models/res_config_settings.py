@@ -7,5 +7,5 @@ class ResConfigSettings(models.TransientModel):
     restrict_email_recipients_to = fields.Char(
         string="Restrict Email Recipients To",
         config_parameter="riverflow.restrict_email_recipients_to",
-        help="Comma-separated list of allowed email domains (e.g., cuneus.eu,vriend.com)",
+        help="Comma-separated list of allowed email domains (e.g., cuneuscrew.eu,vriend.com)",
     )
