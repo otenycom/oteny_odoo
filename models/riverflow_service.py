@@ -87,6 +87,7 @@ class Service(models.Model):
         default=lambda self: self.env.company,
         tracking=True,
     )
+
     active = fields.Boolean(
         default=True, help="Set active to false to archive the service", tracking=True
     )

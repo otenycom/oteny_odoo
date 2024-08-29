@@ -36,6 +36,12 @@ class ServiceWizard(models.TransientModel):
     # new chatter internal note
     new_remark = fields.Html("New Internal Note")
 
+    responsible_team_id = fields.Many2one(
+        "riverflow.team",
+        string="Responsible Team",
+        help="Team executing the workflow of this service. This team is also responsible for reviewing external messages.",
+    )
+
     def updated_property_values(self, service, vals):
         if not self.env.context.get("name_readonly"):
             vals["name"] = self.name
@@ -46,6 +52,7 @@ class ServiceWizard(models.TransientModel):
         vals["use_project_deadline_from"] = self.use_project_deadline_from
         vals["res_id"] = self.res_id
         vals["res_model"] = self.res_model
+        vals["responsible_team_id"] = self.responsible_team_id
 
     def create_related_records(self, service):
         if not self.env.context.get("new_remark_invisible") and self.new_remark:

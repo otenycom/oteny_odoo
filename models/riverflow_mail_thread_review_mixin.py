@@ -11,6 +11,14 @@ class MailThreadReviewMixin(models.AbstractModel):
     _description = "Mail Thread Review Mixin"
     _inherit = ["mail.thread"]
 
+    responsible_team_id = fields.Many2one(
+        "riverflow.team",
+        string="Responsible Team",
+        tracking=True,
+        help="Team executing the workflow of this log entry. This team is also responsible for reviewing external messages.",
+        index=True,
+    )
+
     internal_note_ids = fields.Many2many(
         comodel_name="mail.message",
         column1="res_id",

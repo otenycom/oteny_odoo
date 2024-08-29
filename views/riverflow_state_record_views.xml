@@ -19,7 +19,7 @@
                     <group>
                         <group>
                             <field name="display_name" />
-                            <field name="indented_name" />
+                            <field name="tag_ids" widget="many2many_tags" />
                             <field name="master_model" />
                             <field name="master_res_id" />
                             <field name="master_record_reference" />
@@ -30,19 +30,11 @@
                         <group>
                             <field name="root_name" />
                             <field name="timing_json" widget="timing_widget" />
+                            <field name="responsible_team_id" />
                             <field name="state_json" widget="json_widget" />
                         </group>
                     </group>
                     <notebook>
-                        <page string="Tags" name="tags">
-                            <field name="tag_ids" widget="many2many_tags" />
-                        </page>
-                        <page string="Timing" name="timing">
-                            <field name="timing_json" widget="json_widget" />
-                        </page>
-                        <page string="State" name="state">
-
-                        </page>
                         <page string="Messages" name="messages">
                             <group>
                                 <field name="internal_notes_summary" />
@@ -78,6 +70,7 @@
                 <field name="deadline" optional="hide" />
                 <field name="state_json" widget="transition_buttons" optional="show" />
                 <field name="state_id" optional="hide" />
+                <field name="responsible_team_id" optional="show" string="Responsible" />
                 <field name='internal_notes_summary' optional="show" />
                 <field name="external_messages_summary" optional="show" />
                 <field name="unreviewed_message_count" optional="show" />
@@ -113,7 +106,7 @@
                 <field name="deadline" />
                 <field name="internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" string="External Messages" />
-
+                <field name="responsible_team_id" />
                 <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('state_id.is_end_state', '=', False)]" />
                 <filter string="Workflow Completed" name="completed" domain="[('state_id.is_end_state', '=', True)]" />
@@ -131,8 +124,10 @@
                 <filter string="Has External Messages" name="has_external_messages"
                     domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
                 <group expand="0" string="Group By">
+                    <!-- <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'project_deadline'}" /> -->
+                    <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
                     <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
-                    <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
                 </group>
             </search>
         </field>

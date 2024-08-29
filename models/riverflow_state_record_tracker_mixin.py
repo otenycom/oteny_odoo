@@ -127,6 +127,11 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                     if hasattr(record, "unreviewed_message_count")
                     else 0
                 ),
+                "responsible_team_id": (
+                    record.responsible_team_id.id
+                    if hasattr(record, "responsible_team_id")
+                    else False
+                ),
             }
             state_record_vals.append(vals)
         self.env["riverflow.state.record"].create(state_record_vals)
@@ -160,6 +165,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                     "internal_notes_summary",
                     "external_messages_summary",
                     "unreviewed_message_count",
+                    "responsible_team_id",
                 ]
 
                 for field in fields_to_update:

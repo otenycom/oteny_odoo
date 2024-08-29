@@ -14,3 +14,4 @@ from . import riverflow_service_tag
 from . import riverflow_transition_mixin
 from . import res_config_settings
 from . import riverflow_check_result
+from . import riverflow_team

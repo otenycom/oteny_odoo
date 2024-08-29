@@ -7,12 +7,15 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     _name = "riverflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
-    # initial workflow
+    # initial workflow. Not a computed field, so it can be set in the form view
+    # and the user can then select the state. If state is change later in write/create, we keep
+    # the workflow_id in sync.
     workflow_id = fields.Many2one(
         "riverflow.workflow",
         domain="[('model', '=', model)]",
         string="Workflow",
         tracking=True,
+        index=True,
     )
 
     state_id = fields.Many2one(
@@ -144,3 +147,21 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def action_button_click(self):
 
         return self._prepare_transition_action()
+
+    def write(self, vals):
+        self._sync_workflow_with_state(vals)
+        return super(RiverflowWorkflowStateMixin, self).write(vals)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            self._sync_workflow_with_state(vals)
+        return super(RiverflowWorkflowStateMixin, self).create(vals_list)
+
+    def _sync_workflow_with_state(self, vals):
+        if "state_id" in vals:
+            if vals["state_id"]:
+                new_state = self.env["riverflow.state"].browse(vals["state_id"])
+                vals["workflow_id"] = new_state.workflow_id.id
+            else:
+                vals["workflow_id"] = False

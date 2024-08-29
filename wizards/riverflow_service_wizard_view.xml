@@ -9,6 +9,7 @@
                     <field name="transition_id" invisible="1" />
                     <field name="transition_description" readonly="1" invisible="not transition_description" />
                     <field name="name" required="1" />
+                    <field name="responsible_team_id" required="1" />
                     <field name="new_remark" required="0" invisible="context.get('new_remark_invisible', False)" widget="html" />
                     <field name="use_project_deadline_from" required="1" />
                     <field name="project_deadline" invisible="use_project_deadline_from != 'self'" />

@@ -135,6 +135,13 @@ class RiverflowStateRecord(models.Model):
         store=True,
     )
 
+    responsible_team_id = fields.Many2one(
+        "riverflow.team",
+        string="Responsible Team",
+        help="Team executing the workflow of this log entry. This team is also responsible for reviewing external messages.",
+        index=True,
+    )
+
     def _fetch_master_records(self):
         """Fetch all master records in a single query."""
         records_by_model = defaultdict(set)

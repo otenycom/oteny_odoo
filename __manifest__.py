@@ -1,12 +1,9 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.74",
-    "depends": [
-        "base",
-        "mail",
-    ],
+    "version": "17.0.1.86",
+    "depends": ["base", "mail"],
     "author": "Vriend Studio",
-    "category": "hr",
+    "category": "Workflow",
     "description": """
     Task manager for the Service Industry
     """,
@@ -22,6 +19,7 @@
         "views/riverflow_transition_views.xml",
         "views/riverflow_transition_action_views.xml",
         "views/riverflow_state_record_views.xml",
+        "views/riverflow_team_views.xml",
         "views/res_config_settings_views.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
