@@ -517,6 +517,22 @@ class Service(models.Model):
             if record.parent_id and not record.res_id:
                 record.res_id = record.parent_id.res_id
                 record.res_model = record.parent_id.res_model
+            elif (
+                not record.parent_id
+                and record.res_model == self._name
+                and record.res_id
+            ):
+                # for auto-adding a child service, they set the parent via res_id
+                # Invalidate the recordset to ensure fresh data
+                record.parent_id = record.res_id
+                record.root_id = record.parent_id.root_id
+                record.res_model = record.parent_id.res_model
+                record.res_id = record.parent_id.res_id
+                # recalculate the parent_id dependent fields
+                record.invalidate_recordset(
+                    ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
+                )
+                record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
     def write(self, vals):
@@ -526,4 +542,16 @@ class Service(models.Model):
                 if record.parent_id and not record.res_id:
                     record.res_id = record.parent_id.res_id
                     record.res_model = record.parent_id.res_model
+        elif "res_model" in vals and "res_id" in vals:
+            for record in self:
+                if record.res_model == self._name:
+                    record.parent_id = record.res_id
+                    record.root_id = record.parent_id.root_id
+                    record.res_model = record.parent_id.res_model
+                    record.res_id = record.parent_id.res_id
+                    record.invalidate_recordset(
+                        ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
+                    )
+                    record.parent_id.invalidate_recordset(["child_ids"])
+
         return result
