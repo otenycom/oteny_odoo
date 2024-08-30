@@ -9,7 +9,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     # initial workflow. Not a computed field, so it can be set in the form view
     # and the user can then select the state. If state is change later in write/create, we keep
-    # the workflow_id in sync.
+    # the workflow_id as it was set initially, so it represents the front office workflow/work status
     workflow_id = fields.Many2one(
         "riverflow.workflow",
         domain="[('model', '=', model)]",
@@ -32,7 +32,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     current_workflow_name = fields.Char(
         "Workflow name",
-        related="state_id.workflow_id.name",
+        related="workflow_id.name",
         store=True,
         index=True,
     )
@@ -81,7 +81,16 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def _compute_from_transition_ids(self):
         for s in self:
             if not s.state_id:
-                s.from_transition_ids = []
+                if s.workflow_id:
+                    domain = [
+                        ("from_state_id", "=", False),
+                        ("workflow_id", "=", s.workflow_id.id),
+                    ]
+                    s.from_transition_ids = self.env["riverflow.transition"].search(
+                        domain, order="workflow_name,sequence,id"
+                    )
+                else:
+                    s.from_transition_ids = []
             else:
                 s.from_transition_ids = self.env["riverflow.transition"].search(
                     [
@@ -98,7 +107,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 wf_state_text = " | ".join([wf_state_text, record.state_name])
 
             # todo: store the icon so its not a lookup
-            icon = record.state_id.workflow_id.icon or ""
+            icon = record.workflow_id.icon or ""
             is_end_state = record.state_id.is_end_state == True
 
             state_json = {

@@ -5,9 +5,11 @@
         <field name="model">riverflow.auto.add.service</field>
         <field name="arch" type="xml">
             <tree>
-                <field name="name" />
-                <field name="workflow_id" />
-                <field name="res_model" />
+                <field name="service_name" />
+                <field name="service_workflow_id" />
+                <field name="applies_to_model_id" />
+                <field name="condition_domain" />
+                <field name="note" />
             </tree>
         </field>
     </record>
@@ -19,10 +21,12 @@
             <form>
                 <sheet>
                     <group>
-                        <field name="name" />
-                        <field name="workflow_id" />
-                        <field name="res_model" />
-                        <field name="domain" widget="domain" options="{'model': 'res_model'}" />
+                        <field name="service_name" />
+                        <field name="service_workflow_id" />
+                        <field name="applies_to_model_id" />
+                        <field name="applies_to_model" readonly="1" />
+                        <field name="condition_domain" widget="domain" options="{'model': 'applies_to_model'}" />
+                        <field name="note" />
                     </group>
                 </sheet>
             </form>
@@ -38,6 +42,6 @@
     <menuitem id="menu_auto_add_service"
         name="Auto Add Services"
         action="action_auto_add_service"
-        parent="menu_riverflow_configuration"
-        sequence="20" />
+        parent="riverflow.services_configuration_menu" sequence="110"
+    />
 </odoo>

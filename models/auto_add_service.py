@@ -27,6 +27,12 @@ class AutoAddService(models.Model):
         ondelete="cascade",
         help="The model to which services will be added.",
     )
+    applies_to_model = fields.Char(
+        string="Applies to Model",
+        related="applies_to_model_id.model",
+        store=True,
+        index=True,
+    )
 
     condition_domain = fields.Text(
         string="Condition",

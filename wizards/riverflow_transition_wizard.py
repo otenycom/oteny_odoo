@@ -11,6 +11,35 @@ class TransitionWizard(models.AbstractModel):
     transition_id = fields.Many2one("riverflow.transition", "Transition")
     transition_description = fields.Text("Description")
 
+    @api.model
+    def default_get(self, form_fields):
+        defaultValues = super().default_get(form_fields)
+
+        transition_id = self.env.context.get("transition_id")
+        defaultValues["transition_id"] = transition_id
+        transition = self.env["riverflow.transition"].browse(transition_id)
+        defaultValues["transition_description"] = transition.description
+
+        isStartTransition = transition.from_state_id.id == False
+        records_to_transition = self.env[self._workflow_model]
+        records_to_transition_ids = []
+        # if we are in a wizard that is triggered by a record,
+        # as opposed to a start-transition selection wizard,
+        # then use the active ids
+        if self.env.context.get("active_model") == self._workflow_model:
+            records_to_transition_ids = self.env.context.get("active_ids")
+        if records_to_transition_ids:
+            records_to_transition = records_to_transition.browse(
+                records_to_transition_ids
+            )
+
+        if records_to_transition.ids:
+            defaultValues["records_to_transition_ids"] = records_to_transition.ids
+
+        self.default_get_using_records(defaultValues, records_to_transition)
+
+        return defaultValues
+
     def action_save(self):
         for wizard in self:
             transition = wizard.transition_id
@@ -69,31 +98,6 @@ class TransitionWizard(models.AbstractModel):
                 self.create_related_records(record)
 
         return action
-
-    @api.model
-    def default_get(self, form_fields):
-        defaultValues = super().default_get(form_fields)
-
-        transition_id = self.env.context.get("transition_id")
-        defaultValues["transition_id"] = transition_id
-        transition = self.env["riverflow.transition"].browse(transition_id)
-        defaultValues["transition_description"] = transition.description
-
-        isStartTransition = transition.from_state_id.id == False
-        records_to_transition = self.env[self._workflow_model]
-        if not isStartTransition:
-            records_to_transition_ids = self.env.context.get("active_ids")
-            if records_to_transition_ids:
-                records_to_transition = records_to_transition.browse(
-                    records_to_transition_ids
-                )
-
-        if records_to_transition.ids:
-            defaultValues["records_to_transition_ids"] = records_to_transition.ids
-
-        self.default_get_using_records(defaultValues, records_to_transition)
-
-        return defaultValues
 
     # abstract methods
     def create_related_records(self, record):
