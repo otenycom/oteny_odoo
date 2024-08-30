@@ -12,3 +12,4 @@ riverflow.access_riverflow_service_email_sender_wizard,access_riverflow_service_
 riverflow.access_riverflow_state_record,access_riverflow_state_record,riverflow.model_riverflow_state_record,base.group_user,1,1,1,1
 riverflow.access_riverflow_check_result,access_riverflow_check_result,riverflow.model_riverflow_check_result,base.group_user,1,1,1,1
 riverflow.access_riverflow_team,access_riverflow_team,riverflow.model_riverflow_team,base.group_user,1,1,1,1
+riverflow.access_riverflow_auto_add_service,access_riverflow_auto_add_service,riverflow.model_riverflow_auto_add_service,base.group_user,1,1,1,1

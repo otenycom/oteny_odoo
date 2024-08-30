@@ -156,7 +156,11 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def create(self, vals_list):
         for vals in vals_list:
             self._sync_workflow_with_state(vals)
-        return super(RiverflowWorkflowStateMixin, self).create(vals_list)
+        records = super(RiverflowWorkflowStateMixin, self).create(vals_list)
+        self.env["riverflow.auto.add.service"].auto_add_services(
+            records, trigger="create"
+        )
+        return records
 
     def _sync_workflow_with_state(self, vals):
         if "state_id" in vals:

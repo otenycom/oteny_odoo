@@ -44,6 +44,11 @@ class Service(models.Model):
         compute="_compute_descendant_ids",
         store=False,
     )
+    created_by_auto_add = fields.Boolean(
+        string="Created by Auto Add",
+        default=False,
+        help="Indicates whether this service was automatically added by a rule",
+    )
 
     @api.depends("child_ids")
     def _compute_descendant_ids(self):
