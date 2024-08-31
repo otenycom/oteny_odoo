@@ -20,3 +20,19 @@
 .riverflow_pending_state {
     color: map-get($o-theme-text-colors, 'danger');
 }
+
+.riverflow_input_dropdown {
+    position: relative;
+
+    &__input {
+        width: 100%;
+        // transition: background-color 0.3s ease, border-color 0.3s ease;
+
+        &:focus {
+            outline: none;
+            box-shadow: none;
+            border-color: transparent;
+            // background-color: rgba(255, 255, 255, 0.1); // Slight highlight
+        }
+    }
+}

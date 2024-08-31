@@ -27,12 +27,13 @@
         </t>
         <t t-else="">
             <div class="transition-selection-group">
-                <input t-ref="inputElement" class="w-100 o_input"
+                <input t-ref="inputElement" class="o_input riverflow_input_dropdown__input"
                     t-on-click.stop="() => {}"
                     t-on-change="(ev) => this.onTransitionChange(ev)"
                     t-att-list="this.datalistId()"
                     placeholder="Select an action"
                     autocomplete="on" />
+                <span class="riverflow_input_dropdown__arrow"></span>
                 <datalist t-att-id="this.datalistId()">
                     <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
                         <option t-att-value="button.caption" t-att-data-index="button.index" />
