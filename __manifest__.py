@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.121",
+    "version": "17.0.1.123",
     "depends": ["base", "mail"],
     "author": "Vriend Studio",
     "category": "Workflow",

@@ -1,31 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates>
-    <t t-name="riverflow.TransitionButtons">
-        <span t-on-click.stop="onSpanClick">
-            <t t-if="this.iconClass()">
-                <span t-att-class="this.iconClass()"></span>
-                <span>&#160;</span>
-            </t>
-            <span t-att-class="this.stateClass()" t-esc="this.text()" />
-        </span>
-
-        <t t-if="this.buttonDefs().length &lt; 3">
-            <div class="button-separator-group">
-                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
-                    <button
-                        t-att-name="button.action"
-                        class="btn btn-link transition_button"
-                        t-on-click.stop="() => this.executeTransition(button)"
-                        type="object">
-                        <span t-esc="button.caption" />
-                    </button>
-                    <t t-if="button.index &lt; this.buttonDefs().length - 1">
-                        <span class="button-separator">&#160;|</span>
-                    </t>
-                </t>
-            </div>
+    <t t-name="riverflow.TransitionButtons.IconAndCaption">
+        <t t-if="this.iconClass()">
+            <span t-att-class="this.iconClass()"></span>
+            <span>&#160;</span>
         </t>
-        <t t-else="">
+        <span t-att-class="this.stateClass()" t-esc="this.text()" />
+    </t>
+    <t t-name="riverflow.TransitionButtons">
+        <t t-if="this.buttonDefs().length > 2">
+            <span t-on-click.stop="onSpanClick">
+                <t t-call="riverflow.TransitionButtons.IconAndCaption" />
+            </span>
             <div class="transition-selection-group">
                 <input t-ref="inputElement" class="o_input riverflow_input_dropdown__input"
                     t-on-click.stop="() => {}"
@@ -39,6 +25,23 @@
                         <option t-att-value="button.caption" t-att-data-index="button.index" />
                     </t>
                 </datalist>
+            </div>
+        </t>
+        <t t-else="">
+            <t t-call="riverflow.TransitionButtons.IconAndCaption" />
+            <div class="button-separator-group">
+                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                    <button
+                        t-att-name="button.action"
+                        class="btn btn-link transition_button"
+                        t-on-click.stop="() => this.executeTransition(button)"
+                        type="object">
+                        <span t-esc="button.caption" />
+                    </button>
+                    <t t-if="button.index &lt; this.buttonDefs().length - 1">
+                        <span class="button-separator">&#160;|</span>
+                    </t>
+                </t>
             </div>
         </t>
     </t>
