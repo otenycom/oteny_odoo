@@ -44,10 +44,10 @@ class Service(models.Model):
         compute="_compute_descendant_ids",
         store=False,
     )
-    created_by_auto_add = fields.Boolean(
-        string="Created by Auto Add",
+    created_by_auto_add_rule_id = fields.Integer(
+        string="Created by Auto Add Rule ID",
         default=False,
-        help="Indicates whether this service was automatically added by a rule",
+        help="ID of the auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
     )
 
     @api.depends("child_ids")
