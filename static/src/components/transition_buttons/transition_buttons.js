@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, onWillRender } from "@odoo/owl";
+import { Component, onWillRender, useRef } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 
 export class TransitionButtons extends Component {
@@ -14,6 +14,7 @@ export class TransitionButtons extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
+        this.inputRef = useRef("inputElement");
         onWillRender(() => {
             this.fieldValueState = this.fieldValue(this.props);
         });
@@ -44,6 +45,10 @@ export class TransitionButtons extends Component {
         return this.fieldValueState.text;
     }
 
+    datalistId() {
+        return this.props.record.resModel + this.props.record.resId + "_transition_options";
+    }
+
     reloadOnClose() {
         return this.fieldValueState.reload_on_close == true;
     }
@@ -58,20 +63,35 @@ export class TransitionButtons extends Component {
         if (node.props.record) {
             await node.props.record.save();
         }
-        // If we are in a Page on a notebook (tab page), we need to also save the parent record
-        // as that may also have changes that need to be saved
         if (node.parent)
             await this.saveRecord(node.parent);
     }
 
-    // Save the record in this component and all its parents
     async saveRecords() {
         await this.saveRecord(this.__owl__)
     }
 
+    async onTransitionChange(event) {
+        const selectedValue = event.target.value;
+        const options = event.target.list.options;
+        let selectedButton;
+
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === selectedValue) {
+                const buttonIndex = options[i].getAttribute('data-index');
+                selectedButton = this.buttonDefs()[buttonIndex];
+                break;
+            }
+        }
+
+        if (selectedButton) {
+            await this.executeTransition(selectedButton);
+            // Clear the input after execution
+            event.target.value = '';
+        }
+    }
+
     async executeTransition(button) {
-        // Needed to prevent data loss due to the dialog being closed
-        // as Cancelled or due to OK and .load() being called
         await this.saveRecords();
 
         const action = {
@@ -81,14 +101,19 @@ export class TransitionButtons extends Component {
             resModel: this.props.record.resModel,
             context: button.context,
             onClose: async () => {
-                // We don't reload the root-data source for start transitions, 
-                // as that's the start transition wizard's
-                // and its closed by the time we need to reload the data
                 if (this.reloadOnClose())
                     await this.props.record.model.root.load();
             }
         }
         await this.action.doActionButton(action);
+    }
+
+    onSpanClick() {
+        const inputElement = this.inputRef.el;
+        if (inputElement) {
+            inputElement.focus();
+            inputElement.click();
+        }
     }
 }
 

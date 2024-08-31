@@ -5,8 +5,10 @@
         <field name="arch" type="xml">
             <form string="New Service">
                 <sheet>
-                    <field name="start_transition_ids" invisible="1" />
-                    <field name="transition_buttons_json" widget="transition_buttons" />
+                    <group>
+                        <field name="start_transition_ids" invisible="1" />
+                        <field name="transition_buttons_json" widget="transition_buttons" string="Service" />
+                    </group>
                 </sheet>
                 <footer>
                     <button string="Cancel" class="btn-secondary" special="cancel" />

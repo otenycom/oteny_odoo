@@ -1,26 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates>
     <t t-name="riverflow.TransitionButtons">
-        <t t-if="this.iconClass()">
-            <span t-att-class="this.iconClass()"></span>
-            <!-- workaround: &nbsp; does not work in xml -->
-            <span>&#160;</span>
-        </t>
-        <span t-att-class="this.stateClass()" t-esc="this.text()" />
-        <div class="button-separator-group">
-            <t t-set="buttons" t-value="this.buttonDefs()" />
-            <t t-foreach="buttons" t-as="button" t-key="button.index">
-                <button
-                    t-att-name="button.action"
-                    class="btn btn-link transition_button"
-                    t-on-click.stop="() => this.executeTransition(button)"
-                    type="object">
-                    <span t-esc="button.caption" />
-                </button>
-                <t t-if="button.index &lt; buttons.length - 1">
-                    <span class="button-separator">&#160;|</span>
-                </t>
+        <span t-on-click.stop="onSpanClick">
+            <t t-if="this.iconClass()">
+                <span t-att-class="this.iconClass()"></span>
+                <span>&#160;</span>
             </t>
-        </div>
+            <span t-att-class="this.stateClass()" t-esc="this.text()" />
+        </span>
+
+        <t t-if="this.buttonDefs().length &lt; 3">
+            <div class="button-separator-group">
+                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                    <button
+                        t-att-name="button.action"
+                        class="btn btn-link transition_button"
+                        t-on-click.stop="() => this.executeTransition(button)"
+                        type="object">
+                        <span t-esc="button.caption" />
+                    </button>
+                    <t t-if="button.index &lt; this.buttonDefs().length - 1">
+                        <span class="button-separator">&#160;|</span>
+                    </t>
+                </t>
+            </div>
+        </t>
+        <t t-else="">
+            <div class="transition-selection-group">
+                <input t-ref="inputElement" class="w-100 o_input"
+                    t-on-click.stop="() => {}"
+                    t-on-change="(ev) => this.onTransitionChange(ev)"
+                    t-att-list="this.datalistId()"
+                    placeholder="Select an action"
+                    autocomplete="on" />
+                <datalist t-att-id="this.datalistId()">
+                    <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                        <option t-att-value="button.caption" t-att-data-index="button.index" />
+                    </t>
+                </datalist>
+            </div>
+        </t>
     </t>
 </templates>
