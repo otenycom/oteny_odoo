@@ -45,11 +45,11 @@
                             </field>
                         </page>
                         <page string="States" name="states">
-                            <!-- <div>
-                            <button name="workflow_add_start_transition" type="object" class="oe_link" data-hotkey="n"
-                                icon="fa-plus">
-                                Add State</button>
-                        </div> -->
+                            <div>
+                                <button name="workflow_add_state" type="object" class="oe_link" data-hotkey="n"
+                                    icon="fa-plus">
+                                    Add State</button>
+                            </div>
                             <field name="state_ids" default_order="sequence,name,id" widget="riverflow_one2many">
                                 <tree create="0" delete="0" edit="0">
                                     <field name="active" column_invisible="True" />

@@ -78,3 +78,13 @@ class RiverflowWorkflow(models.Model):
             "context": {"default_workflow_id": self.id, "is_start_transition": True},
             "target": "current",
         }
+
+    def workflow_add_state(self):
+        return {
+            "type": "ir.actions.act_window",
+            "name": "Add Workflow State to: " + self.name,
+            "view_mode": "form",
+            "res_model": "riverflow.state",
+            "context": {"default_workflow_id": self.id},
+            "target": "current",
+        }
