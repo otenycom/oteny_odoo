@@ -1,0 +1,146 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id='view_official_document_form' model='ir.ui.view'>
+        <field name="name">riverflow.official.document.form</field>
+        <field name="model">riverflow.official.document</field>
+        <field name="arch" type="xml">
+            <form string="Official Documents">
+                <sheet>
+                    <div class="oe_title">
+                        <h3>
+                            <field name="display_name" placeholder="Official Document" readonly="1" />
+                        </h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="document_type_id" />
+                            <field name="number" />
+                            <field name="issuing_country_id" />
+                            <field name="issue_date" />
+                            <field name="expiry_date" />
+                            <!-- ... other fields ... -->
+                            <label for="document_id" />
+                            <div>
+                                <field name="document_id" />
+                                <button name="on_click_open_document" type="object" string="Open Document" class="oe_inline oe_link" />
+                            </div>
+                        </group>
+                        <group name="holder" string="Holder">
+                            <!-- <field name="holder_partner_id" /> -->
+                            <!-- <field name="holder_employee_id" />
+                            <field name="holder_ship_id" /> -->
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Holder Details">
+                            <group>
+                                <field name="holder_model" invisible="0" />
+                                <field name="holder_id" invisible="0" />
+                                <field name="holder_name" invisible="0" readonly="1" />
+                                <field name="holder_ref" readonly="1" />
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" />
+                    <field name="message_ids" />
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id='official_document_view_tree' model='ir.ui.view'>
+        <field name='name'>riverflow.official.document.tree</field>
+        <field name='model'>riverflow.official.document</field>
+        <field name='arch' type='xml'>
+            <tree>
+                <field name="number" />
+                <field name="document_type_id" />
+                <field name="holder_name" />
+                <field name="issuing_country_id" />
+                <field name="issue_date" />
+                <field name="expiry_date" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="official_document_view_search" model="ir.ui.view">
+        <field name="name">riverflow.official.document.search</field>
+        <field name="model">riverflow.official.document</field>
+        <field name="arch" type="xml">
+            <search string="Search Official Documents">
+                <field name="number" />
+                <field name="document_type_id" />
+                <field name="holder_name" />
+                <field name="issuing_country_id" />
+                <separator />
+                <filter string="Expired" name="expired" domain="[('expiry_date', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Valid" name="valid" domain="[('expiry_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]" />
+                <group expand="0" string="Group By">
+                    <filter string="Document Type" name="group_by_type" context="{'group_by': 'document_type_id'}" />
+                    <filter string="Issuing Country" name="group_by_country" context="{'group_by': 'issuing_country_id'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="official_document_action" model="ir.actions.act_window">
+        <field name="name">Official Documents</field>
+        <field name="res_model">riverflow.official.document</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="riverflow.official_document_view_search" />
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new official document!
+            </p>
+        </field>
+    </record>
+
+    <!-- Official Document Type views -->
+    <record id="view_official_document_type_form" model="ir.ui.view">
+        <field name="name">riverflow.official.document.type.form</field>
+        <field name="model">riverflow.official.document.type</field>
+        <field name="arch" type="xml">
+            <form string="Official Document Types">
+                <sheet>
+                    <group>
+                        <field name="name" />
+                        <field name="code" />
+                        <field name="sequence" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="official_document_type_view_tree" model="ir.ui.view">
+        <field name="name">riverflow.official.document.type.tree</field>
+        <field name="model">riverflow.official.document.type</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="sequence" widget="handle" />
+                <field name="name" />
+                <field name="code" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="official_document_type_action" model="ir.actions.act_window">
+        <field name="name">Official Document Types</field>
+        <field name="res_model">riverflow.official.document.type</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new official document type!
+            </p>
+        </field>
+    </record>
+
+    <!-- Menu Items -->
+    <menuitem id="riverflow_official_documents_menu" name="Official Documents" parent="riverflow.service_root" sequence="20">
+        <menuitem id="menu_official_documents" name="Official Documents" action="riverflow.official_document_action" sequence="10" />
+        <menuitem id="menu_official_document_types" name="Document Types" action="riverflow.official_document_type_action" sequence="20" />
+    </menuitem>
+</odoo>

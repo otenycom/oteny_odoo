@@ -1,7 +1,7 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.131",
-    "depends": ["base", "mail"],
+    "version": "17.0.1.133",
+    "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
     "description": """
@@ -22,6 +22,7 @@
         "views/riverflow_team_views.xml",
         "views/auto_add_service_views.xml",
         "views/res_config_settings_views.xml",
+        "views/riverflow_official_document_views.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
     ],
