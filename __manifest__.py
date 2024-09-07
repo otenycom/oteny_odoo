@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.133",
+    "version": "17.0.1.135",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -10,6 +10,7 @@
     # data files always loaded at installation
     "data": [
         "security/ir.model.access.csv",
+        "data/riverflow_teams_data.xml",
         "wizards/riverflow_service_wizard_view.xml",
         "wizards/riverflow_start_service_view.xml",
         "wizards/riverflow_service_email_sender_view.xml",
@@ -22,7 +23,6 @@
         "views/riverflow_team_views.xml",
         "views/auto_add_service_views.xml",
         "views/res_config_settings_views.xml",
-        "views/riverflow_official_document_views.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
     ],
