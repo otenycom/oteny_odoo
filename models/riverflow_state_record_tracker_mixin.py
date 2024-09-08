@@ -93,11 +93,11 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 "root_name": (
                     record.root_name if hasattr(record, "root_name") else False
                 ),
-                "indented_name": (
-                    record.indented_name
-                    if hasattr(record, "indented_name")
-                    else record.name
-                ),
+                # "indented_name": (
+                #     record.indented_name
+                #     if hasattr(record, "indented_name")
+                #     else record.name
+                # ),
                 "sequence": record.sequence if hasattr(record, "sequence") else 0,
                 "tag_ids": (
                     [(6, 0, record.tag_ids.ids)]
