@@ -8,7 +8,9 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence"
+    _order = (
+        "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
+    )
 
     active = fields.Boolean(
         default=True, help="Set active to false to archive the service"
@@ -147,7 +149,7 @@ class RiverflowStateRecord(models.Model):
         records_by_model = defaultdict(set)
 
         for record in self:
-            if record.res_model not in self.env:
+            if record.master_model not in self.env:
                 # Skip if the master model is not yet loaded in the environment
                 #  (during upgrades of the module, when the container is a module dependent on riverflow)
                 continue
@@ -172,7 +174,7 @@ class RiverflowStateRecord(models.Model):
                     + master.indented_name
                 )
             else:
-                slave.indented_name = master.name if master else ""
+                slave.indented_name = master.name if master else False
 
     @api.depends("master_model", "master_res_id")
     def _compute_internal_notes_summary(self):

@@ -47,6 +47,20 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         store=False,
     )
 
+    deadline = fields.Date(
+        string="Deadline",
+        compute="_compute_deadline",
+        store=True,
+        index=True,
+        help="Planning deadline.",
+    )
+
+    timing_json = fields.Json(
+        "Timing",
+        compute="_compute_timing_json",
+        store=False,
+    )
+
     # = self._name, made accessible for use in the filter-domain of the workflow dropdown
     model = fields.Char(
         compute="_compute_model", help="Model on which the workflow runs."
@@ -178,3 +192,30 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 vals["workflow_id"] = new_state.workflow_id.id
             else:
                 vals["workflow_id"] = False
+
+    def _compute_deadline(self):
+        pass
+
+    @api.depends("deadline", "state_id.is_end_state")
+    def _compute_timing_json(self):
+        Service = self.env["riverflow.service"]
+        for record in self:
+            if not record.deadline:
+                record.timing_json = False
+                continue
+
+            date_str = record.deadline.strftime(Service.DATE_FORMAT)
+
+            today = fields.Date.today()
+            days_remaining = (record.deadline - today).days
+            is_past = record.deadline < today
+            is_today = record.deadline == today
+
+            record.timing_json = {
+                "relative_days": "",
+                "date": date_str,
+                "days_remaining": days_remaining,
+                "is_past": is_past,
+                "is_today": is_today,
+                "is_end_state": record.state_id.is_end_state,
+            }
