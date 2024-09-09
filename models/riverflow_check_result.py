@@ -24,7 +24,7 @@ class CheckResult(models.Model):
     @api.depends("check_type")
     def _compute_name(self):
         for record in self:
-            record.name = f"{record.check_type.capitalize()} Check"
+            record.name = f"{record.check_type.capitalize()}: {record.description}"
 
     @api.depends("severity")
     def _compute_color(self):
