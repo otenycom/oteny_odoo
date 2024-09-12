@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "17.0.1.157",
+    "version": "17.0.1.159",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -11,6 +11,7 @@
     "data": [
         "security/ir.model.access.csv",
         "data/riverflow_teams_data.xml",
+        "wizards/riverflow_transition_wizard_view.xml",
         "wizards/riverflow_service_wizard_view.xml",
         "wizards/riverflow_start_service_view.xml",
         "wizards/riverflow_service_email_sender_view.xml",

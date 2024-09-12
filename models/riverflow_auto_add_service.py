@@ -61,7 +61,7 @@ class AutoAddService(models.Model):
             ("self", "Self"),
             ("root", "Root Service"),
         ],
-        string="Project Deadline From",
+        string="Deadline From",
         required=True,
         default="self",
     )
