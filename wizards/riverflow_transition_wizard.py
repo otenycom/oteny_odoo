@@ -20,7 +20,6 @@ class TransitionWizard(models.AbstractModel):
         transition = self.env["riverflow.transition"].browse(transition_id)
         defaultValues["transition_description"] = transition.description
 
-        isStartTransition = transition.from_state_id.id == False
         records_to_transition = self.env[self._workflow_model]
         records_to_transition_ids = []
         # if we are in a wizard that is triggered by a record,
