@@ -168,7 +168,12 @@ class RiverflowStateRecord(models.Model):
 
         for slave in self:
             master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "indented_name"):
+            if (
+                master
+                and hasattr(master, "indented_name")
+                and master.res_model
+                and master.res_id
+            ):
                 slave.indented_name = (
                     "\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}"
                     + master.indented_name
