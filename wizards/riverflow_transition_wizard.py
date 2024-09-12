@@ -150,7 +150,8 @@ class TransitionWizard(models.AbstractModel):
         pass
 
     def updated_property_values(self, record, vals):
-        pass
+        if not self.responsible_team_id_invisible:
+            vals["responsible_team_id"] = self.responsible_team_id.id
 
     def _is_to_end_state(self):
         return self.transition_id.to_state_id.is_end_state

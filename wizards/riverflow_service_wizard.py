@@ -40,6 +40,7 @@ class ServiceWizard(models.TransientModel):
     )
 
     def updated_property_values(self, service, vals):
+        super().updated_property_values(service, vals)
         vals["res_id"] = self.res_id
         vals["res_model"] = self.res_model
 
