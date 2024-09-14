@@ -173,13 +173,13 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     def write(self, vals):
         self._sync_workflow_with_state(vals)
-        return super(RiverflowWorkflowStateMixin, self).write(vals)
+        return super().write(vals)
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             self._sync_workflow_with_state(vals)
-        records = super(RiverflowWorkflowStateMixin, self).create(vals_list)
+        records = super().create(vals_list)
         self.env["riverflow.auto.add.service"].auto_add_services(
             records, trigger="create"
         )

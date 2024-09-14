@@ -144,6 +144,16 @@ class RiverflowStateRecord(models.Model):
         index=True,
     )
 
+    def init(self):
+        # Create a unique index on (master_model, master_res_id) to ensure no duplicates
+        self._cr.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS riverflow_global_state_unique_record
+            ON %s (master_model, master_res_id)
+        """
+            % self._table
+        )
+
     def _fetch_master_records(self):
         """Fetch all master records in a single query."""
         records_by_model = defaultdict(set)
@@ -213,16 +223,6 @@ class RiverflowStateRecord(models.Model):
                 slave.unreviewed_message_count = master.unreviewed_message_count
             else:
                 slave.unreviewed_message_count = 0
-
-    def init(self):
-        # Create a unique index on (master_model, master_res_id) to ensure no duplicates
-        self._cr.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS riverflow_global_state_unique_record
-            ON %s (master_model, master_res_id)
-        """
-            % self._table
-        )
 
     @api.depends("master_model", "master_res_id")
     def _compute_state_json(self):

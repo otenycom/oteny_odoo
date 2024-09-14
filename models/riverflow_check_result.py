@@ -38,7 +38,7 @@ class CheckResult(models.Model):
             else:
                 record.color = 0  # Gray (default)
 
-    def compare_base(self, other):
+    def compare(self, other):
         """
         Base compare method for check results.
         Compare basic fields common to all check results.
