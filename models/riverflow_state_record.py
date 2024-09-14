@@ -293,7 +293,7 @@ class RiverflowStateRecord(models.Model):
             if record.service_id:
                 record.res_name = record.service_id.res_name
             else:
-                record.res_name = self.name
+                record.res_name = record.name
 
     def action_view_master_record(self):
         action = {
