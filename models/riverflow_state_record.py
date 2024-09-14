@@ -63,13 +63,14 @@ class RiverflowStateRecord(models.Model):
     )
     res_name = fields.Char(
         string="Subject of Service",
+        compute="_compute_res_name",  # computed because of the service_id dependency
         store=True,
         index="trigram",
     )
 
     root_id = fields.Integer(string="Root ID", index=True)
     root_name = fields.Char(string="Root Name", index=True)
-    indented_name = fields.Char("Record", compute="_compute_indented_name", store=True)
+    indented_name = fields.Char("Record", compute="_compute_indented_name", store=False)
 
     deadline = fields.Date(
         "Deadline Date",
@@ -143,6 +144,33 @@ class RiverflowStateRecord(models.Model):
         help="Team executing the workflow of this log entry. This team is also responsible for reviewing external messages.",
         index=True,
     )
+
+    service_id = fields.Many2one(
+        "riverflow.service",
+        string="Service",
+        compute="_compute_service_id",
+        inverse="_inverse_service_id",
+        store=True,
+        index=True,
+        help="The service to which this record applies",
+    )
+
+    @api.depends("master_model", "master_res_id")
+    def _compute_service_id(self):
+        for record in self:
+            if record.master_model == "riverflow.service":
+                record.service_id = record.master_res_id
+            else:
+                record.service_id = False
+
+    def _inverse_service_id(self):
+        for record in self:
+            if record.service_id:
+                record.master_model = "riverflow.service"
+                record.master_res_id = record.service_id.id
+            else:
+                record.master_model = False
+                record.master_res_id = False
 
     def init(self):
         # Create a unique index on (master_model, master_res_id) to ensure no duplicates
@@ -257,6 +285,15 @@ class RiverflowStateRecord(models.Model):
                 slave.timing_json = master.timing_json
             else:
                 slave.timing_json = False
+
+    @api.depends("service_id.res_name", "name")
+    def _compute_res_name(self):
+        """Compute res_name based on service_id.res_name or name."""
+        for record in self:
+            if record.service_id:
+                record.res_name = record.service_id.res_name
+            else:
+                record.res_name = self.name
 
     def action_view_master_record(self):
         action = {

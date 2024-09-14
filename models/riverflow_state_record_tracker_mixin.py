@@ -160,7 +160,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
             "tag_ids",
             "res_id",
             "res_model",
-            "res_name",
+            # "res_name",
             "internal_notes_summary",
             "external_messages_summary",
             "unreviewed_message_count",
@@ -178,7 +178,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 update_vals = {}
                 for field in available_fields:
                     record_value = record[field]
-                    if field in ("root_id"):
+                    if field == "root_id":
                         record_value = int(record_value.id)
                     state_record_value = state_record[field]
 
@@ -191,10 +191,13 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                         else:
                             update_vals[field] = record_value
 
-                # Handle 'res_name' if it doesn't exist in the master model
-                master_model_fields = self.env[self._name]._fields
-                if "res_name" not in master_model_fields and "name" in vals:
-                    update_vals["res_name"] = vals["name"]
+                # Assign 'res_name' from 'name' if 'res_name' field does not exist and differs
+                # master_model_fields = self.env[self._name]._fields
+                # if (
+                #     "res_name" not in master_model_fields
+                #     and state_record.res_name != record.name
+                # ):
+                #     update_vals["res_name"] = record.name
 
                 if update_vals:
                     # Update the state record with the new values
