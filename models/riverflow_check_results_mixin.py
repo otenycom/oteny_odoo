@@ -27,9 +27,9 @@ class CheckResultsMixin(models.AbstractModel):
 
         return result
 
-    def _write(self, vals):
+    def write(self, vals):
         before__write_result = self._refresh_check_results_on_before__write(vals)
-        result = super()._write(vals)
+        result = super().write(vals)
         self._refresh_check_results_on_after__write(before__write_result)
         return result
 

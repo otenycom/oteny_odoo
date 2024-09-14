@@ -44,9 +44,8 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         self._create_state_record(records)
         return records
 
-    # overriding _write not write, so we also see the computed field values
-    def _write(self, vals):
-        result = super()._write(vals)
+    def write(self, vals):
+        result = super().write(vals)
         self._update_state_record(vals)
         return result
 
@@ -137,50 +136,61 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         self.env["riverflow.state.record"].create(state_record_vals)
 
     def _update_state_record(self, vals):
-        # if self.isInUnlink:
-        #     return
+        """
+        Dynamically updates the associated state record with changes from the master record.
+
+        This method retrieves the fields to update dynamically, ensuring that only existing fields
+        are processed. It compares each relevant field between the master record and the state record,
+        updating only those fields that have changed. Fields that do not exist in the current model
+        are gracefully skipped.
+
+        :param vals: Dictionary of values to update from the master record
+        """
+        # Define the fields that should be tracked for updates
+        fields_to_update = [
+            "name",
+            "display_name",
+            "workflow_id",
+            "state_id",
+            "active",
+            "deadline",
+            "root_name",
+            "root_id",
+            "sequence",
+            "tag_ids",
+            "res_id",
+            "res_model",
+            "res_name",
+            "internal_notes_summary",
+            "external_messages_summary",
+            "unreviewed_message_count",
+            "responsible_team_id",
+        ]
+
+        # Dynamically retrieve fields that exist in the current model
+        existing_fields = self.fields_get(fields_to_update)
+        available_fields = existing_fields.keys()
 
         for record in self:
             state_record = record._get_state_record()
 
             if state_record:
                 update_vals = {}
-                fields_to_update = [
-                    # fields from riverflow.state.mixin
-                    "name",
-                    "display_name",
-                    "workflow_id",
-                    "state_id",
-                    # fields from riverflow.service
-                    "active",
-                    "deadline",
-                    "root_name",
-                    "root_id",
-                    "sequence",
-                    "tag_ids",
-                    "res_id",
-                    "res_model",
-                    "res_name",
-                    # fields from MailThreadReviewMixin
-                    "internal_notes_summary",
-                    "external_messages_summary",
-                    "unreviewed_message_count",
-                    "responsible_team_id",
-                ]
+                for field in available_fields:
+                    record_value = record[field]
+                    state_record_value = state_record[field]
 
-                for field in fields_to_update:
-                    if field in vals:
+                    if record_value != state_record_value:
                         if field == "tag_ids":
                             update_vals[field] = [(6, 0, record.tag_ids.ids)]
                         else:
-                            update_vals[field] = vals[field]
+                            update_vals[field] = record_value
 
+                # Handle 'res_name' if it doesn't exist in the master model
                 master_model_fields = self.env[self._name]._fields
-                if "res_name" not in master_model_fields:
-                    if "name" in vals:
-                        # for sorting master records just before its services, we use the
-                        # res_name field and the sequence field
-                        update_vals["res_name"] = vals["name"]
+                if "res_name" not in master_model_fields and "name" in vals:
+                    update_vals["res_name"] = vals["name"]
 
                 if update_vals:
+                    # Update the state record with the new values
                     state_record.sudo().write(update_vals)
