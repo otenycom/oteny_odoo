@@ -178,8 +178,13 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 update_vals = {}
                 for field in available_fields:
                     record_value = record[field]
+                    if field in ("root_id"):
+                        record_value = int(record_value.id)
                     state_record_value = state_record[field]
 
+                    # _logger.info(
+                    #     f"Updating {field} from {state_record_value} to {record_value}"
+                    # )
                     if record_value != state_record_value:
                         if field == "tag_ids":
                             update_vals[field] = [(6, 0, record.tag_ids.ids)]

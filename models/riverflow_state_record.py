@@ -69,7 +69,7 @@ class RiverflowStateRecord(models.Model):
 
     root_id = fields.Integer(string="Root ID", index=True)
     root_name = fields.Char(string="Root Name", index=True)
-    indented_name = fields.Char("Record", compute="_compute_indented_name", store=False)
+    indented_name = fields.Char("Record", compute="_compute_indented_name", store=True)
 
     deadline = fields.Date(
         "Deadline Date",
