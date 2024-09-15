@@ -44,6 +44,11 @@ class Service(models.Model):
         compute="_compute_descendant_ids",
         store=False,
     )
+    created_by_auto_add_rule_id = fields.Integer(
+        string="Created by Auto Add Rule ID",
+        default=False,
+        help="ID of the auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
+    )
 
     @api.depends("child_ids")
     def _compute_descendant_ids(self):
@@ -87,6 +92,7 @@ class Service(models.Model):
         default=lambda self: self.env.company,
         tracking=True,
     )
+
     active = fields.Boolean(
         default=True, help="Set active to false to archive the service", tracking=True
     )
@@ -102,7 +108,7 @@ class Service(models.Model):
             ("self", "Self"),
             ("root", "Root Service"),
         ],
-        string="Project Deadline From",
+        string="Deadline From",
         required=True,
         tracking=True,
         default="self",
@@ -511,6 +517,22 @@ class Service(models.Model):
             if record.parent_id and not record.res_id:
                 record.res_id = record.parent_id.res_id
                 record.res_model = record.parent_id.res_model
+            elif (
+                not record.parent_id
+                and record.res_model == self._name
+                and record.res_id
+            ):
+                # for auto-adding a child service, they set the parent via res_id
+                # Invalidate the recordset to ensure fresh data
+                record.parent_id = record.res_id
+                record.root_id = record.parent_id.root_id
+                record.res_model = record.parent_id.res_model
+                record.res_id = record.parent_id.res_id
+                # recalculate the parent_id dependent fields
+                record.invalidate_recordset(
+                    ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
+                )
+                record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
     def write(self, vals):
@@ -520,4 +542,16 @@ class Service(models.Model):
                 if record.parent_id and not record.res_id:
                     record.res_id = record.parent_id.res_id
                     record.res_model = record.parent_id.res_model
+        elif "res_model" in vals and "res_id" in vals:
+            for record in self:
+                if record.res_model == self._name:
+                    record.parent_id = record.res_id
+                    record.root_id = record.parent_id.root_id
+                    record.res_model = record.parent_id.res_model
+                    record.res_id = record.parent_id.res_id
+                    record.invalidate_recordset(
+                        ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
+                    )
+                    record.parent_id.invalidate_recordset(["child_ids"])
+
         return result

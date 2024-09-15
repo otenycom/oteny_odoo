@@ -14,9 +14,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     ]
     _description = "Riverflow Service Email Sender Wizard"
 
-    _workflow_model = "riverflow.service"
-    records_to_transition_ids = fields.Many2many("riverflow.service")
-
     recipient_partner_ids = fields.Many2many("res.partner", string="Recipients")
     subject = fields.Char(string="Subject")
     body = fields.Html(

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_auto_add_service_form" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.form</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active" />
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1" invisible="1" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active" invisible="1" />
+                            <field name="applies_to_model_id" />
+                            <field name="applies_to_model" readonly="1" invisible="1" />
+                            <field name="condition_domain" widget="domain" options="{'model': 'applies_to_model'}" />
+                        </group>
+                        <group>
+                            <field name="service_name" />
+                            <field name="service_workflow_id" />
+                            <field name="service_responsible_team_id" />
+                            <field name="service_use_project_deadline_from" />
+                            <field name="service_days_relative_to_project" />
+                            <field name="service_note" />
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Internal notes about the rule's purpose or behavior..." />
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_auto_add_service_tree" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.tree</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="active" column_invisible="1" />
+                <field name="name" optional="show" />
+                <field name="applies_to_model_id" optional="show" />
+                <field name="condition_domain" optional="show" />
+                <field name="note" optional="hide" />
+                <field name="service_name" optional="hide" />
+                <field name="service_workflow_id" optional="hide" />
+                <field name="service_responsible_team_id" optional="show" string="Responsible" />
+                <field name="service_use_project_deadline_from" optional="show" />
+                <field name="service_days_relative_to_project" optional="show" string="Days" />
+                <field name="service_note" optional="show" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_auto_add_service" model="ir.actions.act_window">
+        <field name="name">Auto Add Services</field>
+        <field name="res_model">riverflow.auto.add.service</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_auto_add_service"
+        name="Auto Add Services"
+        action="action_auto_add_service"
+        parent="riverflow.services_configuration_menu" sequence="110"
+    />
+</odoo>

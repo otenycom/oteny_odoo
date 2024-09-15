@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from collections import defaultdict
+from datetime import datetime
 
 # Define the date format constant here instead of relying on Service class
 DATE_FORMAT = "%d/%m/%Y"
@@ -8,10 +9,15 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence"
+    _order = (
+        "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
+    )
 
     active = fields.Boolean(
-        default=True, help="Set active to false to archive the service"
+        default=True,
+        help="Set active to false to archive the service",
+        compute="_compute_active",
+        store=True,
     )
     is_subject = fields.Boolean(
         string="Is Subject",
@@ -33,8 +39,18 @@ class RiverflowStateRecord(models.Model):
         ]
 
     # Fields to identify the record
-    name = fields.Char(string="Name", required=True, index=True)
-    display_name = fields.Char(string="Display Name", required=True, index=True)
+    name = fields.Char(
+        string="Name",
+        index=True,
+        compute="_compute_name",
+        store=True,
+    )
+    display_name = fields.Char(
+        string="Display Name",
+        index=True,
+        compute="_compute_display_name",
+        store=True,
+    )
     master_model = fields.Char(string="Master Model", required=True, index=True)
     master_res_id = fields.Integer(string="Master Record ID", required=True, index=True)
     master_record_reference = fields.Reference(
@@ -55,24 +71,49 @@ class RiverflowStateRecord(models.Model):
                 record.master_record_reference = False
 
     # --- service fields
-    res_id = fields.Integer(string="Subject of Service ID", required=False)
+    res_id = fields.Integer(
+        string="Subject of Service ID",
+        required=False,
+        compute="_compute_res_id",
+        store=True,
+    )
     res_model = fields.Char(
         string="Subject of Service Model Name",
+        compute="_compute_res_model",
+        store=True,
     )
     res_name = fields.Char(
         string="Subject of Service",
+        compute="_compute_res_name",
         store=True,
         index="trigram",
     )
 
-    root_id = fields.Integer(string="Root ID", index=True)
-    root_name = fields.Char(string="Root Name", index=True)
+    root_id = fields.Integer(
+        string="Root ID",
+        index=True,
+        compute="_compute_root_id",
+        store=True,
+    )
+    root_name = fields.Char(
+        string="Root Name",
+        index=True,
+        compute="_compute_root_name",
+        store=True,
+    )
+    indent_level = fields.Integer(
+        string="Indent Level",
+        compute="_compute_indent_level",
+        store=True,
+    )
     indented_name = fields.Char("Record", compute="_compute_indented_name", store=False)
 
     deadline = fields.Date(
         "Deadline Date",
         help="Deadline based on the project-deadline and the relative day of this service",
         index=True,
+        compute="_compute_deadline",
+        store=True,
     )
     deadline_formatted = fields.Char(
         "Deadline", compute="_compute_deadline_formatted", store=False
@@ -87,6 +128,8 @@ class RiverflowStateRecord(models.Model):
         default=1,
         index=True,
         required=True,
+        compute="_compute_sequence",
+        store=True,
     )
 
     tag_ids = fields.Many2many(
@@ -101,13 +144,26 @@ class RiverflowStateRecord(models.Model):
     workflow_id = fields.Many2one(
         "riverflow.workflow",
         string="Workflow",
+        compute="_compute_workflow_id",
         readonly=True,
+        store=True,
+    )
+    current_workflow_name = fields.Char(
+        "Workflow name",
+        related="workflow_id.name",
+        store=True,
+        index=True,
     )
     state_id = fields.Many2one(
         "riverflow.state",
         string="Workflow State",
+        compute="_compute_state_id",
+        store=True,
         readonly=True,
         index=True,
+    )
+    state_name = fields.Char(
+        "State name", related="state_id.name", store=True, index=True
     )
     state_json = fields.Json(
         string="State",
@@ -135,70 +191,41 @@ class RiverflowStateRecord(models.Model):
         store=True,
     )
 
-    def _fetch_master_records(self):
-        """Fetch all master records in a single query."""
-        records_by_model = defaultdict(set)
+    responsible_team_id = fields.Many2one(
+        "riverflow.team",
+        string="Responsible Team",
+        help="Team executing the workflow of this log entry. This team is also responsible for reviewing external messages.",
+        index=True,
+        compute="_compute_responsible_team_id",
+        store=True,
+    )
 
+    service_id = fields.Many2one(
+        "riverflow.service",
+        string="Service",
+        compute="_compute_service_id",
+        inverse="_inverse_service_id",
+        store=True,
+        index=True,
+        help="The service to which this record applies",
+    )
+
+    @api.depends("master_model", "master_res_id")
+    def _compute_service_id(self):
         for record in self:
-            if record.res_model not in self.env:
-                # Skip if the master model is not yet loaded in the environment
-                #  (during upgrades of the module, when the container is a module dependent on riverflow)
-                continue
-            records_by_model[record.master_model].add(record.master_res_id)
-
-        master_records = {}
-        for model, ids in records_by_model.items():
-            records = self.env[model].browse(ids)
-            master_records.update({(model, r.id): r for r in records})
-
-        return master_records
-
-    @api.depends("master_model", "master_res_id")
-    def _compute_indented_name(self):
-        master_records = self._fetch_master_records()
-
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "indented_name"):
-                slave.indented_name = (
-                    "\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}"
-                    + master.indented_name
-                )
+            if record.master_model == "riverflow.service":
+                record.service_id = record.master_res_id
             else:
-                slave.indented_name = master.name if master else ""
+                record.service_id = False
 
-    @api.depends("master_model", "master_res_id")
-    def _compute_internal_notes_summary(self):
-        master_records = self._fetch_master_records()
-
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "internal_notes_summary"):
-                slave.internal_notes_summary = master.internal_notes_summary
+    def _inverse_service_id(self):
+        for record in self:
+            if record.service_id:
+                record.master_model = "riverflow.service"
+                record.master_res_id = record.service_id.id
             else:
-                slave.internal_notes_summary = False
-
-    @api.depends("master_model", "master_res_id")
-    def _compute_external_messages_summary(self):
-        master_records = self._fetch_master_records()
-
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "external_messages_summary"):
-                slave.external_messages_summary = master.external_messages_summary
-            else:
-                slave.external_messages_summary = False
-
-    @api.depends("master_model", "master_res_id")
-    def _compute_unreviewed_message_count(self):
-        master_records = self._fetch_master_records()
-
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "unreviewed_message_count"):
-                slave.unreviewed_message_count = master.unreviewed_message_count
-            else:
-                slave.unreviewed_message_count = 0
+                record.master_model = False
+                record.master_res_id = False
 
     def init(self):
         # Create a unique index on (master_model, master_res_id) to ensure no duplicates
@@ -210,39 +237,223 @@ class RiverflowStateRecord(models.Model):
             % self._table
         )
 
-    @api.depends("master_model", "master_res_id")
+    @api.depends("service_id.indented_name", "name")
+    def _compute_indented_name(self):
+        for slave in self:
+            if slave.indent_level == 0:
+                slave.indented_name = slave.name
+            else:
+                slave.indented_name = "%s%s" % (
+                    "\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}\N{NO-BREAK SPACE}"
+                    * slave.indent_level,
+                    slave.name,
+                )
+
+    @api.depends("service_id.internal_notes_summary")
+    def _compute_internal_notes_summary(self):
+        for record in self:
+            if record.service_id:
+                record.internal_notes_summary = record.service_id.internal_notes_summary
+            else:
+                record.internal_notes_summary = False
+
+    @api.depends("service_id.external_messages_summary")
+    def _compute_external_messages_summary(self):
+        for record in self:
+            if record.service_id:
+                record.external_messages_summary = (
+                    record.service_id.external_messages_summary
+                )
+            else:
+                record.external_messages_summary = False
+
+    @api.depends("service_id.unreviewed_message_count")
+    def _compute_unreviewed_message_count(self):
+        for record in self:
+            if record.service_id:
+                record.unreviewed_message_count = (
+                    record.service_id.unreviewed_message_count
+                )
+            else:
+                record.unreviewed_message_count = 0
+
     def _compute_state_json(self):
-        master_records = self._fetch_master_records()
+        # for rendering just the state name and workflow name
+        for record in self:
+            wf_state_text = record.current_workflow_name or ""
+            if record.state_name:
+                wf_state_text = " | ".join([wf_state_text, record.state_name])
 
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "state_json"):
-                json = master.state_json
-                slave.state_json = json
-            else:
-                slave.state_json = False
+            # todo: store the icon so its not a lookup
+            icon = record.workflow_id.icon or ""
+            is_end_state = record.state_id.is_end_state == True
 
-    @api.depends("master_model", "master_res_id")
+            state_json = {
+                "text": wf_state_text,
+                "workflow_icon": icon,
+                "is_end_state": is_end_state,
+                # this is not a start transition, so we can refresh the underlying list/form view
+                "reload_on_close": True,
+                "buttons": [],
+            }
+
+            record.state_json = state_json
+
+    @api.depends("deadline")
     def _compute_deadline_formatted(self):
-        master_records = self._fetch_master_records()
-
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "deadline_formatted"):
-                slave.deadline_formatted = master.deadline_formatted
+        for record in self:
+            if record.deadline:
+                # Format the deadline date
+                record.deadline_formatted = datetime.strftime(
+                    record.deadline, DATE_FORMAT
+                )
             else:
-                slave.deadline_formatted = False
+                record.deadline_formatted = False
 
-    @api.depends("master_model", "master_res_id")
     def _compute_timing_json(self):
-        master_records = self._fetch_master_records()
+        Service = self.env["riverflow.service"]
+        for record in self:
+            if not record.deadline:
+                record.timing_json = False
+                continue
 
-        for slave in self:
-            master = master_records.get((slave.master_model, slave.master_res_id))
-            if master and hasattr(master, "timing_json"):
-                slave.timing_json = master.timing_json
+            date_str = record.deadline.strftime(Service.DATE_FORMAT)
+
+            today = fields.Date.today()
+            days_remaining = (record.deadline - today).days
+            is_past = record.deadline < today
+            is_today = record.deadline == today
+
+            record.timing_json = {
+                "relative_days": "",
+                "date": date_str,
+                "days_remaining": days_remaining,
+                "is_past": is_past,
+                "is_today": is_today,
+                "is_end_state": record.state_id.is_end_state,
+            }
+
+    @api.depends("service_id.res_name", "name")
+    def _compute_res_name(self):
+        """Compute res_name based on service_id.res_name or name."""
+        for record in self:
+            if record.service_id:
+                record.res_name = record.service_id.res_name
             else:
-                slave.timing_json = False
+                record.res_name = record.name
+
+    @api.depends("service_id.workflow_id")
+    def _compute_workflow_id(self):
+        """needs to be overridden in the child class, to add more dependencies"""
+        for record in self:
+            if record.service_id:
+                record.workflow_id = record.service_id.workflow_id
+            else:
+                record.workflow_id = False
+
+    @api.depends("service_id.state_id")
+    def _compute_state_id(self):
+        for record in self:
+            if record.service_id:
+                record.state_id = record.service_id.state_id
+            else:
+                record.state_id = False
+
+    @api.depends("service_id.display_name", "name")
+    def _compute_display_name(self):
+        for record in self:
+            if record.service_id:
+                record.display_name = record.service_id.display_name
+            else:
+                record.display_name = record.name
+
+    @api.depends("service_id.active")
+    def _compute_active(self):
+        for record in self:
+            if record.service_id:
+                record.active = record.service_id.active
+            else:
+                record.active = True
+
+    @api.depends("service_id.deadline")
+    def _compute_deadline(self):
+        for record in self:
+            if record.service_id:
+                record.deadline = record.service_id.deadline
+            else:
+                record.deadline = False
+
+    @api.depends("service_id.root_name")
+    def _compute_root_name(self):
+        for record in self:
+            if record.service_id:
+                record.root_name = record.service_id.root_name
+            else:
+                record.root_name = False
+
+    @api.depends("service_id.root_id")
+    def _compute_root_id(self):
+        for record in self:
+            if record.service_id:
+                record.root_id = record.service_id.root_id
+            else:
+                record.root_id = False
+
+    @api.depends("service_id.sequence")
+    def _compute_sequence(self):
+        for record in self:
+            if record.service_id:
+                record.sequence = record.service_id.sequence
+            else:
+                record.sequence = 1
+
+    @api.depends("service_id.tag_ids")
+    def _compute_tag_ids(self):
+        for record in self:
+            if record.service_id:
+                record.tag_ids = record.service_id.tag_ids
+            else:
+                record.tag_ids = False
+
+    @api.depends("service_id.res_id")
+    def _compute_res_id(self):
+        for record in self:
+            if record.service_id:
+                record.res_id = record.service_id.res_id
+            else:
+                record.res_id = False
+
+    @api.depends("service_id.res_model")
+    def _compute_res_model(self):
+        for record in self:
+            if record.service_id:
+                record.res_model = record.service_id.res_model
+            else:
+                record.res_model = False
+
+    @api.depends("service_id.res_name", "name")
+    def _compute_res_name(self):
+        for record in self:
+            if record.service_id:
+                record.res_name = record.service_id.res_name
+            else:
+                record.res_name = record.name
+
+    @api.depends("service_id.responsible_team_id")
+    def _compute_responsible_team_id(self):
+        for record in self:
+            if record.service_id:
+                record.responsible_team_id = record.service_id.responsible_team_id
+            else:
+                record.responsible_team_id = False
+
+    @api.depends("service_id.indent_level")
+    def _compute_indent_level(self):
+        for record in self:
+            if record.service_id:
+                record.indent_level = record.service_id.indent_level + 1
+            else:
+                record.indent_level = 0
 
     def action_view_master_record(self):
         action = {
@@ -257,3 +468,11 @@ class RiverflowStateRecord(models.Model):
 
     def row_click(self):
         return self.action_view_master_record()
+
+    @api.depends("service_id.name")
+    def _compute_name(self):
+        for record in self:
+            if record.service_id:
+                record.name = record.service_id.name
+            else:
+                record.name = False

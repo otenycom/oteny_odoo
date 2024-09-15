@@ -30,8 +30,8 @@
                                     icon="fa-plus">
                                     Add Transition</button>
                             </div>
-                            <field name="from_transition_ids" default_order="sequence,name,id">
-                                <tree editable="bottom" create="0" delete="1" multi_edit="0" edit="0" open_form_view="True">
+                            <field name="from_transition_ids" default_order="sequence,name,id" widget="riverflow_one2many">
+                                <tree create="0" delete="0" edit="0">
                                     <field name="active" column_invisible="True" />
                                     <field name="workflow_id" column_invisible="True" />
                                     <field name="sequence" widget="handle" />

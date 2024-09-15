@@ -2,26 +2,19 @@
     <record id="view_service_transition_action_default_form" model="ir.ui.view">
         <field name="name">service.wizard.form</field>
         <field name="model">riverflow.service.wizard</field>
+        <field name="inherit_id" ref="riverflow.view_transition_wizard_form" />
         <field name="arch" type="xml">
-            <form string="Update Service">
-                <group>
-                    <field name="records_to_transition_ids" invisible="1" />
-                    <field name="transition_id" invisible="1" />
-                    <field name="transition_description" readonly="1" invisible="not transition_description" />
-                    <field name="name" required="1" />
-                    <field name="new_remark" required="0" invisible="context.get('new_remark_invisible', False)" widget="html" />
-                    <field name="use_project_deadline_from" required="1" />
-                    <field name="project_deadline" invisible="use_project_deadline_from != 'self'" />
-                    <field name="days_relative_to_project" invisible="context.get('days_relative_to_project_invisible')" />
-                    <field name="res_id" invisible="1"></field>
-                    <field name="res_model" invisible="1"></field>
-                </group>
-                <footer>
-                    <button string="OK" type="object" name="action_save" class="btn-primary"
-                        data-hotkey="q" />
-                    <button string="Cancel" class="btn-secondary" special="cancel" />
-                </footer>
-            </form>
+            <xpath expr="//field[@name='transition_id']" position="after">
+                <field name="name" required="1" />
+                <field name="use_project_deadline_from" required="1" invisible="use_project_deadline_from_invisible" />
+                <field name="use_project_deadline_from_invisible" invisible="1" />
+                <field name="project_deadline" invisible="use_project_deadline_from != 'self' or use_project_deadline_from_invisible" />
+                <field name="project_deadline_invisible" invisible="1" />
+                <field name="days_relative_to_project" invisible="days_relative_to_project_invisible" />
+                <field name="days_relative_to_project_invisible" invisible="1" />
+                <field name="res_id" invisible="1" />
+                <field name="res_model" invisible="1" />
+            </xpath>
         </field>
     </record>
 </odoo>

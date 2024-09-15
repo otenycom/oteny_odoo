@@ -7,12 +7,15 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     _name = "riverflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
-    # initial workflow
+    # initial workflow. Not a computed field, so it can be set in the form view
+    # and the user can then select the state. If state is change later in write/create, we keep
+    # the workflow_id as it was set initially, so it represents the front office workflow/work status
     workflow_id = fields.Many2one(
         "riverflow.workflow",
         domain="[('model', '=', model)]",
         string="Workflow",
         tracking=True,
+        index=True,
     )
 
     state_id = fields.Many2one(
@@ -29,7 +32,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     current_workflow_name = fields.Char(
         "Workflow name",
-        related="state_id.workflow_id.name",
+        related="workflow_id.name",
         store=True,
         index=True,
     )
@@ -41,6 +44,20 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     transition_buttons_json = fields.Json(
         string="Workflow Actions",
         compute="_compute_transition_buttons_json",
+        store=False,
+    )
+
+    deadline = fields.Date(
+        string="Deadline",
+        compute="_compute_deadline",
+        store=True,
+        index=True,
+        help="Planning deadline.",
+    )
+
+    timing_json = fields.Json(
+        "Timing",
+        compute="_compute_timing_json",
         store=False,
     )
 
@@ -78,7 +95,16 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def _compute_from_transition_ids(self):
         for s in self:
             if not s.state_id:
-                s.from_transition_ids = []
+                if s.workflow_id:
+                    domain = [
+                        ("from_state_id", "=", False),
+                        ("workflow_id", "=", s.workflow_id.id),
+                    ]
+                    s.from_transition_ids = self.env["riverflow.transition"].search(
+                        domain, order="workflow_name,sequence,id"
+                    )
+                else:
+                    s.from_transition_ids = []
             else:
                 s.from_transition_ids = self.env["riverflow.transition"].search(
                     [
@@ -95,7 +121,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 wf_state_text = " | ".join([wf_state_text, record.state_name])
 
             # todo: store the icon so its not a lookup
-            icon = record.state_id.workflow_id.icon or ""
+            icon = record.workflow_id.icon or ""
             is_end_state = record.state_id.is_end_state == True
 
             state_json = {
@@ -144,3 +170,52 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def action_button_click(self):
 
         return self._prepare_transition_action()
+
+    def write(self, vals):
+        self._sync_workflow_with_state(vals)
+        return super().write(vals)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            self._sync_workflow_with_state(vals)
+        records = super().create(vals_list)
+        self.env["riverflow.auto.add.service"].auto_add_services(
+            records, trigger="create"
+        )
+        return records
+
+    def _sync_workflow_with_state(self, vals):
+        if "state_id" in vals:
+            if vals["state_id"]:
+                new_state = self.env["riverflow.state"].browse(vals["state_id"])
+                vals["workflow_id"] = new_state.workflow_id.id
+            else:
+                vals["workflow_id"] = False
+
+    def _compute_deadline(self):
+        pass
+
+    @api.depends("deadline", "state_id.is_end_state")
+    def _compute_timing_json(self):
+        Service = self.env["riverflow.service"]
+        for record in self:
+            if not record.deadline:
+                record.timing_json = False
+                continue
+
+            date_str = record.deadline.strftime(Service.DATE_FORMAT)
+
+            today = fields.Date.today()
+            days_remaining = (record.deadline - today).days
+            is_past = record.deadline < today
+            is_today = record.deadline == today
+
+            record.timing_json = {
+                "relative_days": "",
+                "date": date_str,
+                "days_remaining": days_remaining,
+                "is_past": is_past,
+                "is_today": is_today,
+                "is_end_state": record.state_id.is_end_state,
+            }
