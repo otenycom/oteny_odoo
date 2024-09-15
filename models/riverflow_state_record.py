@@ -39,10 +39,14 @@ class RiverflowStateRecord(models.Model):
         ]
 
     # Fields to identify the record
-    name = fields.Char(string="Name", required=True, index=True)
+    name = fields.Char(
+        string="Name",
+        index=True,
+        compute="_compute_name",
+        store=True,
+    )
     display_name = fields.Char(
         string="Display Name",
-        required=True,
         index=True,
         compute="_compute_display_name",
         store=True,
@@ -464,3 +468,11 @@ class RiverflowStateRecord(models.Model):
 
     def row_click(self):
         return self.action_view_master_record()
+
+    @api.depends("service_id.name")
+    def _compute_name(self):
+        for record in self:
+            if record.service_id:
+                record.name = record.service_id.name
+            else:
+                record.name = False

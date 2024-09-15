@@ -44,11 +44,6 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         self._create_state_record(records)
         return records
 
-    def write(self, vals):
-        result = super().write(vals)
-        self._update_state_record(vals)
-        return result
-
     def _unlink_state_record(self):
         state_records = self._get_state_records(ids=self.ids)
         if state_records:
@@ -80,125 +75,8 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 f"Creating riverflow_state_record for {record._name} with id {record.id}"
             )
             vals = {
-                "name": record.name,
-                "display_name": record.display_name,
                 "master_model": record._name,
                 "master_res_id": record.id,
-                "workflow_id": record.workflow_id.id,
-                "state_id": record.state_id.id,
-                "active": record.active if hasattr(record, "active") else True,
-                "deadline": record.deadline if hasattr(record, "deadline") else False,
-                "root_id": (record.root_id if hasattr(record, "root_id") else False),
-                "root_name": (
-                    record.root_name if hasattr(record, "root_name") else False
-                ),
-                # "indented_name": (
-                #     record.indented_name
-                #     if hasattr(record, "indented_name")
-                #     else record.name
-                # ),
-                "sequence": record.sequence if hasattr(record, "sequence") else 0,
-                "tag_ids": (
-                    [(6, 0, record.tag_ids.ids)]
-                    if hasattr(record, "tag_ids")
-                    else False
-                ),
-                "res_id": record.res_id if hasattr(record, "res_id") else record.id,
-                "res_model": (
-                    record.res_model if hasattr(record, "res_model") else record._name
-                ),
-                "res_name": (
-                    record.res_name if hasattr(record, "res_name") else record.name
-                ),
-                # New fields from MailThreadReviewMixin
-                "internal_notes_summary": (
-                    record.internal_notes_summary
-                    if hasattr(record, "internal_notes_summary")
-                    else False
-                ),
-                "external_messages_summary": (
-                    record.external_messages_summary
-                    if hasattr(record, "external_messages_summary")
-                    else False
-                ),
-                "unreviewed_message_count": (
-                    record.unreviewed_message_count
-                    if hasattr(record, "unreviewed_message_count")
-                    else 0
-                ),
-                "responsible_team_id": (
-                    record.responsible_team_id.id
-                    if hasattr(record, "responsible_team_id")
-                    else False
-                ),
             }
             state_record_vals.append(vals)
         self.env["riverflow.state.record"].create(state_record_vals)
-
-    def _update_state_record(self, vals):
-        """
-        Dynamically updates the associated state record with changes from the master record.
-
-        This method retrieves the fields to update dynamically, ensuring that only existing fields
-        are processed. It compares each relevant field between the master record and the state record,
-        updating only those fields that have changed. Fields that do not exist in the current model
-        are gracefully skipped.
-
-        :param vals: Dictionary of values to update from the master record
-        """
-        # Define the fields that should be tracked for updates
-        fields_to_update = [
-            "name",
-            "display_name",
-            "workflow_id",
-            "state_id",
-            "active",
-            "deadline",
-            "root_name",
-            "root_id",
-            "sequence",
-            "tag_ids",
-            "res_id",
-            "res_model",
-            # "res_name",
-            "internal_notes_summary",
-            "external_messages_summary",
-            "unreviewed_message_count",
-            "responsible_team_id",
-        ]
-
-        # Dynamically retrieve fields that exist in the current model
-        existing_fields = self.fields_get(fields_to_update)
-        available_fields = existing_fields.keys()
-
-        for record in self:
-            state_record = record._get_state_record()
-
-            if state_record:
-                update_vals = {}
-                for field in available_fields:
-                    record_value = record[field]
-                    if field == "root_id":
-                        record_value = int(record_value.id)
-                    state_record_value = state_record[field]
-
-                    # _logger.info(
-                    #     f"Updating {field} from {state_record_value} to {record_value}"
-                    # )
-                    if record_value != state_record_value:
-                        if field == "tag_ids":
-                            update_vals[field] = [(6, 0, record.tag_ids.ids)]
-                        else:
-                            update_vals[field] = record_value
-
-                # Assign 'res_name' from 'name' if 'res_name' field does not exist and differs
-                # master_model_fields = self.env[self._name]._fields
-                # if (
-                #     "res_name" not in master_model_fields
-                #     and state_record.res_name != record.name
-                # ):
-                #     update_vals["res_name"] = record.name
-
-                if update_vals:
-                    # Update the state record with the new values
-                    state_record.sudo().write(update_vals)
