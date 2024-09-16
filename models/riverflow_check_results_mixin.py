@@ -56,8 +56,6 @@ class CheckResultsMixin(models.AbstractModel):
         to_unlink = existing_check_results - to_keep
         to_unlink.unlink()  # cascade delete
 
-        return (to_unlink.ids, created_results)
-
     def base_check_results(self):
         result = self.check_result_ids.filtered(
             lambda r: r.check_type in ["gap", "overlap", "reversed"]
