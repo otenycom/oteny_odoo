@@ -7,9 +7,8 @@ class CheckResult(models.Model):
     _name = "riverflow.check.result"
     _description = "Base Check Result"
 
-    name = fields.Char(string="Name", compute="_compute_name", store=True)
+    name = fields.Char(string="Name", store=True)
     check_type = fields.Selection([], string="Check Type", required=True)
-    description = fields.Text(string="Description")
     severity = fields.Selection(
         [
             ("info", "Info"),
@@ -19,12 +18,8 @@ class CheckResult(models.Model):
         string="Severity",
         required=True,
     )
-    color = fields.Integer(string="Color", compute="_compute_color", store=True)
 
-    @api.depends("check_type")
-    def _compute_name(self):
-        for record in self:
-            record.name = f"{record.check_type.capitalize()}: {record.description}"
+    color = fields.Integer(string="Color", compute="_compute_color", store=False)
 
     @api.depends("severity")
     def _compute_color(self):
@@ -45,14 +40,14 @@ class CheckResult(models.Model):
         """
         if isinstance(other, dict):
             return (
-                self.check_type == other.get("check_type")
-                and self.description == other.get("description")
+                self.name == other.get("name")
+                and self.check_type == other.get("check_type")
                 and self.severity == other.get("severity")
             )
         elif isinstance(other, type(self)):
             return (
-                self.check_type == other.check_type
-                and self.description == other.description
+                self.name == other.name
+                and self.check_type == other.check_type
                 and self.severity == other.severity
             )
         return False

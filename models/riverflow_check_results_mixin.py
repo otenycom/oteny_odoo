@@ -41,6 +41,7 @@ class CheckResultsMixin(models.AbstractModel):
 
     def _sync_check_results(self, existing_check_results, new_check_results):
         CheckResult = self.env["riverflow.check.result"]
+
         to_keep = existing_check_results.filtered(
             lambda r: any(r.compare(new_result) for new_result in new_check_results)
         )
@@ -51,11 +52,17 @@ class CheckResultsMixin(models.AbstractModel):
         ]
 
         created_results = CheckResult.create(to_create)
-        to_unlink = existing_check_results - to_keep
-        to_unlink.unlink()
 
-        remaining_results = to_keep | created_results
-        return (to_unlink.ids, remaining_results)
+        to_unlink = existing_check_results - to_keep
+        to_unlink.unlink()  # cascade delete
+
+        return (to_unlink.ids, created_results)
+
+    def base_check_results(self):
+        result = self.check_result_ids.filtered(
+            lambda r: r.check_type in ["gap", "overlap", "reversed"]
+        )
+        return result
 
     def print_check_results(self):
         """
@@ -64,7 +71,7 @@ class CheckResultsMixin(models.AbstractModel):
         print(f"\nCheck Results for Log Entry: {self.name}")
         print(
             "{:<10} {:<12} {:<12} {:<10} {:<50}".format(
-                "Type", "Start Date", "End Date", "Severity", "Description"
+                "Type", "Start Date", "End Date", "Severity", "Name"
             )
         )
         print("-" * 94)
@@ -80,9 +87,9 @@ class CheckResultsMixin(models.AbstractModel):
                     result.end_date.strftime("%Y-%m-%d") if result.end_date else "N/A",
                     result.severity,
                     (
-                        result.description[:47] + "..."
-                        if len(result.description) > 50
-                        else result.description
+                        result.name[:47] + "..."
+                        if len(result.name) > 50
+                        else result.name
                     ),
                 )
             )
