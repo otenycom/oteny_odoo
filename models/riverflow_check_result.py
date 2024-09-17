@@ -21,6 +21,19 @@ class CheckResult(models.Model):
 
     color = fields.Integer(string="Color", compute="_compute_color", store=False)
 
+    state_record_id = fields.Many2one(
+        comodel_name="riverflow.state.record",
+        string="State Record",
+        required=False,
+        ondelete="cascade",
+        compute="_compute_state_record_id",
+        store=True,
+    )
+
+    @api.depends()
+    def _compute_state_record_id(self):
+        pass
+
     @api.depends("severity")
     def _compute_color(self):
         for record in self:

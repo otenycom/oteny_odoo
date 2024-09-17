@@ -99,74 +99,112 @@ class AutoAddService(models.Model):
         }
 
     @api.model
-    def prepare_service_values(self, service_vals):
+    def prepare_services_to_create(self, to_create):
         """
         Hook method to prepare or modify service values before creation.
         This method can be overridden in inherited models to customize service values.
         """
-        return service_vals
+        pass
 
     @api.model
-    def service_created(self, auto_add_rule, service):
+    def service_created(self, service):
         """
         Hook method to perform actions after a service is created.
         This method can be overridden in inherited models to customize post-creation actions.
         """
-        if auto_add_rule.service_note:
+        if service.created_by_auto_add_service_id.note:
             # post the note as a comment on the chatter
             service.message_post(
-                body=auto_add_rule.service_note,
+                body=service.created_by_auto_add_service_id.note,
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
             )
 
     @api.model
-    def auto_add_services(self, records, trigger="create"):
+    def auto_add_services(self, records):
         """Check rules and add services to matching records."""
-        Service = self.env["riverflow.service"]
+        if not records:
+            return
 
-        # Collect distinct model names from the records
-        model_names = list(set(record._name for record in records))
-
-        # Lookup matching rules with one query
-        matching_rules = self.search(
+        model = records[0]._name
+        auto_add_rules = self.search(
             [
-                ("applies_to_model_id.model", "in", model_names),
+                ("applies_to_model_id.model", "=", model),
                 ("active", "=", True),
-                (f"apply_on_{trigger}", "=", True),
             ]
         )
 
         eval_context = self._eval_context()
+        new_services = []
+
         for record in records:
-            auto_add_rules = matching_rules.filtered(
-                lambda r: r.applies_to_model_id.model == record._name
-            )
             for auto_add_rule in auto_add_rules:
                 try:
                     domain = safe_eval(auto_add_rule.condition_domain, eval_context)
                     domain = expression.normalize_domain(domain)
                     if record.sudo().filtered_domain(domain):
-                        service_vals = {
-                            "name": auto_add_rule.service_name,
-                            "workflow_id": auto_add_rule.service_workflow_id.id,
-                            "res_model": record._name,
-                            "res_id": record.id,
-                            "created_by_auto_add_rule_id": auto_add_rule.id,
-                            "responsible_team_id": (
-                                auto_add_rule.service_responsible_team_id.id
-                                if auto_add_rule.service_responsible_team_id
-                                else record.responsible_team_id.id
-                            ),
-                            "use_project_deadline_from": auto_add_rule.service_use_project_deadline_from,
-                            "days_relative_to_project": auto_add_rule.service_days_relative_to_project,
-                        }
-                        # Allow inherited classes to update service values
-                        service_vals = self.prepare_service_values(service_vals)
-                        service = Service.create([service_vals])[0]
-
-                        self.service_created(auto_add_rule, service)
+                        new_services.append(
+                            {
+                                "name": auto_add_rule.service_name,
+                                "workflow_id": auto_add_rule.service_workflow_id.id,
+                                "res_model": record._name,
+                                "res_id": record.id,
+                                "created_by_auto_add_service_id": auto_add_rule.id,
+                                "responsible_team_id": (
+                                    auto_add_rule.service_responsible_team_id.id
+                                    if auto_add_rule.service_responsible_team_id
+                                    else record.responsible_team_id.id
+                                ),
+                                "use_project_deadline_from": auto_add_rule.service_use_project_deadline_from,
+                                "days_relative_to_project": auto_add_rule.service_days_relative_to_project,
+                            }
+                        )
                 except Exception as e:
                     _logger.error(
                         f"Error evaluating domain for rule {auto_add_rule.name}: {e}"
                     )
+
+        # Sync the generated services with the existing services
+        current_services = self.env["riverflow.service"].search(
+            [
+                ("res_model", "=", model),
+                ("res_id", "in", records.ids),
+                ("created_by_auto_add_service_id", "!=", False),
+                ("created_by_auto_add_service_id", "!=", 0),
+            ]
+        )
+
+        # Create sets for easy comparison
+        new_services_set = {
+            (ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services
+        }
+        current_services_set = {
+            (s.created_by_auto_add_service_id.id, s.res_id) for s in current_services
+        }
+
+        # Services to keep (intersection of current and new)
+        to_keep = current_services.filtered(
+            lambda s: (s.created_by_auto_add_service_id.id, s.res_id)
+            in new_services_set
+        )
+
+        # Services to delete (in current but not in new)
+        to_delete = current_services - to_keep
+
+        # Services to create (in new but not in current)
+        to_create = [
+            ns
+            for ns in new_services
+            if (ns["created_by_auto_add_service_id"], ns["res_id"])
+            not in current_services_set
+        ]
+
+        if to_delete:
+            to_delete.unlink()
+
+        if to_create:
+            # Allow inherited classes to update service values
+            self.prepare_services_to_create(to_create)
+            created_services = self.env["riverflow.service"].create(to_create)
+            for created_service in created_services:
+                self.service_created(created_service)

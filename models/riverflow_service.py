@@ -44,10 +44,10 @@ class Service(models.Model):
         compute="_compute_descendant_ids",
         store=False,
     )
-    created_by_auto_add_rule_id = fields.Integer(
-        string="Created by Auto Add Rule ID",
-        default=False,
-        help="ID of the auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
+    created_by_auto_add_service_id = fields.Many2one(
+        "riverflow.auto.add.service",
+        string="Created by Auto Add Rule",
+        help="The auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
     )
 
     @api.depends("child_ids")

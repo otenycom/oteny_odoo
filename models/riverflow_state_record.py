@@ -204,7 +204,6 @@ class RiverflowStateRecord(models.Model):
         "riverflow.service",
         string="Service",
         compute="_compute_service_id",
-        inverse="_inverse_service_id",
         store=True,
         index=True,
         help="The service to which this record applies",
@@ -226,6 +225,13 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.master_model = False
                 record.master_res_id = False
+
+    check_result_ids = fields.One2many(
+        comodel_name="riverflow.check.result",
+        inverse_name="state_record_id",
+        string="Issues",
+        auto_join=True,
+    )
 
     def init(self):
         # Create a unique index on (master_model, master_res_id) to ensure no duplicates

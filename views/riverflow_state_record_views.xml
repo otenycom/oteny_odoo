@@ -71,6 +71,7 @@
                 <field name="state_json" widget="transition_buttons" optional="show" />
                 <field name="state_id" optional="hide" />
                 <field name="responsible_team_id" optional="show" string="Responsible" />
+                <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name='internal_notes_summary' optional="show" />
                 <field name="external_messages_summary" optional="show" />
                 <field name="unreviewed_message_count" optional="show" />
