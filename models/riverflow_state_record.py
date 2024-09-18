@@ -207,6 +207,7 @@ class RiverflowStateRecord(models.Model):
         store=True,
         index=True,
         help="The service to which this record applies",
+        ondelete="cascade",
     )
 
     @api.depends("master_model", "master_res_id")

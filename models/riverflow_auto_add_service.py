@@ -38,19 +38,9 @@ class AutoAddService(models.Model):
         default="[]",
         help="Domain filter to determine when the service should be added.",
     )
-    note = fields.Text(
+    description = fields.Text(
         string="Description",
         help="Internal notes about the rule's purpose or behavior.",
-    )
-    apply_on_create = fields.Boolean(
-        string="Apply on Create",
-        default=True,
-        help="Apply this rule when a new subject record is created.",
-    )
-    apply_on_write = fields.Boolean(
-        string="Apply on Write",
-        default=True,
-        help="Apply this rule when a subject record is updated.",
     )
     service_name = fields.Char(string="Service Name", required=True)
     service_workflow_id = fields.Many2one(
@@ -112,32 +102,35 @@ class AutoAddService(models.Model):
         Hook method to perform actions after a service is created.
         This method can be overridden in inherited models to customize post-creation actions.
         """
-        if service.created_by_auto_add_service_id.note:
+        if service.created_by_auto_add_service_id.service_note:
             # post the note as a comment on the chatter
             service.message_post(
-                body=service.created_by_auto_add_service_id.note,
+                body=service.created_by_auto_add_service_id.service_note,
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
             )
 
     @api.model
-    def auto_add_services(self, records):
-        """Check rules and add services to matching records."""
-        if not records:
+    def auto_add_services(self, subjects):
+        if subjects and isinstance(subjects[0].id, models.NewId):
+            """Because of the fake id in form view, we need to return"""
             return
 
-        model = records[0]._name
+        """Check rules and add services to matching records."""
+        if not subjects:
+            return
+
+        model = subjects[0]._name
         auto_add_rules = self.search(
             [
                 ("applies_to_model_id.model", "=", model),
-                ("active", "=", True),
             ]
         )
 
         eval_context = self._eval_context()
         new_services = []
 
-        for record in records:
+        for record in subjects:
             for auto_add_rule in auto_add_rules:
                 try:
                     domain = safe_eval(auto_add_rule.condition_domain, eval_context)
@@ -165,42 +158,53 @@ class AutoAddService(models.Model):
                     )
 
         # Sync the generated services with the existing services
-        current_services = self.env["riverflow.service"].search(
-            [
-                ("res_model", "=", model),
-                ("res_id", "in", records.ids),
-                ("created_by_auto_add_service_id", "!=", False),
-                ("created_by_auto_add_service_id", "!=", 0),
-            ]
+        current_services = (
+            self.with_context(active_test=False)
+            .env["riverflow.service"]
+            .search(
+                [
+                    ("res_id", "in", subjects.ids),
+                    ("res_model", "=", model),
+                    ("created_by_auto_add_service_id", "!=", False),
+                ]
+            )
         )
 
         # Create sets for easy comparison
         new_services_set = {
             (ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services
         }
-        current_services_set = {
-            (s.created_by_auto_add_service_id.id, s.res_id) for s in current_services
+        current_services_dict = {
+            (s.created_by_auto_add_service_id.id, s.res_id): s for s in current_services
         }
 
-        # Services to keep (intersection of current and new)
-        to_keep = current_services.filtered(
+        # Services to activate (in new_services_set and currently inactive)
+        to_activate = current_services.filtered(
             lambda s: (s.created_by_auto_add_service_id.id, s.res_id)
             in new_services_set
+            and not s.active
         )
 
-        # Services to delete (in current but not in new)
-        to_delete = current_services - to_keep
+        # Services to deactivate (not in new_services_set and currently active)
+        to_deactivate = current_services.filtered(
+            lambda s: (s.created_by_auto_add_service_id.id, s.res_id)
+            not in new_services_set
+            and s.active
+        )
 
-        # Services to create (in new but not in current)
+        # Services to create (in new_services_set but not in current_services_dict)
         to_create = [
             ns
             for ns in new_services
             if (ns["created_by_auto_add_service_id"], ns["res_id"])
-            not in current_services_set
+            not in current_services_dict
         ]
 
-        if to_delete:
-            to_delete.unlink()
+        if to_activate:
+            to_activate.write({"active": True})
+
+        if to_deactivate:
+            to_deactivate.write({"active": False})
 
         if to_create:
             # Allow inherited classes to update service values

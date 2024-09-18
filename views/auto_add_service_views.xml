@@ -28,7 +28,7 @@
                             <field name="service_note" />
                         </group>
                     </group>
-                    <field name="note" placeholder="Internal notes about the rule's purpose or behavior..." />
+                    <field name="description" placeholder="Description of the rule's purpose or behavior..." />
                 </sheet>
             </form>
         </field>
@@ -43,7 +43,7 @@
                 <field name="name" optional="show" />
                 <field name="applies_to_model_id" optional="show" />
                 <field name="condition_domain" optional="show" />
-                <field name="note" optional="hide" />
+                <field name="description" optional="hide" />
                 <field name="service_name" optional="hide" />
                 <field name="service_workflow_id" optional="hide" />
                 <field name="service_responsible_team_id" optional="show" string="Responsible" />

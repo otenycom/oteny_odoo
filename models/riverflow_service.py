@@ -385,9 +385,9 @@ class Service(models.Model):
     def print_compute_sequence_counter(self):
         if not hasattr(self.__class__, "_compute_sequence_counter"):
             self.__class__._compute_sequence_counter = 0
-        # print(
-        #     f"_compute_sequence counter: {self.__class__._compute_sequence_counter} - {self.display_name}"
-        # )
+        print(
+            f"_compute_sequence counter: {self.__class__._compute_sequence_counter} - {self.display_name} - id: {self.id} - entry: {self.log_entry_id.id}"
+        )
         self.__class__._compute_sequence_counter += 1
 
     @api.depends(
@@ -396,86 +396,101 @@ class Service(models.Model):
         "deadline",
     )
     def _compute_sequence(self):
-        self.print_compute_sequence_counter()
+        # if self.env.context.get("computing_sequence"):
+        #     return
 
-        if isinstance(self.id, models.NewId):
-            return
+        try:
+            self = self.with_context(computing_sequence=True)
+            for record in self:
 
-        # Retrieve all service records with the same root_id as the current record
-        # we only set the sequence field of child nodes, the root nodes are sorted
-        # by name; as it would become very slow to sequence the entire list of services
-        services = self.sudo().search([("root_id", "=", self.root_id.id)])
+                record.print_compute_sequence_counter()
 
-        # Dictionary to hold the tree structure of services
-        service_tree = {}
+                if isinstance(record.id, models.NewId):
+                    return
 
-        # Dictionary to map service IDs to their corresponding service objects
-        service_dict = {service.id: service for service in services}
-
-        # Build the tree structure
-        for service in services:
-            # Determine the parent ID of the current service
-            parent_id = service.parent_id.id if service.parent_id else None
-
-            # Initialize the parent node list if it doesn't exist
-            if parent_id not in service_tree:
-                service_tree[parent_id] = []
-
-            # Add the current service to its parent's list of children
-            service_tree[parent_id].append(service.id)
-
-        # Initialize the sequence counter
-        sequence = 0
-
-        def assign_sequence(service_id, visited):
-            nonlocal sequence  # Use the nonlocal keyword to modify the outer scope 'sequence' variable
-
-            # Check for circular references in the hierarchy
-            if service_id in visited:
-                raise ValueError(
-                    f"Circular reference detected in service hierarchy involving service ID {service_id}"
+                # Retrieve all service records with the same root_id as the current record
+                # we only set the sequence field of child nodes, the root nodes are sorted
+                # by name; as it would become very slow to sequence the entire list of services
+                services = (
+                    self.env["riverflow.service"]
+                    .with_context(active_test=False)
+                    .sudo()
+                    .search([("root_id", "=", record.root_id.id)])
                 )
 
-            # Add the current service ID to the set of visited nodes
-            visited.add(service_id)
+                # Dictionary to hold the tree structure of services
+                service_tree = {}
 
-            # Retrieve the service object using its ID
-            service = service_dict[service_id]
+                # Dictionary to map service IDs to their corresponding service objects
+                service_dict = {service.id: service for service in services}
 
-            # Assign the current sequence number to the service
-            service.sequence = sequence
+                # Build the tree structure
+                for service in services:
+                    # Determine the parent ID of the current service
+                    parent_id = service.parent_id.id if service.parent_id else None
 
-            # Increment the sequence number for the next service
-            sequence += 1
+                    # Initialize the parent node list if it doesn't exist
+                    if parent_id not in service_tree:
+                        service_tree[parent_id] = []
 
-            if service_id in service_tree:
-                children_ids = service_tree[service_id]
-                # Sort children based on `deadline`, then `name`, then `id`
-                sorted_children_ids = sorted(
-                    children_ids,
-                    key=lambda child_id: (
-                        service_dict[child_id].deadline or date.max,
-                        service_dict[child_id].name,
-                        service_dict[child_id].id,
-                    ),
-                )
-                for child_id in sorted_children_ids:
-                    assign_sequence(child_id, visited)
+                    # Add the current service to its parent's list of children
+                    service_tree[parent_id].append(service.id)
 
-        # Assign sequence numbers to root services (those without parents) and their children
-        if None in service_tree:
-            visited = set()
+                # Initialize the sequence counter
+                sequence = 0
 
-            # Sort the root services by `name`, then `id`
-            root_ids = sorted(
-                service_tree[None],
-                key=lambda root_id: (
-                    service_dict[root_id].name,
-                    service_dict[root_id].id,
-                ),
-            )
-            for root_id in root_ids:
-                assign_sequence(root_id, visited)
+                def assign_sequence(service_id, visited):
+                    nonlocal sequence  # Use the nonlocal keyword to modify the outer scope 'sequence' variable
+
+                    # Check for circular references in the hierarchy
+                    if service_id in visited:
+                        raise ValueError(
+                            f"Circular reference detected in service hierarchy involving service ID {service_id}"
+                        )
+
+                    # Add the current service ID to the set of visited nodes
+                    visited.add(service_id)
+
+                    # Retrieve the service object using its ID
+                    service = service_dict[service_id]
+
+                    # Assign the current sequence number to the service
+                    service.sequence = sequence
+
+                    # Increment the sequence number for the next service
+                    sequence += 1
+
+                    if service_id in service_tree:
+                        children_ids = service_tree[service_id]
+                        # Sort children based on `deadline`, then `name`, then `id`
+                        sorted_children_ids = sorted(
+                            children_ids,
+                            key=lambda child_id: (
+                                service_dict[child_id].deadline or date.max,
+                                service_dict[child_id].name,
+                                service_dict[child_id].id,
+                            ),
+                        )
+                        for child_id in sorted_children_ids:
+                            assign_sequence(child_id, visited)
+
+                # Assign sequence numbers to root services (those without parents) and their children
+                if None in service_tree:
+                    visited = set()
+
+                    # Sort the root services by `name`, then `id`
+                    root_ids = sorted(
+                        service_tree[None],
+                        key=lambda root_id: (
+                            service_dict[root_id].name,
+                            service_dict[root_id].id,
+                        ),
+                    )
+                    for root_id in root_ids:
+                        assign_sequence(root_id, visited)
+
+        finally:
+            self = self.with_context(computing_sequence=False)
 
     def action_view_parent_service(self):
         return {
