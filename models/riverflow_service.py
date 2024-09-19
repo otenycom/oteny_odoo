@@ -411,14 +411,22 @@ class Service(models.Model):
 
             # self = self.with_context(computing_sequence=True)
             # try:
+
             # Retrieve all service records with the same root_id as the current record
             # we only set the sequence field of child nodes, the root nodes are sorted
             # by name; as it would become very slow to sequence the entire list of services
-            services = set(
-                Service.search(
-                    [("root_id", "=", record.root_id.id), ("id", "!=", record.id)]
-                )
+
+            # we use direct sql to avoid recalculation of root_id, which means 'search' would decide
+            # to recursively recalculate all records in the table, this overflows the stack
+            self.env.cr.execute(
+                """
+                    SELECT id FROM riverflow_service
+                    WHERE root_id = %s AND id != %s
+                    """,
+                (record.root_id.id, record.id),
             )
+            service_ids = [row[0] for row in self.env.cr.fetchall()]
+            services = set(Service.browse(service_ids))
             # current record is not included in the search as it can lead to recursive stack overflow
             # as search also recalculates the sequence field
             services.add(record)
