@@ -204,10 +204,10 @@ class RiverflowStateRecord(models.Model):
         "riverflow.service",
         string="Service",
         compute="_compute_service_id",
-        inverse="_inverse_service_id",
         store=True,
         index=True,
         help="The service to which this record applies",
+        ondelete="cascade",
     )
 
     @api.depends("master_model", "master_res_id")
@@ -226,6 +226,13 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.master_model = False
                 record.master_res_id = False
+
+    check_result_ids = fields.One2many(
+        comodel_name="riverflow.check.result",
+        inverse_name="state_record_id",
+        string="Issues",
+        auto_join=True,
+    )
 
     def init(self):
         # Create a unique index on (master_model, master_res_id) to ensure no duplicates
@@ -252,30 +259,41 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.internal_notes_summary")
     def _compute_internal_notes_summary(self):
         for record in self:
-            if record.service_id:
-                record.internal_notes_summary = record.service_id.internal_notes_summary
-            else:
-                record.internal_notes_summary = False
+            record.internal_notes_summary = (
+                self._compute_internal_notes_summary_for_record(record)
+            )
+
+    @api.model
+    def _compute_internal_notes_summary_for_record(self, record):
+        if record.service_id:
+            return record.service_id.internal_notes_summary
+        return False
 
     @api.depends("service_id.external_messages_summary")
     def _compute_external_messages_summary(self):
         for record in self:
-            if record.service_id:
-                record.external_messages_summary = (
-                    record.service_id.external_messages_summary
-                )
-            else:
-                record.external_messages_summary = False
+            record.external_messages_summary = (
+                self._compute_external_messages_summary_for_record(record)
+            )
+
+    @api.model
+    def _compute_external_messages_summary_for_record(self, record):
+        if record.service_id:
+            return record.service_id.external_messages_summary
+        return False
 
     @api.depends("service_id.unreviewed_message_count")
     def _compute_unreviewed_message_count(self):
         for record in self:
-            if record.service_id:
-                record.unreviewed_message_count = (
-                    record.service_id.unreviewed_message_count
-                )
-            else:
-                record.unreviewed_message_count = 0
+            record.unreviewed_message_count = (
+                self._compute_unreviewed_message_count_for_record(record)
+            )
+
+    @api.model
+    def _compute_unreviewed_message_count_for_record(self, record):
+        if record.service_id:
+            return record.service_id.unreviewed_message_count
+        return 0
 
     def _compute_state_json(self):
         # for rendering just the state name and workflow name
@@ -344,44 +362,58 @@ class RiverflowStateRecord(models.Model):
 
     @api.depends("service_id.workflow_id")
     def _compute_workflow_id(self):
-        """needs to be overridden in the child class, to add more dependencies"""
         for record in self:
-            if record.service_id:
-                record.workflow_id = record.service_id.workflow_id
-            else:
-                record.workflow_id = False
+            record.workflow_id = self._compute_workflow_id_for_record(record)
+
+    @api.model
+    def _compute_workflow_id_for_record(self, record):
+        if record.service_id:
+            return record.service_id.workflow_id
+        return False
 
     @api.depends("service_id.state_id")
     def _compute_state_id(self):
         for record in self:
-            if record.service_id:
-                record.state_id = record.service_id.state_id
-            else:
-                record.state_id = False
+            record.state_id = self._compute_state_id_for_record(record)
+
+    @api.model
+    def _compute_state_id_for_record(self, record):
+        if record.service_id:
+            return record.service_id.state_id
+        return False
 
     @api.depends("service_id.display_name", "name")
     def _compute_display_name(self):
         for record in self:
-            if record.service_id:
-                record.display_name = record.service_id.display_name
-            else:
-                record.display_name = record.name
+            record.display_name = self._compute_display_name_for_record(record)
+
+    @api.model
+    def _compute_display_name_for_record(self, record):
+        if record.service_id:
+            return record.service_id.display_name
+        return record.name
 
     @api.depends("service_id.active")
     def _compute_active(self):
         for record in self:
-            if record.service_id:
-                record.active = record.service_id.active
-            else:
-                record.active = True
+            record.active = self._compute_active_for_record(record)
+
+    @api.model
+    def _compute_active_for_record(self, record):
+        if record.service_id:
+            return record.service_id.active
+        return True
 
     @api.depends("service_id.deadline")
     def _compute_deadline(self):
         for record in self:
-            if record.service_id:
-                record.deadline = record.service_id.deadline
-            else:
-                record.deadline = False
+            record.deadline = self._compute_deadline_for_record(record)
+
+    @api.model
+    def _compute_deadline_for_record(self, record):
+        if record.service_id:
+            return record.service_id.deadline
+        return False
 
     @api.depends("service_id.root_name")
     def _compute_root_name(self):
@@ -421,7 +453,7 @@ class RiverflowStateRecord(models.Model):
             if record.service_id:
                 record.res_id = record.service_id.res_id
             else:
-                record.res_id = False
+                record.res_id = record.master_res_id
 
     @api.depends("service_id.res_model")
     def _compute_res_model(self):
@@ -429,7 +461,7 @@ class RiverflowStateRecord(models.Model):
             if record.service_id:
                 record.res_model = record.service_id.res_model
             else:
-                record.res_model = False
+                record.res_model = record.master_model
 
     @api.depends("service_id.res_name", "name")
     def _compute_res_name(self):
@@ -442,10 +474,26 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.responsible_team_id")
     def _compute_responsible_team_id(self):
         for record in self:
-            if record.service_id:
-                record.responsible_team_id = record.service_id.responsible_team_id
-            else:
-                record.responsible_team_id = False
+            record.responsible_team_id = self._compute_responsible_team_id_for_record(
+                record
+            )
+
+    @api.model
+    def _compute_responsible_team_id_for_record(self, record):
+        if record.service_id:
+            return record.service_id.responsible_team_id
+        return False
+
+    @api.depends("service_id.name")
+    def _compute_name(self):
+        for record in self:
+            record.name = self._compute_name_for_record(record)
+
+    @api.model
+    def _compute_name_for_record(self, record):
+        if record.service_id:
+            return record.service_id.name
+        return False
 
     @api.depends("service_id.indent_level")
     def _compute_indent_level(self):
@@ -457,7 +505,7 @@ class RiverflowStateRecord(models.Model):
 
     def action_view_master_record(self):
         action = {
-            "name": "View " + self.name,
+            "name": f"View {self.name}",
             "type": "ir.actions.act_window",
             "res_model": self.master_model,
             "res_id": self.master_res_id,
@@ -468,11 +516,3 @@ class RiverflowStateRecord(models.Model):
 
     def row_click(self):
         return self.action_view_master_record()
-
-    @api.depends("service_id.name")
-    def _compute_name(self):
-        for record in self:
-            if record.service_id:
-                record.name = record.service_id.name
-            else:
-                record.name = False
