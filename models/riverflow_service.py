@@ -253,13 +253,16 @@ class Service(models.Model):
             name = record.display_name
             service.res_name = name if name else f"{service.res_model}/{service.res_id}"
 
-    @api.depends("root_id", "root_id.name", "name")
+    @api.depends("root_id", "root_id.name", "name", "deadline")
     def _compute_root_name(self):
         for service in self:
-            if service.root_id.id == service.id:
-                service.root_name = service.name
-            else:
-                service.root_name = service.root_id.name
+            root_service = service.root_id
+            sortable_deadline = (
+                root_service.deadline.strftime("%Y-%m-%d")
+                if root_service.deadline
+                else "2000-01-01"
+            )
+            service.root_name = f"{sortable_deadline} {root_service.name}"
 
     @api.depends("parent_path")
     def _compute_root_id(self):
