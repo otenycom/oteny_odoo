@@ -121,6 +121,11 @@ class AutoAddService(models.Model):
             return
 
         model = subjects[0]._name
+
+        """
+        TODO: also make this a log_entry.applicable_auto_add_service_ids field, so that log entry services_ids can take 
+        a  dependency on applicable_auto_add_service_ids.condition_domain to make this more responsive
+        """
         auto_add_rules = self.search(
             [
                 ("applies_to_model_id.model", "=", model),
