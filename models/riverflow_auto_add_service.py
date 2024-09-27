@@ -4,6 +4,7 @@ from odoo import api, fields, models, tools
 from odoo.osv import expression
 from odoo.tools.safe_eval import safe_eval
 import logging
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
@@ -134,12 +135,23 @@ class AutoAddService(models.Model):
 
         eval_context = self._eval_context()
         new_services = []
+        # Prefetch the records to avoid multiple database hits
+        self.env[model].browse(subjects.ids)
+
+        # Pre-process domains for all auto_add_rules
+        rule_domains = {}
+        for auto_add_rule in auto_add_rules:
+            try:
+                domain = safe_eval(auto_add_rule.condition_domain, eval_context)
+                rule_domains[auto_add_rule] = expression.normalize_domain(domain)
+            except Exception as e:
+                raise ValidationError(
+                    f"Error evaluating domain for rule {auto_add_rule.name}: {e}"
+                )
 
         for record in subjects:
-            for auto_add_rule in auto_add_rules:
+            for auto_add_rule, domain in rule_domains.items():
                 try:
-                    domain = safe_eval(auto_add_rule.condition_domain, eval_context)
-                    domain = expression.normalize_domain(domain)
                     if record.sudo().filtered_domain(domain):
                         new_services.append(
                             {
@@ -159,7 +171,7 @@ class AutoAddService(models.Model):
                         )
                 except Exception as e:
                     _logger.error(
-                        f"Error evaluating domain for rule {auto_add_rule.name}: {e}"
+                        f"Error applying domain for rule {auto_add_rule.name} to record {record}: {e}"
                     )
 
         # Sync the generated services with the existing services
