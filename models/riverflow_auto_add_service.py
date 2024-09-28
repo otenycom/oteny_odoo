@@ -5,6 +5,8 @@ from odoo.osv import expression
 from odoo.tools.safe_eval import safe_eval
 import logging
 from odoo.exceptions import ValidationError
+from ..util import log_execution_time
+
 
 _logger = logging.getLogger(__name__)
 
@@ -112,9 +114,12 @@ class AutoAddService(models.Model):
             )
 
     @api.model
+    @log_execution_time
     def auto_add_services(self, subjects):
         if subjects and isinstance(subjects[0].id, models.NewId):
-            """Because of the fake id in form view, we need to return"""
+            """Because of the fake id in form view, we need to return
+            todo: review if we can use .add() and .new() on the many2one fields in the sync below to also make this work in form view
+            """
             return
 
         """Check rules and add services to matching records."""

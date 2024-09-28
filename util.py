@@ -2,6 +2,11 @@
 
 from odoo.http import request
 import ipaddress
+import time
+import logging
+from functools import wraps
+
+_logger = logging.getLogger(__name__)
 
 
 def is_neutralized_or_development():
@@ -25,3 +30,17 @@ def is_neutralized_or_development():
     ).is_private
 
     return is_neutralized or is_development_network
+
+
+def log_execution_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        _logger.info(f"Starting {func.__name__}")
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        duration = end_time - start_time
+        _logger.info(f"Finished {func.__name__}. Duration: {duration:.2f} seconds")
+        return result
+
+    return wrapper
