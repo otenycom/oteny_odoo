@@ -135,7 +135,7 @@
     </record>
 
     <record id="state_record_action" model="ir.actions.act_window">
-        <field name="name">Global Status</field>
+        <field name="name">Tracker</field>
         <field name="res_model">riverflow.state.record</field>
         <field name="view_mode">tree,form,calendar</field>
         <field name="search_view_id" ref="riverflow.state_record_view_search" />
