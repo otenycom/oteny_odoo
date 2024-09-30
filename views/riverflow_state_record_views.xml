@@ -94,7 +94,7 @@
         <field name="name">riverflow.state.record.search</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
-            <search string="Search State Records">
+            <search>
                 <field name="name" string="Name"
                     filter_domain="['|', ('res_name', 'ilike', self), ('display_name', 'ilike', self)]" />
                 <field name="indented_name" string="Record" />
@@ -115,6 +115,8 @@
                 <separator />
                 <filter string="Deadline" name="deadline" date="deadline" />
                 <separator />
+                <!-- TODO: make a stored/calculated field for is_end_state, that is False if state_id is blank/Not Started and start transitions exist
+                    currently we have a bug that such auto-add services don't show in the list -->
                 <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
                 <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d'))]" />
                 <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
