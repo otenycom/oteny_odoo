@@ -162,9 +162,9 @@
                 <separator />
                 <filter string="Deadline" name="deadline" date="project_deadline" />
                 <separator />
-                <filter string="Overdue" name="overdue" domain="[('project_deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
-                <filter string="Today" name="today" domain="[('project_deadline', '=', context_today().strftime('%Y-%m-%d'))]" />
-                <filter string="Upcoming" name="upcoming" domain="[('project_deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Overdue" name="overdue" domain="[('project_deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Today" name="today" domain="[('project_deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Upcoming" name="upcoming" domain="[('project_deadline', '&gt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"
