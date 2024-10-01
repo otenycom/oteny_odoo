@@ -105,12 +105,13 @@
                 <field name="state_id" />
                 <field name="tag_ids" />
                 <field name="deadline" />
+                <field name="is_end_state" />
                 <field name="internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" string="External Messages" />
                 <field name="responsible_team_id" />
                 <separator />
-                <filter string="Workflow Pending" name="pending" domain="[('state_id.is_end_state', '=', False)]" />
-                <filter string="Workflow Completed" name="completed" domain="[('state_id.is_end_state', '=', True)]" />
+                <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
                 <separator />
                 <filter string="Deadline" name="deadline" date="deadline" />
