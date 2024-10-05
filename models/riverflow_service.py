@@ -364,7 +364,7 @@ class Service(models.Model):
                 "days_remaining": days_remaining,
                 "is_past": is_past,
                 "is_today": is_today,
-                "is_end_state": service.state_id.is_end_state,
+                "is_end_state": service.is_end_state,
             }
 
     def relative_to_project_days_prefix(self):

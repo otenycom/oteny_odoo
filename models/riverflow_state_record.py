@@ -170,7 +170,12 @@ class RiverflowStateRecord(models.Model):
         readonly=True,
         compute="_compute_state_json",
     )
-
+    is_end_state = fields.Boolean(
+        "Is End State",
+        compute="_compute_is_end_state",
+        store=True,
+        index=True,
+    )
     # fields from MailThreadReviewMixin
     internal_notes_summary = fields.Html(
         string="Internal Notes",
@@ -304,7 +309,7 @@ class RiverflowStateRecord(models.Model):
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_id.icon or ""
-            is_end_state = record.state_id.is_end_state == True
+            is_end_state = record.is_end_state == True
 
             state_json = {
                 "text": wf_state_text,
@@ -348,7 +353,7 @@ class RiverflowStateRecord(models.Model):
                 "days_remaining": days_remaining,
                 "is_past": is_past,
                 "is_today": is_today,
-                "is_end_state": record.state_id.is_end_state,
+                "is_end_state": record.is_end_state,
             }
 
     @api.depends("service_id.res_name", "name")
@@ -374,12 +379,25 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.state_id")
     def _compute_state_id(self):
         for record in self:
+            # print(f"old state_id: {record.state_id.name}")
             record.state_id = self._compute_state_id_for_record(record)
+            # print(f"new state_id: {record.state_id.name}")
 
     @api.model
     def _compute_state_id_for_record(self, record):
         if record.service_id:
             return record.service_id.state_id
+        return False
+
+    @api.depends("service_id.is_end_state")
+    def _compute_is_end_state(self):
+        for record in self:
+            record.is_end_state = self._compute_is_end_state_for_record(record)
+
+    @api.model
+    def _compute_is_end_state_for_record(self, record):
+        if record.service_id:
+            return record.service_id.is_end_state
         return False
 
     @api.depends("service_id.display_name", "name")

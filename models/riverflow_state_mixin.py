@@ -61,6 +61,13 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         store=False,
     )
 
+    is_end_state = fields.Boolean(
+        "Is End State",
+        compute="_compute_is_end_state",
+        store=True,
+        index=True,
+    )
+
     # = self._name, made accessible for use in the filter-domain of the workflow dropdown
     model = fields.Char(
         compute="_compute_model", help="Model on which the workflow runs."
@@ -122,7 +129,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_id.icon or ""
-            is_end_state = record.state_id.is_end_state == True
+            is_end_state = record.is_end_state == True
 
             state_json = {
                 "text": wf_state_text,
@@ -194,7 +201,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     def _compute_deadline(self):
         pass
 
-    @api.depends("deadline", "state_id.is_end_state")
+    @api.depends("deadline", "is_end_state")
     def _compute_timing_json(self):
         Service = self.env["riverflow.service"]
         for record in self:
@@ -215,5 +222,14 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 "days_remaining": days_remaining,
                 "is_past": is_past,
                 "is_today": is_today,
-                "is_end_state": record.state_id.is_end_state,
+                "is_end_state": record.is_end_state,
             }
+
+    @api.depends("from_transition_ids", "state_id.is_end_state")
+    def _compute_is_end_state(self):
+        for record in self:
+            if record.state_id:
+                record.is_end_state = record.state_id.is_end_state
+            else:
+                # start transitions are not end states
+                record.is_end_state = len(record.from_transition_ids) == 0
