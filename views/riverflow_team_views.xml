@@ -24,32 +24,29 @@
                         </group>
                     </group>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" />
-                    <field name="message_ids" />
-                </div>
+                <chatter />
             </form>
         </field>
     </record>
 
     <record id="team_view_tree" model="ir.ui.view">
-        <field name="name">riverflow.team.tree</field>
+        <field name="name">riverflow.team.list</field>
         <field name="model">riverflow.team</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="active" column_invisible="True" />
                 <field name="name" />
                 <field name="color" widget="color" />
                 <field name="discuss_channel_id" />
                 <field name="company_id" groups="base.group_multi_company" />
-            </tree>
+            </list>
         </field>
     </record>
 
     <record id="team_action" model="ir.actions.act_window">
         <field name="name">Teams</field>
         <field name="res_model">riverflow.team</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create a new team!

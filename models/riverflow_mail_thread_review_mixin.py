@@ -229,7 +229,7 @@ class MailThreadReviewMixin(models.AbstractModel):
             "type": "ir.actions.act_window",
             "name": "External Messages",
             "res_model": "mail.message",
-            "view_mode": "tree,form",
+            "view_mode": "list,form",
             "domain": [("id", "in", self.mapped("external_message_ids").ids)],
             "context": {
                 "default_model": self._name,
