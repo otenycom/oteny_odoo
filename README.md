@@ -45,7 +45,7 @@ Riverflow aims to:
 1. Streamline workflow creation and management within Odoo
 2. Offer a versatile framework for defining states, transitions, and actions
 3. Facilitate seamless integration with existing Odoo modules
-4. Provide an intuitive interface for both administrators and end-users.
+4. Provide an intuitive interface for both administrators and end-users
 
 ## Key Features
 
