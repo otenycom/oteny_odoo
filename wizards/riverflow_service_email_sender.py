@@ -33,7 +33,10 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
         if res_id:
+            """TODO: move this to rivermen module"""
             log_entry_id = self.env["rivermen.log.entry"].browse(res_id)
+        else:
+            log_entry_id = None
         return {
             "service": service,
             "log_entry": log_entry_id,

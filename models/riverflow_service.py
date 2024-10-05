@@ -27,7 +27,7 @@ class Service(models.Model):
 
     # auto calculated by Odoo in the form of parent_id/parent_id/self_id/
     # see def _get_domain_locations(self)
-    parent_path = fields.Char(index="btree", unaccent=False)
+    parent_path = fields.Char(index="btree")
     indent_level = fields.Integer(
         "Indent level", compute="_compute_indent_level", store=True, recursive=True
     )
@@ -364,7 +364,7 @@ class Service(models.Model):
                 "days_remaining": days_remaining,
                 "is_past": is_past,
                 "is_today": is_today,
-                "is_end_state": service.state_id.is_end_state,
+                "is_end_state": service.is_end_state,
             }
 
     def relative_to_project_days_prefix(self):
