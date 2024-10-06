@@ -46,6 +46,7 @@
 
     <record id="transition_action_action" model="ir.actions.act_window">
         <field name="name">Transition Actions</field>
+        <field name="path">transition-actions</field>
         <field name="res_model">riverflow.transition.action</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">

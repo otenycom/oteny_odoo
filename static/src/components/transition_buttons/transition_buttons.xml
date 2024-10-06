@@ -36,7 +36,7 @@
                         class="btn btn-link transition_button"
                         t-on-click.stop="() => this.executeTransition(button)"
                         type="object">
-                        <span t-esc="button.caption" />
+                        <span t-esc="button.caption" t-att-title="button.caption" />
                     </button>
                     <t t-if="button.index &lt; this.buttonDefs().length - 1">
                         <span class="button-separator">&#160;|</span>

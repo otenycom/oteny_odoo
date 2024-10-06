@@ -2,15 +2,15 @@
 <templates xml:space="preserve">
     <t t-name="riverflow.TimingWidget">
         <span>
-            <t t-esc="relativedays"/>
+            <t t-esc="relativedays" t-att-title="relativedays"/>
 
-            <span t-att-class="dateClass">
+            <span t-att-class="dateClass" t-att-title="date">
                 <t t-esc="date"/>
             </span>
 
             <t t-if="daysRemaining">
                 | in 
-                <span t-att-class="dateClass">
+                <span t-att-class="dateClass" t-att-title="daysRemaining">
                     <t t-esc="daysRemaining"/>d
                 </span>
             </t>

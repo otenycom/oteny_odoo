@@ -179,6 +179,7 @@
 
     <record id="service_action" model="ir.actions.act_window">
         <field name="name">Services</field>
+        <field name="path">services</field>
         <field name="res_model">riverflow.service</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="riverflow.service_view_search" />
@@ -216,6 +217,7 @@
 
     <record id="service_tag_action" model="ir.actions.act_window">
         <field name="name">Service Tags</field>
+        <field name="path">service-tags</field>
         <field name="res_model">riverflow.service.tag</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
@@ -227,6 +229,7 @@
     <!-- Define the action for the service start transition wizard -->
     <record id="action_riverflow_start_service" model="ir.actions.act_window">
         <field name="name">New Service</field>
+        <field name="path">start-service</field>
         <field name="res_model">riverflow.start.service</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>

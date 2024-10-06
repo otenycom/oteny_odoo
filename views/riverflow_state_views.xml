@@ -65,6 +65,7 @@
 
     <record id="state_action" model="ir.actions.act_window">
         <field name="name">Workflow States</field>
+        <field name="path">workflow-states</field>
         <field name="res_model">riverflow.state</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
