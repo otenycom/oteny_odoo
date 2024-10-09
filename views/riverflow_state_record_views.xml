@@ -110,6 +110,10 @@
                 <field name="external_messages_summary" string="External Messages" />
                 <field name="responsible_team_id" />
                 <separator />
+                <filter string="Credentials" name="credentials" domain="[('res_model', '=', 'rivercreds.credential')]" />
+                <filter string="Log entries &amp; services" name="logbook" domain="['|', ('res_model', '=', 'rivermen.log.entry'), ('master_model', '=', 'rivermen.log.entry')]" />
+                <filter string="Services" name="services" domain="[('res_model', '=', 'riverflow.service')]" />
+                <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
                 <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
