@@ -102,6 +102,12 @@
                         <page string="Internal Notes" name="internal_notes">
                             <field name="internal_note_ids" />
                         </page>
+                        <page string="Workflow Override" name="workflow" groups="base.group_no_one">
+                            <group>
+                                <field name="workflow_id" on_change="1" />
+                                <field name="state_id" on_change="1" />
+                            </group>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter reload_on_post="False" />

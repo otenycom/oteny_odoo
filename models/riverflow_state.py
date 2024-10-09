@@ -18,6 +18,7 @@ class RiverflowWorkflowState(models.Model):
     )
     sequence = fields.Integer(default=10)
     is_end_state = fields.Boolean("Is End State", default=False)
+    is_cancelled_state = fields.Boolean("Is Cancelled State", default=False)
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",

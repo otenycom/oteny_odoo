@@ -21,6 +21,7 @@
                             <field name="workflow_id" readonly="1" />
                             <field name="description" />
                             <field name="is_end_state" />
+                            <field name="is_cancelled_state" />
                         </group>
                     </group>
                     <notebook>
@@ -59,6 +60,8 @@
                 <field name="name" />
                 <field name="display_name" optional="hide" />
                 <field name="description" />
+                <field name="is_cancelled_state" />
+                <field name="is_end_state" />
             </list>
         </field>
     </record>
