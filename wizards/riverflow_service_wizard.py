@@ -19,19 +19,15 @@ class ServiceWizard(models.TransientModel):
         string="Deadline From",
         required=False,
     )
-    use_project_deadline_from_invisible = fields.Boolean(
-        compute="_compute_field_visibility"
-    )
+    use_project_deadline_from_invisible = fields.Boolean()
     project_deadline = fields.Date(
         "Project deadline",
         help="The services are timed relative to this deadline",
     )
-    project_deadline_invisible = fields.Boolean(compute="_compute_field_visibility")
+    project_deadline_invisible = fields.Boolean()
 
     days_relative_to_project = fields.Integer("Relative Deadline (days)")
-    days_relative_to_project_invisible = fields.Boolean(
-        compute="_compute_field_visibility"
-    )
+    days_relative_to_project_invisible = fields.Boolean()
 
     # the container of the service (log_entry, employee, etc)
     res_id = fields.Integer(string="Subject of Service ID", required=False)
@@ -39,8 +35,8 @@ class ServiceWizard(models.TransientModel):
         string="Subject of Service Model Name",
     )
 
-    def updated_property_values(self, service, vals):
-        super().updated_property_values(service, vals)
+    def update_write_values(self, service, vals):
+        super().update_write_values(service, vals)
         vals["res_id"] = self.res_id
         vals["res_model"] = self.res_model
 
@@ -52,11 +48,18 @@ class ServiceWizard(models.TransientModel):
 
         if not self.use_project_deadline_from_invisible:
             vals["use_project_deadline_from"] = self.use_project_deadline_from
+            if self.use_project_deadline_from == "self":
+                vals["project_deadline"] = self.project_deadline
+                vals["days_relative_to_project"] = 0
 
-    @api.depends("transition_id")
-    def _compute_field_visibility(self):
-        super()._compute_field_visibility()
-        for wizard in self:
-            wizard.project_deadline_invisible = self._is_to_end_state()
-            wizard.use_project_deadline_from_invisible = self._is_to_end_state()
-            wizard.days_relative_to_project_invisible = self._is_to_end_state()
+        if not self.project_deadline_invisible:
+            vals["project_deadline"] = self.project_deadline
+
+    def get_visibility_defaults(self, transition_id):
+        visibility_defaults = super().get_visibility_defaults(transition_id)
+        is_end_state = transition_id.to_state_id.is_end_state
+        visibility_defaults["project_deadline_invisible"] = is_end_state
+        visibility_defaults["use_project_deadline_from_invisible"] = is_end_state
+        visibility_defaults["days_relative_to_project_invisible"] = is_end_state
+
+        return visibility_defaults

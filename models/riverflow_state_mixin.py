@@ -20,7 +20,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     state_id = fields.Many2one(
         "riverflow.state",
-        "Workflow State",
+        "State",
         tracking=True,
         index=True,
         help="Current workflow state",
@@ -40,7 +40,9 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         "State name", related="state_id.name", store=True, index=True
     )
 
-    state_json = fields.Json(string="State", compute="_compute_state_json", store=False)
+    state_json = fields.Json(
+        string="State Info", compute="_compute_state_json", store=False
+    )
     transition_buttons_json = fields.Json(
         string="Workflow Actions",
         compute="_compute_transition_buttons_json",

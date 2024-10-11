@@ -149,7 +149,7 @@
             <search string="Search Services">
                 <field name="name" string="Name"
                     filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
-                <field name="indented_name" string="Service" />
+                <field name="res_name" string="Subject" />
                 <field name="workflow_id" />
                 <field name="state_id" />
                 <field name="tag_ids" />
@@ -178,6 +178,7 @@
                     <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
                     <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
                     <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'res_name'}" />
                 </group>
             </search>
         </field>

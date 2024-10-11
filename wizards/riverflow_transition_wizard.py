@@ -1,5 +1,9 @@
 from odoo import models, fields, api, _, Command
 from odoo.exceptions import UserError, ValidationError
+import logging
+import pdb
+
+_logger = logging.getLogger(__name__)
 
 
 class TransitionWizard(models.AbstractModel):
@@ -22,22 +26,17 @@ class TransitionWizard(models.AbstractModel):
         string="Responsible Team",
         help="Team executing the workflow of this record.",
     )
-    responsible_team_id_invisible = fields.Boolean(compute="_compute_field_visibility")
+    responsible_team_id_invisible = fields.Boolean()
     new_note = fields.Text(string="Internal Note")
-    new_note_invisible = fields.Boolean(compute="_compute_field_visibility")
-
-    @api.depends("transition_id")
-    def _compute_field_visibility(self):
-        for wizard in self:
-            wizard.responsible_team_id_invisible = self._is_to_end_state()
-            wizard.new_note_invisible = False
+    new_note_invisible = fields.Boolean()
 
     @api.model
     def default_get(self, form_fields):
         defaultValues = super().default_get(form_fields)
 
         transition_id = self.env.context.get("transition_id")
-        defaultValues["transition_id"] = transition_id
+        transition_id = self.env["riverflow.transition"].browse(transition_id)
+        defaultValues["transition_id"] = transition_id.id
 
         records_to_transition = self.env[self._workflow_model]
         records_to_transition_ids = []
@@ -56,7 +55,19 @@ class TransitionWizard(models.AbstractModel):
 
         self.default_get_using_records(defaultValues, records_to_transition)
 
+        visibility_defaults = self.get_visibility_defaults(transition_id)
+        # Update defaultValues with new values, without overwriting existing ones, so that
+        # the defaults given by the calling action are kept (e.g. from action_context)
+        for key, value in visibility_defaults.items():
+            if key not in defaultValues:
+                defaultValues[key] = value
+
         return defaultValues
+
+    def get_visibility_defaults(self, transition_id):
+        return {
+            "responsible_team_id_invisible": transition_id.to_state_id.is_end_state,
+        }
 
     def action_save(self):
         for wizard in self:
@@ -68,19 +79,17 @@ class TransitionWizard(models.AbstractModel):
             recordsToTransition = wizard.records_to_transition_ids
 
             createNewRecord = len(recordsToTransition) == 0
+            create_vals = {}
             if createNewRecord:
-                new_record = self.env[self._workflow_model].new(
-                    {
-                        "workflow_id": transition.workflow_id.id,
-                    }
-                )
+                create_vals["workflow_id"] = transition.workflow_id.id
+                in_memory_record = self.env[self._workflow_model].new(create_vals)
 
-                recordsToTransition = [new_record]
+                recordsToTransition = [in_memory_record]
 
                 action = {
                     "type": "ir.actions.act_window",
                     "res_model": self._workflow_model,
-                    "res_id": new_record.id,  # NewId value, will be updated below
+                    "res_id": 0,  # NewId value, will be updated below
                     # "views": [(self.env.ref("riverflow.view_service_form").id, "form")],
                     "view_mode": "form",
                     "target": "current",
@@ -93,27 +102,35 @@ class TransitionWizard(models.AbstractModel):
             # them in one go write(), so that the validations @api.constrains
             # get triggered on a record with all the new property values
             for record in recordsToTransition:
-                vals = {"state_id": transition.to_state_id.id}
-                self.updated_property_values(record, vals)
-                record.write(vals)
+                write_vals = {"state_id": transition.to_state_id.id}
+                self.update_write_values(record, write_vals)
 
-            if createNewRecord:
-                # Save the record to the database, and pass the actual id to the action that opens the form
-                # also allows to place remarks in the chatter of the new record
-                new_record = (
-                    self.env[self._workflow_model]
-                    .with_context(
-                        mail_create_nosubscribe=True,  # individual team members are not subscribed to the record thread
-                        mail_auto_subscribe_no_notify=True,  # individual team members are not notified of the record thread
+                _logger.info(f"Values to be written for new record: {write_vals}")
+                if not write_vals:
+                    _logger.warning("vals is empty, this might cause issues")
+                    pdb.set_trace()  # Debug breakpoint
+
+                if not createNewRecord:
+                    record.write(write_vals)
+                    self.create_related_records(record)
+                else:
+                    # Merge write_vals into create_vals
+                    create_vals.update(write_vals)
+
+                    if not create_vals:
+                        _logger.warning("create_vals is empty, this might cause issues")
+                        pdb.set_trace()  # Debug breakpoint
+
+                    new_record = (
+                        self.env[self._workflow_model]
+                        .with_context(
+                            mail_create_nosubscribe=True,  # individual team members are not subscribed to the record thread
+                            mail_auto_subscribe_no_notify=True,  # individual team members are not notified of the record thread
+                        )
+                        .create(create_vals)
                     )
-                    .create(new_record._convert_to_write(new_record._cache))
-                )
-                recordsToTransition = [new_record]
-                action["res_id"] = new_record.id
-
-            # Now create related records, such as chatter remarks, based on the actual ID of the root record
-            for record in recordsToTransition:
-                self.create_related_records(record)
+                    action["res_id"] = new_record.id
+                    self.create_related_records(new_record)
 
         return action
 
@@ -149,7 +166,7 @@ class TransitionWizard(models.AbstractModel):
     def default_get_using_records(self, defaultValues, records_to_transition):
         pass
 
-    def updated_property_values(self, record, vals):
+    def update_write_values(self, record, vals):
         if not self.responsible_team_id_invisible:
             vals["responsible_team_id"] = self.responsible_team_id.id
 

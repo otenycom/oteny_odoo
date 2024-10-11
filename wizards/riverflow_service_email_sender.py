@@ -61,8 +61,8 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             truncated_subject += "..."
         return f"Email: {truncated_subject}"
 
-    def updated_property_values(self, service, vals):
-        super(RiverflowServiceEmailSenderWizard, self).updated_property_values(
+    def update_write_values(self, service, vals):
+        super(RiverflowServiceEmailSenderWizard, self).update_write_values(
             service, vals
         )
         # new services are automatically assigned a name equal to the email subject
