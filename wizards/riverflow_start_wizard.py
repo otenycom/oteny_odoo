@@ -30,6 +30,7 @@ class StartWizard(RiverflowTransitionMixin):
                 "workflow_icon": "",
                 "is_end_state": False,
                 "reload_on_close": False,
+                "layout": "full_list",
                 "buttons": [],
             }
 
@@ -49,9 +50,14 @@ class StartWizard(RiverflowTransitionMixin):
 
                 button_context = defaults_context.copy()
                 button_context["transition_id"] = transition_id
+                icon = transition.to_state_id.workflow_id.icon
+                if not icon:
+                    icon = "plus"  # for 'create new record'
+
                 transition_buttons["buttons"].append(
                     {
                         "index": index,
+                        "icon": icon,
                         "caption": f"{transition.workflow_name} - {transition.name}",
                         "help": transition.description,
                         "action": "action_start_transition",

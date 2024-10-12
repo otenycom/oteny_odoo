@@ -35,10 +35,21 @@ export class TransitionButtons extends Component {
         return this.fieldValueState.buttons;
     }
 
+    buttonIconClass(button) {
+        let class_name = "icon_span";
+        if (button.icon)
+            class_name += " fa " + button.icon;
+        return class_name;
+    }
+
     iconClass() {
         if (this.fieldValueState.workflow_icon)
             return "fa " + this.fieldValueState.workflow_icon;
         else return "";
+    }
+
+    useFullListLayout() {
+        return this.fieldValueState.layout === "full_list";
     }
 
     text() {
