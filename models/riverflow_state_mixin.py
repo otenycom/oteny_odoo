@@ -126,8 +126,9 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         # for rendering just the state name and workflow name
         for record in self:
             wf_state_text = record.current_workflow_name or ""
-            if record.state_name:
-                wf_state_text = " | ".join([wf_state_text, record.state_name])
+            if wf_state_text or record.state_name:
+                state_text = record.state_name or "Not Started"
+                wf_state_text = " | ".join([wf_state_text, state_text])
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_id.icon or ""
