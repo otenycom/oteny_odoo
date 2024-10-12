@@ -39,17 +39,39 @@ class CheckResultsMixin(models.AbstractModel):
     def _refresh_check_results_on_after__write(self, before__write_result):
         pass
 
-    def _sync_check_results(self, existing_check_results, new_check_results):
+    def _sync_check_results(
+        self, existing_check_results, new_check_results, index_field
+    ):
         CheckResult = self.env["riverflow.check.result"]
 
-        to_keep = existing_check_results.filtered(
-            lambda r: any(r.compare(new_result) for new_result in new_check_results)
-        )
-        to_create = [
-            result
-            for result in new_check_results
-            if not any(existing.compare(result) for existing in to_keep)
-        ]
+        # Index existing check results
+        existing_indexed = {}
+        for result in existing_check_results:
+            index = getattr(result, index_field).id
+            existing_indexed.setdefault(index, []).append(result)
+
+        to_keep = self.env["riverflow.check.result"]
+        to_create = []
+
+        for new_result in new_check_results:
+            new_index = new_result[index_field]
+            matching_result = None
+
+            if new_index in existing_indexed:
+                existing_results = existing_indexed[new_index]
+                matching_result = next(
+                    (
+                        result
+                        for result in existing_results
+                        if result.compare(new_result)
+                    ),
+                    None,
+                )
+
+            if matching_result:
+                to_keep |= matching_result
+            else:
+                to_create.append(new_result)
 
         created_results = CheckResult.create(to_create)
 

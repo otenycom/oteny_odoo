@@ -18,7 +18,6 @@ class CheckResult(models.Model):
         string="Severity",
         required=True,
     )
-
     color = fields.Integer(string="Color", compute="_compute_color", store=False)
 
     state_record_id = fields.Many2one(
