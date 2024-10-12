@@ -10,7 +10,7 @@ class CheckResultsMixin(models.AbstractModel):
         records = super().create(vals_list)
         self._refresh_check_results_on_create(records)
         # important: flush the database to ensure that _write is triggered before web_save in models.py
-        # captures the current record state
+        # captures the current record state.
         # self.env.flush_all()
         return records
 
