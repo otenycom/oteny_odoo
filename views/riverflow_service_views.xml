@@ -9,7 +9,7 @@
                 <header>
                     <!-- see compileHeader(el, params) for btn in class="btn": this moves the transitions buttons to the left
                       in the slot where the normal Odoo buttons are -->
-                    <field name="transition_buttons_json" widget="transition_buttons" class="btn" max_buttons="5" />
+                    <field name="transition_buttons_json" widget="transition_buttons" max_buttons="5" />
                     <!-- o_field_statusbar is needed because riverflow_statusbar inherits from o_field_statusbar, and its scss files only work inside o_field_statusbar -->
                     <field name="state_id" widget="riverflow_statusbar" readonly="1" class="o_field_statusbar" />
                     <field name="state_id_statusbar_json" invisible="1" />
