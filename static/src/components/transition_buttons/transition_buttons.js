@@ -9,6 +9,7 @@ export class TransitionButtons extends Component {
     static template = "riverflow.TransitionButtons";
     static props = {
         ...standardFieldProps,
+        maxButtons: { type: String, optional: true },
     };
 
     setup() {
@@ -68,6 +69,10 @@ export class TransitionButtons extends Component {
         if (this.fieldValueState.is_end_state)
             return "riverflow_end_state";
         else return "riverflow_pending_state";
+    }
+
+    maxButtons() {
+        return parseInt(this.props.maxButtons) || 2;
     }
 
     async saveRecord(node) {
@@ -132,6 +137,9 @@ export const transitionButtons = {
     component: TransitionButtons,
     displayName: "Transition Buttons",
     supportedTypes: ["json"],
+    extractProps: ({ attrs, options, viewType }, dynamicInfo) => ({
+        maxButtons: attrs.max_buttons || "2"
+    }),
 };
 
 registry.category("fields").add("transition_buttons", transitionButtons);

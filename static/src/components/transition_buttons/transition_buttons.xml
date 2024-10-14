@@ -29,7 +29,7 @@
             </div>
         </t>
         <t t-else="">
-            <t t-if="this.buttonDefs().length > 2">
+            <t t-if="this.buttonDefs().length > this.maxButtons()">
                 <span t-on-click.stop="onSpanClick">
                     <t t-call="riverflow.TransitionButtons.IconAndCaption" />
                 </span>

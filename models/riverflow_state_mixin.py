@@ -25,6 +25,9 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         index=True,
         help="Current workflow state",
     )
+    state_id_statusbar_json = fields.Json(
+        "Statusbar Info", compute="_compute_state_id_statusbar_json", store=False
+    )
     from_transition_ids = fields.Many2many(
         "riverflow.transition",
         compute="_compute_from_transition_ids",
@@ -176,6 +179,27 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                     index += 1
 
             record.transition_buttons_json = transition_buttons
+
+    def _compute_state_id_statusbar_json(self):
+        for record in self:
+            state_ids = self.env["riverflow.state"].search(
+                [("workflow_id", "=", record.state_id.workflow_id.id)]
+            )
+
+            json = {"states": []}
+            for state in state_ids:
+                is_current_state = state.id == record.state_id.id
+                if not state.hide_in_statusbar or is_current_state:
+                    json["states"].append(
+                        {
+                            "value": state.id,
+                            "label": state.name,
+                            "isFolded": state.hide_in_statusbar,
+                            "isSelected": is_current_state,
+                        }
+                    )
+
+            record.state_id_statusbar_json = json
 
     def action_button_click(self):
 

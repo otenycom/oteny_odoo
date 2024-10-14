@@ -22,6 +22,7 @@
                             <field name="description" />
                             <field name="is_end_state" />
                             <field name="is_cancelled_state" />
+                            <field name="hide_in_statusbar" />
                         </group>
                     </group>
                     <notebook>
@@ -62,6 +63,7 @@
                 <field name="description" />
                 <field name="is_cancelled_state" />
                 <field name="is_end_state" />
+                <field name="hide_in_statusbar" />
             </list>
         </field>
     </record>

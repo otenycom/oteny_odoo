@@ -17,6 +17,7 @@ class RiverflowWorkflowState(models.Model):
         "riverflow.workflow", "Workflow", copy=True, index=True, required=True
     )
     sequence = fields.Integer(default=10)
+    hide_in_statusbar = fields.Boolean("Hide in Statusbar", default=False)
     is_end_state = fields.Boolean("Is End State", default=False)
     is_cancelled_state = fields.Boolean("Is Cancelled State", default=False)
 
