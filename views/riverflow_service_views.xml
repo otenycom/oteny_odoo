@@ -42,7 +42,6 @@
                             <field name="state_id" on_change="1" invisible="1" />
                         </group>
                         <group>
-                            <field name="display_name" invisible="not parent_id" />
                             <!-- Make a workflow action 'move service' if we really need to edit the parent
                              its cluttering the screen here in the form view
                               -->
@@ -55,6 +54,7 @@
                             <field name="related_project_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="use_project_deadline_from == 'self'"
                                 on_change="1" />
+                            <field name="deadline" readonly="1" />
                             <field name="timing_json" widget="timing_widget" />
 
                         </group>
@@ -75,8 +75,9 @@
                                     <field name="name" optional="hide" />
                                     <field name="display_name" optional="hide" />
                                     <field name="transition_buttons_json" widget="transition_buttons" />
-                                    <field name="timing_json" widget="timing_widget" optional="show" />
-                                    <field name="deadline_formatted" optional="hide" />
+                                    <field name="timing_json" widget="timing_widget" optional="hide" />
+                                    <field name="deadline" optional="show" />
+                                    <field name="responsible_team_id" optional="show" string="Responsible" width="120px" />
                                     <field name="internal_notes_summary" />
                                     <field name="external_messages_summary" />
                                     <field name="unreviewed_message_count" />

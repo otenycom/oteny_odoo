@@ -52,9 +52,6 @@ class ServiceWizard(models.TransientModel):
                 vals["project_deadline"] = self.project_deadline
                 vals["days_relative_to_project"] = 0
 
-        if not self.project_deadline_invisible:
-            vals["project_deadline"] = self.project_deadline
-
     def get_visibility_defaults(self, transition_id):
         visibility_defaults = super().get_visibility_defaults(transition_id)
         is_end_state = transition_id.to_state_id.is_end_state

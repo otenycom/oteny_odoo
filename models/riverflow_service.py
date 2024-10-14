@@ -310,7 +310,7 @@ class Service(models.Model):
                 service.name,
             )
 
-    @api.depends("use_project_deadline_from", "project_deadline", "root_id.deadline")
+    @api.depends("use_project_deadline_from", "root_id.deadline", "root_id")
     def _compute_project_deadline(self):
         for service in self:
             use_project_deadline_from = service.use_project_deadline_from

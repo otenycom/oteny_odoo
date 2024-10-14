@@ -182,13 +182,26 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     def _compute_state_id_statusbar_json(self):
         for record in self:
+            current_state_id = record.state_id
+            if current_state_id:
+                workflow_id = current_state_id.workflow_id.id
+            else:
+                workflow_id = record.workflow_id.id
+
             state_ids = self.env["riverflow.state"].search(
-                [("workflow_id", "=", record.state_id.workflow_id.id)]
+                [("workflow_id", "=", workflow_id)]
             )
 
             json = {"states": []}
+            is_first = True
+
             for state in state_ids:
-                is_current_state = state.id == record.state_id.id
+                if current_state_id:
+                    is_current_state = state.id == current_state_id.id
+                else:
+                    is_current_state = is_first
+                    is_first = False
+
                 if not state.hide_in_statusbar or is_current_state:
                     json["states"].append(
                         {
