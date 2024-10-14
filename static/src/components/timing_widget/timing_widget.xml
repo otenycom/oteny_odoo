@@ -9,7 +9,7 @@
             </span>
 
             <t t-if="daysRemaining">
-                | in 
+                <br/>in 
                 <span t-att-class="dateClass" t-att-title="daysRemaining">
                     <t t-esc="daysRemaining"/>d
                 </span>
