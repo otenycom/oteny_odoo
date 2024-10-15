@@ -55,11 +55,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         return subject_rendered
 
     def _generate_default_name(self, subject):
-        max_length = 50
+        max_length = 100
         truncated_subject = subject[:max_length].strip()
         if len(subject) > max_length:
             truncated_subject += "..."
-        return f"Email: {truncated_subject}"
+        return f"{truncated_subject}"
 
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(

@@ -16,6 +16,10 @@ export class RiverflowStatusBar extends StatusBarField {
      */
     getAllItems() {
         const statuses = this.props.record.data["state_id_statusbar_json"]["states"];
+        if (!statuses) {
+            // This happens in new-record mode, where the record is not saved yet
+            return [];
+        }
         return statuses;
     }
 }

@@ -25,6 +25,7 @@
         <field name="name">Not Needed</field>
         <field name="sequence">30</field>
         <field name="is_end_state">True</field>
+        <field name="hide_in_statusbar">True</field>
     </record>
 
     <!-- Send Email Transitions -->

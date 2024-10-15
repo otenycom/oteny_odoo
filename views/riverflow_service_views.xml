@@ -25,9 +25,9 @@
                         invisible="active" />
                     <div class="oe_title">
                         <label for="name" />
-                        <h1>
+                        <h2>
                             <field name="name" class="w-100" on_change="1" />
-                        </h1>
+                        </h2>
                     </div>
                     <group>
                         <group>
@@ -99,7 +99,7 @@
                                 <field name="message_from_external_sender_ids" />
                             </group>
                         </page>
-                        <page string="External Messages" name="all_external_messages">
+                        <page string="External Messages" name="all_external_messages" invisible="1">
                             <span>Messages visible to third parties (customers, vendors, etc.),
                                 or received from third party.</span>
                             <group>
@@ -108,7 +108,7 @@
                                 <field name="external_message_ids" />
                             </group>
                         </page>
-                        <page string="Internal Notes" name="internal_notes">
+                        <page string="Internal Notes" name="internal_notes" invisible="1">
                             <field name="internal_note_ids" />
                         </page>
                         <page string="Workflow Override" name="workflow" groups="base.group_no_one">
