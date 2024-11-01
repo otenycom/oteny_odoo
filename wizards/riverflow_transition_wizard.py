@@ -101,7 +101,16 @@ class TransitionWizard(models.AbstractModel):
             # Collect the property values that need to be updated and pass
             # them in one go write(), so that the validations @api.constrains
             # get triggered on a record with all the new property values
+            expected_state = transition.from_state_id
             for record in recordsToTransition:
+                current_state = record.state_id
+                if expected_state and current_state != expected_state:
+                    raise UserError(
+                        _(
+                            "Another user just updated this record. Please refresh and try again."
+                        )
+                    )
+
                 write_vals = {"state_id": transition.to_state_id.id}
                 self.update_write_values(record, write_vals)
 
