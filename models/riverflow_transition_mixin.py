@@ -13,15 +13,16 @@ class RiverflowTransitionMixin(models.AbstractModel):
         if not transition:
             raise UserError(_("No transition selected."))
 
-        current_state = self.state_id
-        expected_state = transition.from_state_id
+        if hasattr(self, "state_id"):  # StartWizard has no state_id
+            current_state = self.state_id
+            expected_state = transition.from_state_id
 
-        if expected_state and current_state != expected_state:
-            raise UserError(
-                _(
-                    "Another user just updated this record. Please refresh and try again."
+            if expected_state and current_state != expected_state:
+                raise UserError(
+                    _(
+                        "Another user just updated this record. Please refresh and try again."
+                    )
                 )
-            )
 
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
