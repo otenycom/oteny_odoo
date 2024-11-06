@@ -13,7 +13,8 @@ class RiverflowTransitionMixin(models.AbstractModel):
         if not transition:
             raise UserError(_("No transition selected."))
 
-        if hasattr(self, "state_id"):  # StartWizard has no state_id
+        isWizard = self._transient
+        if not isWizard:  # start transition selection wizard has no state_id
             current_state = self.state_id
             expected_state = transition.from_state_id
 
@@ -28,7 +29,6 @@ class RiverflowTransitionMixin(models.AbstractModel):
         action_context["transition_id"] = transition.id
 
         defaults_context = {}
-        isWizard = self._transient
         if isWizard:
             # start transition selection wizard; carry over the default field values passed in by the caller
             for key, value in self.env.context.items():
