@@ -75,8 +75,8 @@
                                     <field name="name" optional="hide" />
                                     <field name="display_name" optional="hide" />
                                     <field name="transition_buttons_json" widget="transition_buttons" />
-                                    <field name="timing_json" widget="timing_widget" optional="hide" />
-                                    <field name="deadline" optional="show" />
+                                    <field name="timing_json" widget="timing_widget" optional="show" />
+                                    <field name="deadline" optional="hide" />
                                     <field name="responsible_team_id" optional="show" string="Responsible" width="120px" />
                                     <field name="internal_notes_summary" />
                                     <field name="external_messages_summary" />
