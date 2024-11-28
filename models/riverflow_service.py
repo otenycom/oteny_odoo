@@ -1,7 +1,5 @@
 from odoo import models, fields, api, _
 from datetime import timedelta, date
-import json
-import re
 
 
 class Service(models.Model):
@@ -50,17 +48,30 @@ class Service(models.Model):
         help="The auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
     )
 
-    @api.depends("child_ids")
-    def _compute_descendant_ids(self):
-        for service in self:
-            descendants = self.env["riverflow.service"].search(
-                [
-                    ("parent_path", "=like", f"{service.parent_path}%"),
-                    ("id", "!=", service.id),
-                ],
-                order="root_name,root_id,sequence",
-            )
-            service.descendant_ids = descendants
+    is_this_a_template = fields.Boolean(
+        string="Is This a Template",
+        default=False,
+        help="Applies to root services only. If checked, this service and its descendants will be used as a template for creating new services",
+    )
+    is_root_a_template = fields.Boolean(
+        string="Is Root a Template",
+        compute="_compute_is_root_a_template",
+        store=True,
+        help="Technical so we always treat the full tree of a service as a template, even if the children are not flagged astemplates themselves",
+    )
+    email_template_id = fields.Many2one(
+        "mail.template",
+        string="Email Template",
+        domain="[('model_id', '=', 'riverflow.service')]",
+        help="The Send Email workflow transition uses this email template. "
+        "Templates can be created in Odoo's Email Templates module.",
+    )
+    add_operator_as_recipient = fields.Boolean(
+        string="Add operator as recipient",
+        default=False,
+        help="The recipients for the email can be set by adding followers to the chatter, "
+        "and by checking 'Add operator as recipient' below.",
+    )
 
     root_id = fields.Many2one(
         "riverflow.service", compute="_compute_root_id", store=True, recursive=True
@@ -169,6 +180,25 @@ class Service(models.Model):
         copy=True,
     )
 
+    # the container of the service (log_entry, employee, etc)
+    res_model = fields.Char(
+        string="Subject of Service Model Name",
+    )
+    res_id = fields.Integer(string="Subject of Service ID", required=False)
+    res_id_computed = fields.Integer(
+        "Computed Service Subject ID",
+        compute="_compute_res_id_computed",
+        store=False,
+        recursive=True,
+        help="Syncs the service's subject reference (ref_id) with the root service. All decendending services reference the same subject.",
+    )
+    res_name = fields.Char(
+        string="Subject of Service",
+        compute="_compute_res_name",
+        store=True,
+        index="trigram",
+    )
+
     # related entity (similar to the one in the mail_message.py in odoo)
     # content fields such as display_name of the related document can be looked
     # up in the riverflow.state.record model
@@ -179,17 +209,6 @@ class Service(models.Model):
             for model in self.env["ir.model"].sudo().search([])
         ]
 
-    # the container of the service (log_entry, employee, etc)
-    res_id = fields.Integer(string="Subject of Service ID", required=False)
-    res_model = fields.Char(
-        string="Subject of Service Model Name",
-    )
-    res_name = fields.Char(
-        string="Subject of Service",
-        compute="_compute_res_name",
-        store=True,
-        index="trigram",
-    )
     resource_ref = fields.Reference(
         string="Subject Reference",
         selection="_selection_target_model",
@@ -216,14 +235,6 @@ class Service(models.Model):
             else:
                 service.res_id = False
                 service.res_model = False
-
-    res_id_computed = fields.Integer(
-        "Computed Service Subject ID",
-        compute="_compute_res_id_computed",
-        store=False,
-        recursive=True,
-        help="Syncs the service's subject reference (ref_id) with the root service. All decendending services reference the same subject.",
-    )
 
     @api.depends("root_id.res_id", "root_id.res_model")
     def _compute_res_id_computed(self):
@@ -292,6 +303,18 @@ class Service(models.Model):
 
             # service.display_name = ' | '.join(
             #     [service.display_name, self.compute_display_name_suffix(service)])
+
+    @api.depends("child_ids")
+    def _compute_descendant_ids(self):
+        for service in self:
+            descendants = self.env["riverflow.service"].search(
+                [
+                    ("parent_path", "=like", f"{service.parent_path}%"),
+                    ("id", "!=", service.id),
+                ],
+                order="root_name,root_id,sequence",
+            )
+            service.descendant_ids = descendants
 
     @api.depends("parent_path")
     def _compute_indent_level(self):
@@ -584,3 +607,23 @@ class Service(models.Model):
                     record.parent_id.invalidate_recordset(["child_ids"])
 
         return result
+
+    @api.depends("root_id.is_this_a_template", "is_this_a_template")
+    def _compute_is_root_a_template(self):
+        for service in self:
+            service.is_root_a_template = bool(service.root_id.is_this_a_template)
+
+    def _get_default_recipients(self):
+        """Get default recipients for email templates based on active followers who receive comments"""
+        self.ensure_one()
+        # Get followers with comment notification enabled (mail.mt_comment)
+        comment_subtype_id = self.env["ir.model.data"]._xmlid_to_res_id(
+            "mail.mt_comment"
+        )
+        return self.message_follower_ids.filtered(
+            lambda f: (
+                f.partner_id
+                and f.partner_id.active
+                and comment_subtype_id in f.subtype_ids.ids
+            )
+        ).mapped("partner_id")

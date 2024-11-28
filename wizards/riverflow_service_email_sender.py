@@ -14,7 +14,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     ]
     _description = "Riverflow Service Email Sender Wizard"
 
-    recipient_partner_ids = fields.Many2many("res.partner", string="Recipients")
+    recipient_partner_ids = fields.Many2many(
+        "res.partner",
+        string="Recipients",
+        help="The default recipients for the email can be set by adding followers to the chatter",
+    )
     subject = fields.Char(string="Subject")
     body = fields.Html(
         string="Body",
@@ -22,13 +26,34 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         render_engine="qweb",
         render_options={"post_process": True},
     )
-    template_id = fields.Many2one("mail.template", string="Email Template")
+    email_template_id = fields.Many2one(
+        "mail.template",
+        string="Email Template",
+        domain="[('model_id', '=', 'riverflow.service')]",
+        required=False,
+    )
 
-    @api.onchange("template_id")
-    def onchange_template_id(self):
-        if self.template_id:
-            self.subject = self.template_id.subject
-            self.body = self.template_id.body_html
+    def default_get_using_records(self, defaultValues, records_to_transition):
+        super().default_get_using_records(defaultValues, records_to_transition)
+
+        # Get default recipients from the first service record
+        if records_to_transition:
+            service = records_to_transition[0]
+            default_recipients = service._get_default_recipients()
+            if default_recipients:
+                recipients = [
+                    Command.link(partner_id) for partner_id in default_recipients.ids
+                ]
+                if "recipient_partner_ids" in defaultValues:
+                    defaultValues["recipient_partner_ids"].extend(recipients)
+                else:
+                    defaultValues["recipient_partner_ids"] = recipients
+
+    @api.onchange("email_template_id")
+    def onchange_email_template_id(self):
+        if self.email_template_id:
+            self.subject = self.email_template_id.subject
+            self.body = self.email_template_id.body_html
 
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
@@ -137,5 +162,5 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=False,
-            email_layout_xmlid=self.template_id.email_layout_xmlid,
+            email_layout_xmlid=self.email_template_id.email_layout_xmlid,
         )

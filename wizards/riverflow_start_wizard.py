@@ -24,49 +24,54 @@ class StartWizard(RiverflowTransitionMixin):
 
     @api.depends("start_transition_ids")
     def _compute_transition_buttons_json(self):
-        for wizard in self:
-            transition_buttons = {
-                "text": "",
-                "workflow_icon": "",
-                "is_end_state": False,
-                "reload_on_close": False,
-                "layout": "full_list",
-                "buttons": [],
-            }
+        wizard = self
+        transition_buttons = {
+            "text": "",
+            "workflow_icon": "",
+            "is_end_state": False,
+            "reload_on_close": False,
+            "layout": "full_list",
+            "buttons": [],
+        }
 
-            # copy over all default values from fields, such as the the default parent FK,
-            # from env.context into context for the new action
-            defaults_context = {}
-            for key, value in self.env.context.items():
-                if key.startswith("default_"):
-                    defaults_context[key] = value
+        # copy over all default values from fields, such as the the default parent FK,
+        # from env.context into context for the new action
+        defaults_context = {}
+        for key, value in self.env.context.items():
+            if key.startswith("default_"):
+                defaults_context[key] = value
 
-            for index, transition in enumerate(wizard.start_transition_ids):
-                transition_id = (
-                    transition.id.origin
-                    if isinstance(wizard.id, models.NewId)
-                    else int(transition.id)
-                )
+        self._add_template_start_transitions(transition_buttons, defaults_context)
+        offset = len(transition_buttons["buttons"])
 
-                button_context = defaults_context.copy()
-                button_context["transition_id"] = transition_id
-                icon = transition.to_state_id.workflow_id.icon
-                if not icon:
-                    icon = "plus"  # for 'create new record'
+        for index, transition in enumerate(wizard.start_transition_ids):
+            transition_id = (
+                transition.id.origin
+                if isinstance(wizard.id, models.NewId)
+                else int(transition.id)
+            )
 
-                transition_buttons["buttons"].append(
-                    {
-                        "index": index,
-                        "icon": icon,
-                        "caption": f"{transition.workflow_name} - {transition.name}",
-                        "help": transition.description,
-                        "action": "action_start_transition",
-                        "context": button_context,
-                    }
-                )
+            button_context = defaults_context.copy()
+            button_context["transition_id"] = transition_id
+            icon = transition.to_state_id.workflow_id.icon
+            if not icon:
+                icon = "plus"  # for 'create new record'
 
-            wizard.transition_buttons_json = transition_buttons
+            transition_buttons["buttons"].append(
+                {
+                    "index": index + offset,
+                    "icon": icon,
+                    "caption": f"{transition.workflow_name} - {transition.name}",
+                    "help": transition.description,
+                    "action": "action_start_transition",
+                    "context": button_context,
+                }
+            )
+
+        wizard.transition_buttons_json = transition_buttons
 
     def action_start_transition(self):
-
         return self._prepare_transition_action()
+
+    def _add_template_start_transitions(self, transition_buttons, defaults_context):
+        pass

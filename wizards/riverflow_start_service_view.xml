@@ -5,10 +5,21 @@
         <field name="arch" type="xml">
             <form string="New Service">
                 <sheet>
-                    <group>
-                        <field name="start_transition_ids" invisible="1" />
-                        <field name="transition_buttons_json" widget="transition_buttons" string="Service" />
-                    </group>
+                    <notebook>
+                        <page string="Add Service" name="add_service_from_template">
+                            <group>
+                                <field name="start_transition_ids" invisible="1" />
+                                <field name="transition_buttons_json" widget="transition_buttons" string="Service" />
+                            </group>
+                        </page>
+
+                        <!-- <page string="Add Simple Service" name="add_service_by_start_transition">
+                            <group>
+                                <field name="start_transition_ids" invisible="1" />
+                                <field name="transition_buttons_json" widget="transition_buttons" string="Service" />
+                            </group>
+                        </page> -->
+                    </notebook>
                 </sheet>
                 <footer>
                     <button string="Cancel" class="btn-secondary" special="cancel" />

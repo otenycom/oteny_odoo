@@ -114,11 +114,6 @@ class TransitionWizard(models.AbstractModel):
                 write_vals = {"state_id": transition.to_state_id.id}
                 self.update_write_values(record, write_vals)
 
-                _logger.info(f"Values to be written for new record: {write_vals}")
-                if not write_vals:
-                    _logger.warning("vals is empty, this might cause issues")
-                    pdb.set_trace()  # Debug breakpoint
-
                 if not createNewRecord:
                     record.write(write_vals)
                     self.create_related_records(record)
@@ -126,15 +121,11 @@ class TransitionWizard(models.AbstractModel):
                     # Merge write_vals into create_vals
                     create_vals.update(write_vals)
 
-                    if not create_vals:
-                        _logger.warning("create_vals is empty, this might cause issues")
-                        pdb.set_trace()  # Debug breakpoint
-
                     new_record = (
                         self.env[self._workflow_model]
                         .with_context(
-                            mail_create_nosubscribe=True,  # individual team members are not subscribed to the record thread
-                            mail_auto_subscribe_no_notify=True,  # individual team members are not notified of the record thread
+                            mail_create_nosubscribe=False,  # recipients are made followers of the record thread
+                            mail_auto_subscribe_no_notify=True,  # recipients are not notified of the record thread
                         )
                         .create(create_vals)
                     )

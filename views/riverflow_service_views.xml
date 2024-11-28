@@ -21,6 +21,8 @@
                             <field name="parent_id" widget="statinfo" />
                         </button>
                     </div>
+                    <widget name="web_ribbon" title="Template" bg_color="text-bg-info"
+                        invisible="not is_root_a_template" />
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                         invisible="active" />
                     <div class="oe_title">
@@ -96,7 +98,15 @@
                             </div>
                             <group>
                                 <field name="unreviewed_message_count" />
-                                <field name="message_from_external_sender_ids" />
+                                <field name="message_from_external_sender_ids">
+                                    <list>
+                                        <field name="date" />
+                                        <field name="author_id" />
+                                        <field name="email_from" />
+                                        <field name="subject" />
+                                        <field name="preview" />
+                                    </list>
+                                </field>
                             </group>
                         </page>
                         <page string="External Messages" name="all_external_messages" invisible="1">
@@ -110,6 +120,18 @@
                         </page>
                         <page string="Internal Notes" name="internal_notes" invisible="1">
                             <field name="internal_note_ids" />
+                        </page>
+                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template and not email_template_id">
+                            <group>
+                                <group>
+                                    <field name="email_template_id" />
+                                    <field name="add_operator_as_recipient" />
+                                </group>
+                                <group groups="base.group_no_one">
+                                    <field name="is_root_a_template" />
+                                    <field name="is_this_a_template" />
+                                </group>
+                            </group>
                         </page>
                         <page string="Workflow Override" name="workflow" groups="base.group_no_one">
                             <group>
@@ -199,11 +221,23 @@
         <field name="res_model">riverflow.service</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="riverflow.service_view_search" />
+        <field name="domain">[('is_root_a_template', '=', False)]</field>
+        <field name="context">{'default_is_this_a_template': False}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Add a new service!
             </p>
         </field>
+    </record>
+
+    <record id="action_service_templates" model="ir.actions.act_window">
+        <field name="name">Service Templates</field>
+        <field name="path">service-template</field>
+        <field name="res_model">riverflow.service</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="riverflow.service_view_search" />
+        <field name="domain">[('is_root_a_template', '=', True)]</field>
+        <field name="context">{'make_template': True, 'default_is_this_a_template': True}</field>
     </record>
 
     <record id="service_tag_view_view_form" model="ir.ui.view">
@@ -251,6 +285,15 @@
         <field name="target">new</field>
     </record>
 
+    <record id="action_riverflow_start_template" model="ir.actions.act_window">
+        <field name="name">New Service Template</field>
+        <field name="path">start-template</field>
+        <field name="res_model">riverflow.start.service</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_is_this_a_template': True}</field>
+    </record>
+
     <!-- Menu Item Definitions 
     https://www.svgrepo.com/svg/455931/service-bell?edit=true 
     -->
@@ -260,6 +303,10 @@
         <menuitem id="riverflow.services_configuration_menu" name="Configuration" sequence="20">
             <menuitem id="riverflow.services_menu_configuration_tags"
                 action="riverflow.service_tag_action" sequence="10" />
+            <menuitem id="riverflow.services_menu_configuration_templates"
+                action="riverflow.action_service_templates" sequence="20" />
+            <menuitem id="riverflow.service_menu_start_template" name="&#10133; New Template"
+                action="riverflow.action_riverflow_start_template" sequence="22" />
         </menuitem>
         <menuitem id="riverflow.service_menu_new_service" name="&#10133; New Service"
             action="riverflow.action_riverflow_start_service" sequence="30" />
