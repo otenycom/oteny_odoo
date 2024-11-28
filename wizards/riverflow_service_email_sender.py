@@ -152,9 +152,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                     )
                 )
 
-        # Post the message
+        # Post the message, add followers to the chatter, and don't subscribe them to the chatter
         service.with_context(
-            mail_post_autofollow=False, mail_create_nosubscribe=True
+            mail_post_autofollow=True, mail_create_nosubscribe=True
         ).message_post(
             message_type="email",
             subject=subject_rendered,

@@ -1,7 +1,6 @@
 from odoo import models, fields, api, _, Command
 from odoo.exceptions import UserError, ValidationError
 import logging
-import pdb
 
 _logger = logging.getLogger(__name__)
 
@@ -124,7 +123,7 @@ class TransitionWizard(models.AbstractModel):
                     new_record = (
                         self.env[self._workflow_model]
                         .with_context(
-                            mail_create_nosubscribe=False,  # recipients are made followers of the record thread
+                            mail_create_nosubscribe=True,  # current user not made followers of the record thread
                             mail_auto_subscribe_no_notify=True,  # recipients are not notified of the record thread
                         )
                         .create(create_vals)

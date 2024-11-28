@@ -1,4 +1,4 @@
-from odoo import models, fields, _
+from odoo import models, Command, _
 from odoo.exceptions import UserError
 
 
@@ -51,6 +51,9 @@ class ServiceNewWizard(models.TransientModel):
             "is_this_a_template": False,
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
+            "tag_ids": [
+                Command.link(tag_id) for tag_id in template_service.tag_ids.ids
+            ],
         }
         if parent_id:
             vals["parent_id"] = parent_id
