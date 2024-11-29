@@ -2,7 +2,7 @@ from odoo import models, fields, api
 
 
 class ServiceWizard(models.TransientModel):
-    _name = "riverflow.service.wizard"
+    _name = "riverflow.service.wizard"  #
     _inherit = "riverflow.transition.wizard"
     _description = "Service Wizard"
 
