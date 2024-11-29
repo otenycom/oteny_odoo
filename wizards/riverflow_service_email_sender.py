@@ -33,6 +33,88 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         required=False,
     )
 
+    # New fields for rendered content
+    subject_rendered = fields.Char(
+        string="Rendered Subject",
+        compute="_compute_rendered_content",
+        store=False,
+    )
+    body_rendered = fields.Html(
+        string="Rendered Content",
+        compute="_compute_rendered_content",
+        store=False,
+        sanitize=False,
+    )
+
+    # New editable fields that mirror the rendered content
+    subject_updatable = fields.Char(
+        string="Message Subject",
+        compute="_compute_updatable_content",
+        inverse="_inverse_subject_updatable",
+        store=True,
+    )
+    body_updatable = fields.Html(
+        string="Message Content",
+        compute="_compute_updatable_content",
+        inverse="_inverse_body_updatable",
+        store=True,
+        sanitize=False,
+    )
+
+    @api.depends("subject_rendered", "body_rendered", "subject", "body")
+    def _compute_updatable_content(self):
+        for wizard in self:
+            # Update if empty or if template fields changed
+            if not wizard.subject_updatable or wizard.subject != wizard._origin.subject:
+                wizard.subject_updatable = wizard.subject_rendered
+            if not wizard.body_updatable or wizard.body != wizard._origin.body:
+                wizard.body_updatable = wizard.body_rendered
+
+    def _inverse_subject_updatable(self):
+        # This method allows manual updates to subject_updatable to persist
+        pass
+
+    def _inverse_body_updatable(self):
+        # This method allows manual updates to body_updatable to persist
+        pass
+
+    @api.depends("subject", "body", "records_to_transition_ids")
+    def _compute_rendered_content(self):
+        for wizard in self:
+            if not wizard.records_to_transition_ids:
+                wizard.subject_rendered = wizard.subject
+                wizard.body_rendered = wizard.body
+                # Update editable fields when template changes
+                wizard.subject_updatable = wizard.subject
+                wizard.body_updatable = wizard.body
+                continue
+
+            service = wizard.records_to_transition_ids[0]
+            render_context = wizard._get_render_context(service, {})
+
+            # Render subject
+            wizard.subject_rendered = wizard._render_template(
+                wizard.subject or "",
+                "riverflow.service",
+                [service.id],
+                engine="inline_template",
+                add_context=render_context,
+            )[service.id]
+
+            # Render body
+            wizard.body_rendered = wizard._render_template(
+                wizard.body,
+                "riverflow.service",
+                [service.id],
+                engine="qweb",
+                add_context=render_context,
+                options={"post_process": True},
+            )[service.id]
+
+            # Update editable fields when template changes
+            wizard.subject_updatable = wizard.subject_rendered
+            wizard.body_updatable = wizard.body_rendered
+
     def default_get_using_records(self, defaultValues, records_to_transition):
         super().default_get_using_records(defaultValues, records_to_transition)
 
@@ -54,6 +136,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if self.email_template_id:
             self.subject = self.email_template_id.subject
             self.body = self.email_template_id.body_html
+            # Force immediate UI update
+            self._compute_rendered_content()
+            self._compute_updatable_content()
 
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
@@ -105,21 +190,8 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if not self.recipient_partner_ids:
             raise UserError(_("Please select at least one recipient."))
 
-        vals = {}  # uncommitted new property values
-        render_context = self._get_render_context(service, vals)
-        subject_rendered = self._get_rendered_subject(service, vals)
-
-        body_rendered = self._render_template(
-            self.body,
-            "riverflow.service",
-            [service.id],
-            engine="qweb",
-            add_context=render_context,
-            options={"post_process": True},
-        )[service.id]
-
-        # Sanitize the rendered body
-        safe_body = tools.html_sanitize(body_rendered)
+        # Use updatable content for sending
+        safe_body = tools.html_sanitize(self.body_updatable)
 
         allowed_domains = (
             self.env["ir.config_parameter"]
@@ -157,7 +229,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             mail_post_autofollow=True, mail_create_nosubscribe=True
         ).message_post(
             message_type="email",
-            subject=subject_rendered,
+            subject=self.subject_updatable,
             partner_ids=self.recipient_partner_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,

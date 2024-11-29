@@ -58,7 +58,11 @@ class ServiceNewWizard(models.TransientModel):
         if parent_id:
             vals["parent_id"] = parent_id
 
-        new_service = self.env["riverflow.service"].create(vals)
+        new_service = (
+            self.env["riverflow.service"]
+            .with_context(context={"mail_create_nosubscribe": True})
+            .create(vals)
+        )
 
         # Clone notes (comments) from template
         template_notes = self.env["mail.message"].search(

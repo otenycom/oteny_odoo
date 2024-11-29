@@ -11,12 +11,18 @@
                         <field name="transition_id" invisible="1" />
                         <field name="email_template_id" options="{'no_create': False, 'no_open': False}" />
                         <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" />
-                        <field name="subject" required="1" />
+                        <field name="subject_updatable" />
                         <field name="res_id" invisible="1"></field>
                         <field name="res_model" invisible="1"></field>
                     </group>
                     <notebook>
-                        <page string="Content" name="content">
+                        <page string="Message" name="message">
+                            <field name="body_updatable" widget="html" options="{'style-inline': true}" />
+                        </page>
+                        <page string="Template" name="template" groups="base.group_no_one">
+                            <group>
+                                <field name="subject" required="1" />
+                            </group>
                             <field name="body" widget="html" options="{'style-inline': true, 'codeview': true, 'dynamic_placeholder': true}" />
                         </page>
                     </notebook>
