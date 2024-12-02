@@ -39,14 +39,6 @@ class RiverflowWorkflowState(models.Model):
                 f"{state.workflow_id.display_name} | {state.name}"  # fmt: off
             )
 
-    # @api.model
-    # def name_search(self, name, args=None, operator='ilike', limit=100):
-    #     args = args or []
-    #     domain = []
-    #     if name:
-    #         domain = [('display_name', operator, name)]
-    #     return self.search(domain + args, limit=limit).ids
-
     def workflow_add_from_transition(self):
         return {
             "type": "ir.actions.act_window",

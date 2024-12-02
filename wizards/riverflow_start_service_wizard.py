@@ -20,11 +20,12 @@ class ServiceNewWizard(models.TransientModel):
             button_context = defaults_context.copy()
             button_context["template_service_id"] = template_service.id
             icon = template_service.workflow_id.icon or "plus"
+
             transition_buttons["buttons"].append(
                 {
                     "index": index,
                     "icon": icon,
-                    "caption": f"{template_service.name}",
+                    "caption": f"{template_service.indented_name}",
                     "help": "",
                     "action": "action_apply_template",
                     "context": button_context,
