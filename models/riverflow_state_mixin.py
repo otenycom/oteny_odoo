@@ -44,7 +44,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     )
 
     state_json = fields.Json(
-        string="State Info", compute="_compute_state_json", store=False
+        string="Workflow State", compute="_compute_state_json", store=False
     )
     transition_buttons_json = fields.Json(
         string="Workflow Actions",
@@ -131,7 +131,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             wf_state_text = record.current_workflow_name or ""
             if wf_state_text or record.state_name:
                 state_text = record.state_name or "Not Started"
-                wf_state_text = " | ".join([wf_state_text, state_text])
+                wf_state_text = state_text  # " | ".join([wf_state_text, state_text])
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_id.icon or ""
@@ -164,6 +164,16 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                         if isinstance(record.id, models.NewId)
                         else int(transition.id)
                     )
+
+                    if not record.state_id:
+                        # The start transition to the first state can be skipped, as that is a no-op
+                        # its typically named "Not Started" and used in the Start-new wizard to create a new record in the first state
+                        # in these, we are handling a record that is already created and the null state is logically the first state
+                        if (
+                            transition.from_state_id.id == False
+                            and transition.name == "Not Started"
+                        ):
+                            continue
 
                     transition_buttons["buttons"].append(
                         {
