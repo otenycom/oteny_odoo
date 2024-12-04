@@ -196,62 +196,23 @@ export class TransitionButtons extends Component {
     toggleCheckbox(buttonIndex) {
         const buttons = this.buttonDefs();
         const button = buttons[buttonIndex];
-        button.checked = !button.checked;
 
-        // If this is a parent, toggle all descendants
-        if (this.hasChildren(button)) {
-            const parentLevel = button.indent_level;
-            for (let i = buttonIndex + 1; i < buttons.length; i++) {
-                if (buttons[i].indent_level > parentLevel) {
-                    buttons[i].checked = button.checked;
-                } else {
-                    break;
-                }
-            }
+        // Only toggle if it's a top-level item
+        if (button.indent_level === 0) {
+            button.checked = !button.checked;
+            this.render();
         }
-
-        // Update parent's checked state based on children
-        this.updateParentCheckboxState(buttonIndex);
-        this.render();
-    }
-
-    updateParentCheckboxState(childIndex) {
-        const buttons = this.buttonDefs();
-        const childLevel = buttons[childIndex].indent_level;
-
-        // Find parent
-        for (let i = childIndex - 1; i >= 0; i--) {
-            if (buttons[i].indent_level < childLevel) {
-                // Found the parent, check all its children
-                const allChecked = this.areAllChildrenChecked(i);
-                buttons[i].checked = allChecked;
-                break;
-            }
-        }
-    }
-
-    areAllChildrenChecked(parentIndex) {
-        const buttons = this.buttonDefs();
-        const parentLevel = buttons[parentIndex].indent_level;
-        let allChecked = true;
-
-        for (let i = parentIndex + 1; i < buttons.length; i++) {
-            if (buttons[i].indent_level <= parentLevel) break;
-            if (buttons[i].indent_level === parentLevel + 1 && !buttons[i].checked) {
-                allChecked = false;
-                break;
-            }
-        }
-
-        return allChecked;
     }
 
     async executeSelectedTransitions() {
-        const selectedButtons = this.buttonDefs().filter(button => button.checked);
+        // Only consider top-level templates
+        const selectedButtons = this.buttonDefs().filter(
+            button => button.checked && button.indent_level === 0
+        );
 
         if (selectedButtons.length === 0) {
             this.notification.add(
-                "Please select at least one template or service.",
+                "Please select at least one template.",
                 { type: "warning" }
             );
             return false;

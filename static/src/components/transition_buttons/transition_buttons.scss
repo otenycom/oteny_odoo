@@ -54,6 +54,7 @@
         display: flex;
         align-items: center;
         padding: 0.25rem 0;
+        padding-left: 1.5rem;
 
         .btn-link {
             padding: 0;
@@ -63,9 +64,17 @@
         .fa-chevron-right,
         .fa-chevron-down {
             cursor: pointer;
-            margin-right: 0.5rem;
+            margin-left: 0.5rem;
             width: 1rem;
             text-align: center;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .icon_span {
+            margin-right: 0.5rem;
         }
     }
 
