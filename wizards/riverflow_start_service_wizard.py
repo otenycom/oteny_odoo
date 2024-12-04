@@ -24,6 +24,8 @@ class ServiceNewWizard(models.TransientModel):
             transition_buttons["buttons"].append(
                 {
                     "index": index,
+                    "is_template": True,
+                    "indent_level": template_service.indent_level,
                     "icon": icon,
                     "caption": f"{template_service.indented_name}",
                     "help": "",

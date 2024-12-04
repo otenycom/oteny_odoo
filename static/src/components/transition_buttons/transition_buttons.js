@@ -10,12 +10,15 @@ export class TransitionButtons extends Component {
     static props = {
         ...standardFieldProps,
         maxButtons: { type: String, optional: true },
+        layout: { type: String, optional: true },
     };
 
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
+        this.notification = useService("notification");
         this.inputRef = useRef("inputElement");
+        this.expandedTemplates = new Set();
         onWillRender(() => {
             this.fieldValueState = this.fieldValue(this.props);
         });
@@ -50,7 +53,21 @@ export class TransitionButtons extends Component {
     }
 
     useFullListLayout() {
-        return this.fieldValueState.layout === "full_list";
+        return this.layout() === "full_list";
+    }
+    useFormHeaderLayout() {
+        return this.layout() === "form_header";
+    }
+
+    layout() {
+        // full_list -> list of all start transitions displayed in a start transition selection wizard
+        // form_header -> show transition buttons for a record's form header
+        // list -> show transition link buttons for a record in a grid
+        if (this.fieldValueState.layout)
+            return this.fieldValueState.layout;
+        else if (this.props.layout)
+            return this.props.layout;
+        else return "list";
     }
 
     text() {
@@ -70,6 +87,12 @@ export class TransitionButtons extends Component {
             return "riverflow_end_state";
         else return "riverflow_pending_state";
     }
+
+
+    maxButtons() {
+        return parseInt(this.props.maxButtons) || 2;
+    }
+
 
     maxButtons() {
         return parseInt(this.props.maxButtons) || 2;
@@ -131,6 +154,129 @@ export class TransitionButtons extends Component {
             inputElement.click();
         }
     }
+
+    hasChildren(button) {
+        const buttons = this.buttonDefs();
+        const currentIndex = buttons.indexOf(button);
+        if (currentIndex < buttons.length - 1) {
+            return buttons[currentIndex + 1].indent_level > button.indent_level;
+        }
+        return false;
+    }
+
+    shouldShowButton(button) {
+        if (button.indent_level === 0) return true;
+
+        const buttons = this.buttonDefs();
+        const currentIndex = buttons.indexOf(button);
+
+        // Find parent template
+        for (let i = currentIndex - 1; i >= 0; i--) {
+            if (buttons[i].indent_level < button.indent_level) {
+                // Found the parent, check if it's expanded
+                return this.isTemplateExpanded(buttons[i].index);
+            }
+        }
+        return true;
+    }
+
+    toggleTemplateExpansion(index) {
+        if (this.expandedTemplates.has(index)) {
+            this.expandedTemplates.delete(index);
+        } else {
+            this.expandedTemplates.add(index);
+        }
+        this.render();
+    }
+
+    isTemplateExpanded(index) {
+        return this.expandedTemplates.has(index);
+    }
+
+    toggleCheckbox(buttonIndex) {
+        const buttons = this.buttonDefs();
+        const button = buttons[buttonIndex];
+        button.checked = !button.checked;
+
+        // If this is a parent, toggle all descendants
+        if (this.hasChildren(button)) {
+            const parentLevel = button.indent_level;
+            for (let i = buttonIndex + 1; i < buttons.length; i++) {
+                if (buttons[i].indent_level > parentLevel) {
+                    buttons[i].checked = button.checked;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Update parent's checked state based on children
+        this.updateParentCheckboxState(buttonIndex);
+        this.render();
+    }
+
+    updateParentCheckboxState(childIndex) {
+        const buttons = this.buttonDefs();
+        const childLevel = buttons[childIndex].indent_level;
+
+        // Find parent
+        for (let i = childIndex - 1; i >= 0; i--) {
+            if (buttons[i].indent_level < childLevel) {
+                // Found the parent, check all its children
+                const allChecked = this.areAllChildrenChecked(i);
+                buttons[i].checked = allChecked;
+                break;
+            }
+        }
+    }
+
+    areAllChildrenChecked(parentIndex) {
+        const buttons = this.buttonDefs();
+        const parentLevel = buttons[parentIndex].indent_level;
+        let allChecked = true;
+
+        for (let i = parentIndex + 1; i < buttons.length; i++) {
+            if (buttons[i].indent_level <= parentLevel) break;
+            if (buttons[i].indent_level === parentLevel + 1 && !buttons[i].checked) {
+                allChecked = false;
+                break;
+            }
+        }
+
+        return allChecked;
+    }
+
+    async executeSelectedTransitions() {
+        const selectedButtons = this.buttonDefs().filter(button => button.checked);
+
+        if (selectedButtons.length === 0) {
+            this.notification.add(
+                "Please select at least one template or service.",
+                { type: "warning" }
+            );
+            return false;
+        }
+
+        await this.saveRecords();
+
+        // Execute transitions in sequence
+        for (const button of selectedButtons) {
+            const action = {
+                type: "object",
+                resId: this.props.record.resId,
+                name: button.action,
+                resModel: this.props.record.resModel,
+                context: button.context,
+                onClose: async () => {
+                    if (this.reloadOnClose())
+                        await this.props.record.model.root.load();
+                }
+            };
+            await this.action.doActionButton(action);
+        }
+
+        return true;
+    }
 }
 
 export const transitionButtons = {
@@ -138,7 +284,8 @@ export const transitionButtons = {
     displayName: "Transition Buttons",
     supportedTypes: ["json"],
     extractProps: ({ attrs, options, viewType }, dynamicInfo) => ({
-        maxButtons: attrs.max_buttons || "2"
+        maxButtons: attrs.max_buttons || "2",
+        layout: attrs.layout || "list",
     }),
 };
 

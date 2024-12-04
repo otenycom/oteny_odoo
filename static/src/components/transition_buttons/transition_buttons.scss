@@ -40,3 +40,56 @@
         }
     }
 }
+
+.full-list-layout {
+    h3 {
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        color: $o-main-text-color;
+        font-size: 1rem;
+    }
+
+    .template-item,
+    .service-item {
+        display: flex;
+        align-items: center;
+        padding: 0.25rem 0;
+
+        .btn-link {
+            padding: 0;
+            text-align: left;
+        }
+
+        .fa-chevron-right,
+        .fa-chevron-down {
+            cursor: pointer;
+            margin-right: 0.5rem;
+            width: 1rem;
+            text-align: center;
+        }
+    }
+
+    [class*="indent-"] {
+        padding-left: calc(var(--indent-level) * 1.5rem);
+    }
+
+    .indent-0 {
+        --indent-level: 0;
+    }
+
+    .indent-1 {
+        --indent-level: 1;
+    }
+
+    .indent-2 {
+        --indent-level: 2;
+    }
+
+    .indent-3 {
+        --indent-level: 3;
+    }
+
+    .indent-4 {
+        --indent-level: 4;
+    }
+}

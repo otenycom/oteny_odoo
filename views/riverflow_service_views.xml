@@ -9,7 +9,7 @@
                 <header>
                     <!-- see compileHeader(el, params) for btn in class="btn": this moves the transitions buttons to the left
                       in the slot where the normal Odoo buttons are -->
-                    <field name="transition_buttons_json" widget="transition_buttons" max_buttons="5" />
+                    <field name="transition_buttons_json" widget="transition_buttons" max_buttons="5" layout="form_header" />
                     <!-- o_field_statusbar is needed because riverflow_statusbar inherits from o_field_statusbar, and its scss files only work inside o_field_statusbar -->
                     <field name="state_id" widget="riverflow_statusbar" readonly="1" class="o_field_statusbar" />
                     <field name="state_id_statusbar_json" invisible="1" />
@@ -65,7 +65,7 @@
                     <notebook>
                         <page string="Child Services" name="services">
                             <div>
-                                <button name="add_child_service" type="object" class="oe_link" data-hotkey="n"
+                                <button name="add_child_service" type="object" data-hotkey="n" class="btn-primary"
                                     icon="fa-plus">
                                     Add Child Service</button>
                             </div>
@@ -89,15 +89,18 @@
                             </field>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages">
-                            <div>
-                                <p>Review the External Messages in the Chatter,
-                                    and once done and followup is complete, mark them as Reviewed</p>
-                                <button name="action_mark_external_messages_reviewed" type="object" class="oe_link"
-                                    string="Mark as Reviewed" icon="fa-check" />
-                                <field name="last_external_message_review_time" />
-                            </div>
                             <group>
-                                <field name="unreviewed_message_count" />
+                                <group>
+                                    <field name="unreviewed_message_count" string="Unreviewed Messages" />
+                                    <field name="last_external_message_review_time" invisible="last_external_message_review_time == False" string="Last Reviewed" />
+                                </group>
+                                <group>
+                                    <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
+                                        string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
+                                    and once done and followup is complete, mark them as Reviewed" />
+                                </group>
+                            </group>
+                            <group>
                                 <field name="message_from_external_sender_ids">
                                     <list>
                                         <field name="date" />

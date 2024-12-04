@@ -153,24 +153,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             "company": service.company_id,
         }
 
-    def _get_rendered_subject(self, service, vals):
-        render_context = self._get_render_context(service, vals)
-        subject_rendered = self._render_template(
-            self.subject or "",
-            "riverflow.service",
-            [service.id],
-            engine="inline_template",
-            add_context=render_context,
-        )[service.id]
-        return subject_rendered
-
-    def _generate_default_name(self, subject):
-        max_length = 100
-        truncated_subject = subject[:max_length].strip()
-        if len(subject) > max_length:
-            truncated_subject += "..."
-        return f"{truncated_subject}"
-
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(
             service, vals
@@ -178,9 +160,8 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         # new services are automatically assigned a name equal to the email subject
         isNewService = isinstance(service.id, models.NewId)
         if isNewService and not vals.get("name"):
-            subject_rendered = self._get_rendered_subject(service, vals)
-            default_name = self._generate_default_name(subject_rendered)
-            vals["name"] = default_name
+            subject = self.subject_updatable
+            vals["name"] = subject
 
     def create_related_records(self, service):
         super(RiverflowServiceEmailSenderWizard, self).create_related_records(service)

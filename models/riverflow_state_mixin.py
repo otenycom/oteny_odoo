@@ -139,6 +139,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
             state_json = {
                 "text": wf_state_text,
+                "workflow_name": record.current_workflow_name,
                 "workflow_icon": icon,
                 "is_end_state": is_end_state,
                 # this is not a start transition, so we can refresh the underlying list/form view

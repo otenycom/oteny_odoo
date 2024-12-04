@@ -180,6 +180,13 @@ class Service(models.Model):
         copy=True,
     )
 
+    workflow_name_html = fields.Html(
+        "Workflow Name",
+        related="workflow_id.icon_name_html",
+        help="Combination of Icon and name",
+        store=False,
+    )
+
     # the container of the service (log_entry, employee, etc)
     res_model = fields.Char(
         string="Subject of Service Model Name",

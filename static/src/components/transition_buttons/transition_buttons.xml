@@ -13,20 +13,70 @@
                 <t t-call="riverflow.TransitionButtons.IconAndCaption" />
             </span>
             <div class="transition-selection-group full-list-layout">
+                <t t-if="this.buttonDefs().some(button => button.is_template)">
+                    <h3>Templates</h3>
+                </t>
+                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                    <t t-if="button.is_template">
+                        <div t-attf-class="template-item indent-#{button.indent_level}"
+                            t-att-style="this.shouldShowButton(button) ? '' : 'display: none;'">
+                            <input type="checkbox"
+                                t-att-checked="button.checked"
+                                t-on-click="() => this.toggleCheckbox(button.index)" />
+                            <span>
+                                <t t-if="this.hasChildren(button)">
+                                    <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
+                                        t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
+                                </t>
+                                <span t-att-class="this.buttonIconClass(button)" />
+                                <span t-esc="button.caption" t-att-title="button.caption" />
+                            </span>
+                        </div>
+                    </t>
+                </t>
+                <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Add Selected Templates</button>
+                <br />
+                <t t-if="this.buttonDefs().some(button => !button.is_template)">
+                    <h3>Blank Service</h3>
+                </t>
+                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                    <t t-if="!button.is_template">
+                        <div t-attf-class="service-item indent-#{button.indent_level}">
+                            <button
+                                t-att-name="button.action"
+                                class="btn btn-link transition_button"
+                                t-on-click.stop="() => this.executeTransition(button)"
+                                type="object">
+                                <span t-att-class="this.buttonIconClass(button)" />
+                                <span t-esc="button.caption" t-att-title="button.caption" />
+                            </button>
+                        </div>
+                    </t>
+                </t>
+            </div>
+        </t>
+        <t t-elif="this.useFormHeaderLayout()">
+            <div class="button-separator-group">
                 <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
                     <button
                         t-att-name="button.action"
-                        class="btn btn-link transition_button"
+                        t-attf-class="btn #{button.index === 0 ? 'btn-primary' : 'btn-secondary'}"
                         t-on-click.stop="() => this.executeTransition(button)"
                         type="object">
-                        <span>
-                            <span t-att-class="this.buttonIconClass(button)" />
-                            <span t-esc="button.caption" t-att-title="button.caption" />
-                        </span>
+                        <span t-esc="button.caption" t-att-title="button.caption" />
                     </button>
-                    <br />
+                    <t t-if="button.index &lt; this.buttonDefs().length - 1">
+                        <span class="mx-1"></span>
+                    </t>
                 </t>
             </div>
+            <!-- <div class="d-flex align-items-center">
+                <t t-if="this.iconClass()">
+                    <span t-att-class="this.iconClass()"></span>
+                    <span>&#160;</span>
+                </t>
+                <span t-att-class="this.stateClass()" t-esc="this.fieldValueState.workflow_name" />
+            </div> -->
         </t>
         <t t-else="">
             <t t-if="this.buttonDefs().length > this.maxButtons()">
