@@ -12,45 +12,48 @@
             <div class="transition-selection-group full-list-layout">
                 <t t-if="this.buttonDefs().some(button => button.is_template)">
                     <h3>Templates</h3>
-                </t>
-                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
-                    <t t-if="button.is_template">
-                        <div t-attf-class="template-item indent-#{button.indent_level}"
-                            t-att-style="this.shouldShowButton(button) ? '' : 'display: none;'">
-                            <t t-if="button.indent_level === 0">
-                                <input type="checkbox"
-                                    t-att-checked="button.checked"
-                                    t-on-click="() => this.toggleCheckbox(button.index)" />
-                            </t>
-                            <span>
-                                <span t-att-class="this.buttonIconClass(button)" />
-                                <span t-esc="button.caption" t-att-title="button.caption" />
-                                <t t-if="button.indent_level === 0 and this.hasChildren(button)">
-                                    <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
-                                        t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
+
+                    <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                        <t t-if="button.is_template">
+                            <div t-attf-class="template-item indent-#{button.indent_level}"
+                                t-att-style="this.shouldShowButton(button) ? '' : 'display: none;'">
+                                <t t-if="button.indent_level === 0">
+                                    <input type="checkbox"
+                                        t-att-checked="button.checked"
+                                        t-on-click="() => this.toggleCheckbox(button.index)" />
                                 </t>
-                            </span>
-                        </div>
+                                <span>
+                                    <span t-att-class="this.buttonIconClass(button)" />
+                                    <span t-esc="button.caption" t-att-title="button.caption" />
+                                    <t t-if="button.indent_level === 0 and this.hasChildren(button)">
+                                        <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
+                                            t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
+                                    </t>
+                                </span>
+                            </div>
+                        </t>
                     </t>
+                    <br />
+                    <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Use Selected Templates</button>
+                    <br />
                 </t>
-                <br />
-                <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Use Selected Templates</button>
-                <br />
                 <t t-if="this.buttonDefs().some(button => !button.is_template)">
-                    <h3>Or create a blank service</h3>
-                </t>
-                <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
-                    <t t-if="!button.is_template">
-                        <div t-attf-class="service-item indent-#{button.indent_level}">
-                            <button
-                                t-att-name="button.action"
-                                class="btn btn-link transition_button"
-                                t-on-click.stop="() => this.executeTransition(button)"
-                                type="object">
-                                <span t-att-class="this.buttonIconClass(button)" />
-                                <span t-esc="button.caption" t-att-title="button.caption" />
-                            </button>
-                        </div>
+                    <t t-if="this.buttonDefs().some(button => button.is_template)">
+                        <h3>Or start with a blank service</h3>
+                    </t>
+                    <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                        <t t-if="!button.is_template">
+                            <div t-attf-class="service-item indent-#{button.indent_level}">
+                                <button
+                                    t-att-name="button.action"
+                                    class="btn btn-link transition_button"
+                                    t-on-click.stop="() => this.executeTransition(button)"
+                                    type="object">
+                                    <span t-att-class="this.buttonIconClass(button)" />
+                                    <span t-esc="button.caption" t-att-title="button.caption" />
+                                </button>
+                            </div>
+                        </t>
                     </t>
                 </t>
             </div>

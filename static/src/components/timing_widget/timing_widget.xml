@@ -2,7 +2,12 @@
 <templates xml:space="preserve">
     <t t-name="riverflow.TimingWidget">
         <span>
-            <t t-esc="relativedays" t-att-title="relativedays"/>
+            <t t-if="relativedays">
+                <t t-esc="relativedays" t-att-title="relativedays"/>
+                <t t-if="date">
+                = 
+                </t>
+            </t>
 
             <span t-att-class="dateClass" t-att-title="date">
                 <t t-esc="date"/>

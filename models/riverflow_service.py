@@ -369,9 +369,10 @@ class Service(models.Model):
     @api.depends("deadline")
     def _compute_timing_json(self):
         for service in self:
-            if not service.deadline:
-                service.timing_json = False
-                continue
+            # In Template services, deadline is not set, but we still want to show the timing
+            # if not service.deadline:
+            #     service.timing_json = False
+            #     continue
 
             relative_days = ""
             if (
@@ -379,14 +380,20 @@ class Service(models.Model):
                 and service.days_relative_to_project
             ):
 
-                relative_days = f"{self.relative_to_project_days_prefix()}{service.days_relative_to_project:+02d}d = "
+                relative_days = f"{self.relative_to_project_days_prefix()}{service.days_relative_to_project:+02d}d"
 
-            today = fields.Date.today()
-            days_remaining = (service.deadline - today).days
-            date_str = service.deadline.strftime(Service.DATE_FORMAT)
+            if not service.deadline:
+                date_str = ""
+                days_remaining = ""
+                is_past = False
+                is_today = False
+            else:
+                today = fields.Date.today()
+                days_remaining = (service.deadline - today).days
+                date_str = service.deadline.strftime(Service.DATE_FORMAT)
 
-            is_past = service.deadline < today
-            is_today = service.deadline == today
+                is_past = service.deadline < today
+                is_today = service.deadline == today
 
             service.timing_json = {
                 "relative_days": relative_days,
