@@ -62,7 +62,7 @@
     </record>
 
     <record id="trans_se_5" model="riverflow.transition">
-        <field name="name">Mark as Not Needed</field>
+        <field name="name">Not Needed</field>
         <field name="from_state_id" ref="state_service_se_not_started" />
         <field name="to_state_id" ref="state_service_se_not_needed" />
         <field name="action_id" ref="riverflow.transition_action_default" />

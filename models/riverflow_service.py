@@ -369,11 +369,6 @@ class Service(models.Model):
     @api.depends("deadline")
     def _compute_timing_json(self):
         for service in self:
-            # In Template services, deadline is not set, but we still want to show the timing
-            # if not service.deadline:
-            #     service.timing_json = False
-            #     continue
-
             relative_days = ""
             if (
                 service.use_project_deadline_from != "self"
@@ -578,7 +573,17 @@ class Service(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super(Service, self).create(vals_list)
+        # current user is not subscribed to the chatter, because we have the tracker-view, the review-count and top-3 external messages
+        # this way, a team can keep track of the external messages instead of a single user
+        records = super(
+            Service,
+            self.with_context(
+                **{
+                    "mail_create_nosubscribe": True,  # At create or message_post, do not subscribe the current user to the record thread
+                    "mail_auto_subscribe_no_notify": True,  # Do no notify users set as followers of the mail thread
+                }
+            ),
+        ).create(vals_list)
         for record in records:
             if record.parent_id and not record.res_id:
                 record.res_id = record.parent_id.res_id

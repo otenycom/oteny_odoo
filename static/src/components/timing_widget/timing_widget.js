@@ -49,6 +49,10 @@ export class TimingWidget extends Component {
         }
         return "";
     }
+
+    get is_end_state() {
+        return this.timingDataState.is_end_state;
+    }
 }
 
 export const timingWidget = {

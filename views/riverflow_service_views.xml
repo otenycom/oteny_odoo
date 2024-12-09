@@ -65,7 +65,7 @@
                     <notebook>
                         <page string="Child Services" name="services">
                             <div>
-                                <button name="add_child_service" type="object" data-hotkey="n" class="btn-primary"
+                                <button name="add_child_service" type="object" data-hotkey="n"
                                     icon="fa-plus">
                                     Add Child Service</button>
                             </div>
