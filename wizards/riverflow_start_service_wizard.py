@@ -67,6 +67,22 @@ class ServiceNewWizard(models.TransientModel):
             .create(vals)
         )
 
+        # Clone direct attachments from the template service
+        template_attachments = self.env["ir.attachment"].search(
+            [
+                ("res_model", "=", "riverflow.service"),
+                ("res_id", "=", template_service.id),
+            ]
+        )
+
+        for attachment in template_attachments:
+            attachment.copy(
+                {
+                    "res_id": new_service.id,
+                    "res_model": "riverflow.service",
+                }
+            )
+
         # Clone notes (comments) from template
         template_notes = self.env["mail.message"].search(
             [
