@@ -91,13 +91,13 @@
                         <page string="Unreviewed External Messages" name="unreviewed_messages">
                             <group>
                                 <group>
-                                    <field name="unreviewed_message_count" string="Unreviewed Messages" />
-                                    <field name="last_external_message_review_time" invisible="last_external_message_review_time == False" string="Last Reviewed" />
-                                </group>
-                                <group>
                                     <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
                                         string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
                                     and once done and followup is complete, mark them as Reviewed" />
+                                </group>
+                                <group>
+                                    <field name="unreviewed_message_count" string="Unreviewed Messages" />
+                                    <field name="last_external_message_review_time" invisible="last_external_message_review_time == False" string="Last Reviewed" />
                                 </group>
                             </group>
                             <group>
