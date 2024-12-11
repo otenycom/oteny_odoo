@@ -51,7 +51,9 @@ class ServiceNewWizard(models.TransientModel):
             "state_id": template_service.state_id.id,
             "use_project_deadline_from": template_service.use_project_deadline_from,
             "days_relative_to_project": template_service.days_relative_to_project,
-            "is_this_a_template": False,
+            "is_this_a_template": self.env.context.get(
+                "default_is_this_a_template", False
+            ),
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
             "tag_ids": [
