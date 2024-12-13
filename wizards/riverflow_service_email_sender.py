@@ -61,6 +61,17 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         sanitize=False,
     )
 
+    attachment_ids = fields.Many2many(
+        "ir.attachment",
+        "riverflow_service_mail_attachments_rel",
+        "wizard_id",
+        "attachment_id",
+        string="Attachments",
+        compute="_compute_attachment_ids",
+        readonly=False,
+        store=True,
+    )
+
     @api.depends("subject_rendered", "body_rendered", "subject", "body")
     def _compute_updatable_content(self):
         for wizard in self:
@@ -77,6 +88,14 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     def _inverse_body_updatable(self):
         # This method allows manual updates to body_updatable to persist
         pass
+
+    @api.depends("email_template_id")
+    def _compute_attachment_ids(self):
+        for wizard in self:
+            if wizard.email_template_id.attachment_ids:
+                wizard.attachment_ids = wizard.email_template_id.attachment_ids
+            else:
+                wizard.attachment_ids = False
 
     @api.depends("subject", "body", "records_to_transition_ids")
     def _compute_rendered_content(self):

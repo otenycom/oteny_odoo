@@ -18,6 +18,7 @@
                     <notebook>
                         <page string="Message" name="message">
                             <field name="body_updatable" widget="html" options="{'style-inline': true}" />
+                            <field name="attachment_ids" widget="many2many_binary" />
                         </page>
                         <page string="Template" name="template" groups="base.group_no_one">
                             <group>
