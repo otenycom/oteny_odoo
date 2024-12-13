@@ -573,7 +573,7 @@ class Service(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        # current user is not subscribed to the chatter, because we have the tracker-view, the review-count and top-3 external messages
+        # current user is not subscribed to the chatter, because we have the radar-view, the review-count and top-3 external messages
         # this way, a team can keep track of the external messages instead of a single user
         records = super(
             Service,

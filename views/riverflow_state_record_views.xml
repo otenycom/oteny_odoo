@@ -139,9 +139,9 @@
         </field>
     </record>
 
-    <record id="state_record_action" model="ir.actions.act_window">
-        <field name="name">Tracker</field>
-        <field name="path">tracker</field>
+    <record id="radar_action" model="ir.actions.act_window">
+        <field name="name">Radar</field>
+        <field name="path">radar</field>
         <field name="res_model">riverflow.state.record</field>
         <field name="view_mode">list,form,calendar</field>
         <field name="search_view_id" ref="riverflow.state_record_view_search" />
@@ -157,9 +157,9 @@
     </record>
 
     <menuitem id='riverflow.tracker_root'
-        web_icon='riverflow,static/description/tracker.png' action="riverflow.state_record_action" sequence="5">
-        <menuitem id="riverflow.tracker_tracker"
-            name="Tracker"
-            action="riverflow.state_record_action" sequence="10" />
+        web_icon='riverflow,static/description/radar.png' action="riverflow.radar_action" sequence="5">
+        <menuitem id="riverflow.radar_radar"
+            name="Radar"
+            action="riverflow.radar_action" sequence="10" />
     </menuitem>
 </odoo>
