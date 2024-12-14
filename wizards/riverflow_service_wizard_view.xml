@@ -14,6 +14,8 @@
                 <field name="days_relative_to_project_invisible" invisible="1" />
                 <field name="res_id" invisible="1" />
                 <field name="res_model" invisible="1" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="tag_ids_invisible" />
+                <field name="tag_ids_invisible" invisible="1" />
             </xpath>
         </field>
     </record>

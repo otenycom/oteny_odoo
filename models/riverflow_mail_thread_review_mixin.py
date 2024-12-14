@@ -58,6 +58,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     # todo: make this a JSON field and render the summaries properly, maybe with a custom widget and a popover
     internal_notes_summary = fields.Html(
         string="Top 3 Internal Notes",
+        help="Enter internal notes via the 'Log note' button in the Chatter",
         compute="_compute_latest_internal_notes",
         inverse="_inverse_internal_notes_summary",
         store=True,
@@ -92,6 +93,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     )
     external_messages_summary = fields.Html(
         string="Top 3 External Messages",
+        help="Send external messages via the 'Send message' button in the Chatter",
         compute="_compute_external_messages_summary",
         store=True,
         index="trigram",

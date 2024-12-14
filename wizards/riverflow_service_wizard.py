@@ -1,4 +1,4 @@
-from odoo import models, fields, api
+from odoo import models, fields, Command
 
 
 class ServiceWizard(models.TransientModel):
@@ -35,6 +35,9 @@ class ServiceWizard(models.TransientModel):
         string="Subject of Service Model Name",
     )
 
+    tag_ids = fields.Many2many("riverflow.service.tag", string="Tags")
+    tag_ids_invisible = fields.Boolean()
+
     def update_write_values(self, service, vals):
         super().update_write_values(service, vals)
         vals["res_id"] = self.res_id
@@ -51,6 +54,9 @@ class ServiceWizard(models.TransientModel):
             if self.use_project_deadline_from == "self":
                 vals["project_deadline"] = self.project_deadline
                 vals["days_relative_to_project"] = 0
+
+        if not self.tag_ids_invisible:
+            vals["tag_ids"] = [Command.set(self.tag_ids.ids)]
 
     def get_visibility_defaults(self, transition_id):
         visibility_defaults = super().get_visibility_defaults(transition_id)
