@@ -15,7 +15,9 @@ Key features:
 
 class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
     _name = "riverflow.state.record.tracker.mixin"
-    _description = "This mixin maintains a global view of services and their parent entities through the RiverflowStateRecord model."
+    _description = (
+        "Syncs the model with the central Radar table (RiverflowStateRecord)."
+    )
 
     def _get_state_record(self):
         self.ensure_one()

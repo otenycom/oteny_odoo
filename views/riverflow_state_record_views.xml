@@ -74,6 +74,7 @@
                 <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name='internal_notes_summary' width="180px" optional="show" />
                 <field name="external_messages_summary" width="180px" optional="show" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name="unreviewed_message_count" optional="show" />
             </list>
         </field>

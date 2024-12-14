@@ -172,12 +172,13 @@ class Service(models.Model):
 
     tag_ids = fields.Many2many(
         "riverflow.service.tag",
-        "riverflow_service_ship_tag_rel",
-        "service_tag_id",
+        "riverflow_service_tag_rel",
+        "service_id",
         "tag_id",
         "Tags",
         tracking=True,
         copy=True,
+        ondelete="cascade",
     )
 
     workflow_name_html = fields.Html(

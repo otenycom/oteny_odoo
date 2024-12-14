@@ -132,14 +132,6 @@ class RiverflowStateRecord(models.Model):
         store=True,
     )
 
-    tag_ids = fields.Many2many(
-        comodel_name="riverflow.service.tag",
-        relation="riverflow_state_record_tag_rel",
-        column1="state_record_id",
-        column2="tag_id",
-        string="Tags",
-    )
-
     # Fields from RiverflowWorkflowStateMixin
     workflow_id = fields.Many2one(
         "riverflow.workflow",
@@ -215,6 +207,24 @@ class RiverflowStateRecord(models.Model):
         ondelete="cascade",
     )
 
+    tag_ids = fields.Many2many(
+        comodel_name="riverflow.service.tag",
+        relation="riverflow_state_record_service_tag_rel",
+        column1="state_record_id",
+        column2="tag_id",
+        string="Tags",
+        compute="_compute_tag_ids",
+        ondelete="cascade",
+        store=True,  # Needed for compute to be triggered
+    )
+
+    check_result_ids = fields.One2many(
+        comodel_name="riverflow.check.result",
+        inverse_name="state_record_id",
+        string="Issues",
+        auto_join=True,
+    )
+
     @api.depends("master_model", "master_res_id")
     def _compute_service_id(self):
         for record in self:
@@ -231,13 +241,6 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.master_model = False
                 record.master_res_id = False
-
-    check_result_ids = fields.One2many(
-        comodel_name="riverflow.check.result",
-        inverse_name="state_record_id",
-        string="Issues",
-        auto_join=True,
-    )
 
     def init(self):
         # Create a unique index on (master_model, master_res_id) to ensure no duplicates
@@ -299,6 +302,17 @@ class RiverflowStateRecord(models.Model):
         if record.service_id:
             return record.service_id.unreviewed_message_count
         return 0
+
+    @api.depends("service_id.tag_ids")
+    def _compute_tag_ids(self):
+        for record in self:
+            record.tag_ids = self._compute_tag_ids_for_record(record)
+
+    @api.model
+    def _compute_tag_ids_for_record(self, record):
+        if record.service_id:
+            return record.service_id.tag_ids
+        return False
 
     def _compute_state_json(self):
         # for rendering just the state name and workflow name
