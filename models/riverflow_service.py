@@ -98,9 +98,11 @@ class Service(models.Model):
     company_id = fields.Many2one(
         "res.company",
         string="Company",
-        required=True,
-        readonly=False,
-        default=lambda self: self.env.company,
+        compute="_compute_company_id",
+        inverse="_inverse_company_id",
+        store=True,
+        required=False,
+        index=True,
         tracking=True,
     )
 
@@ -647,3 +649,14 @@ class Service(models.Model):
                 and comment_subtype_id in f.subtype_ids.ids
             )
         ).mapped("partner_id")
+
+    def _compute_company_id(self):
+        """Default company is the current user's company, unless overridden"""
+        for record in self:
+            if not record.company_id:
+                record.company_id = self.env.company
+
+    def _inverse_company_id(self):
+        """Allow manual override of computed company"""
+        # This is a flag method that allows the field to be written
+        pass

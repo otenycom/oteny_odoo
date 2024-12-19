@@ -191,10 +191,18 @@ class RiverflowStateRecord(models.Model):
     responsible_team_id = fields.Many2one(
         "riverflow.team",
         string="Responsible Team",
-        help="Team executing the workflow of this log entry. This team is also responsible for reviewing external messages.",
+        help="Team executing the workflow. This team is also responsible for reviewing external messages.",
         index=True,
         compute="_compute_responsible_team_id",
         store=True,
+    )
+
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        compute="_compute_company_id",
+        store=True,
+        required=False,
     )
 
     service_id = fields.Many2one(
@@ -521,6 +529,17 @@ class RiverflowStateRecord(models.Model):
             return record.service_id.responsible_team_id
         return False
 
+    @api.depends("service_id.company_id")
+    def _compute_company_id(self):
+        for record in self:
+            record.company_id = self._compute_company_id_for_record(record)
+
+    @api.model
+    def _compute_company_id_for_record(self, record):
+        if record.service_id:
+            return record.service_id.company_id
+        return False
+
     @api.depends("service_id.name")
     def _compute_name(self):
         for record in self:
@@ -536,7 +555,10 @@ class RiverflowStateRecord(models.Model):
     def _compute_indent_level(self):
         for record in self:
             if record.service_id:
-                record.indent_level = record.service_id.indent_level + 1
+                record.indent_level = record.service_id.indent_level
+                if record.res_model != False:
+                    # services that that are children of a subject-record need to be indented + 1 so they appear as children
+                    record.indent_level += 1
             else:
                 record.indent_level = 0
 
@@ -553,3 +575,21 @@ class RiverflowStateRecord(models.Model):
 
     def row_click(self):
         return self.action_view_master_record()
+
+    @api.model
+    def action_recompute_company_id(self):
+        """Recompute company_id for all state records.
+        This is a maintenance action to fix records where company_id was not properly set.
+        """
+        records = self.search([])
+        records._compute_company_id()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Company Recompute"),
+                "message": _("Recomputed company for %d state records", len(records)),
+                "sticky": False,
+                "type": "success",
+            },
+        }

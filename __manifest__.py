@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.323",
+    "version": "18.0.1.328",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -9,6 +9,7 @@
     """,
     # data files always loaded at installation
     "data": [
+        "security/riverflow_security.xml",
         "security/ir.model.access.csv",
         "data/riverflow_teams_data.xml",
         "wizards/riverflow_transition_wizard_view.xml",

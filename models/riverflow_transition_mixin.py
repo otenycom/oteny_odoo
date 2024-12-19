@@ -47,7 +47,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
         odoo_view = transition.action_id.odoo_view
         if "." not in odoo_view:
             odoo_view = f"riverflow.{odoo_view}"
-        view = self.env.ref(odoo_view)
+        view = self.sudo().env.ref(odoo_view)
         res_model = view.model
 
         action = {

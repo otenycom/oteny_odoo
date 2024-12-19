@@ -19,6 +19,7 @@
                     <group>
                         <group>
                             <field name="display_name" />
+                            <field name="company_id" />
                             <field name="tag_ids" widget="many2many_tags" />
                             <field name="master_model" />
                             <field name="master_res_id" />
@@ -63,6 +64,7 @@
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
                 <field name="indented_name" optional="show" />
+                <field name="company_id" optional="hide" width="120px" />
                 <field name="master_model" optional="hide" />
                 <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="res_model" optional="hide" />
@@ -110,10 +112,11 @@
                 <field name="internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" string="External Messages" />
                 <field name="responsible_team_id" />
+                <field name="company_id" />
                 <separator />
                 <filter string="Credentials" name="credentials" domain="[('res_model', '=', 'rivercreds.credential')]" />
                 <filter string="Log entries &amp; services" name="logbook" domain="['|', ('res_model', '=', 'rivermen.log.entry'), ('master_model', '=', 'rivermen.log.entry')]" />
-                <filter string="Services" name="services" domain="[('res_model', '=', 'riverflow.service')]" />
+                <filter string="Standalone Services" name="standalone_services" domain="['&amp;', ('res_model', '=', False), ('master_model', '=', 'riverflow.service')]" />
                 <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
                 <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
@@ -133,6 +136,7 @@
                 <group expand="0" string="Group By">
                     <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
                     <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />
                     <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
                     <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
                 </group>
@@ -157,10 +161,32 @@
         </field>
     </record>
 
+    <!-- Add this before the closing </odoo> tag -->
+    <record id="action_recompute_company_id" model="ir.actions.server">
+        <field name="name">Recompute Company</field>
+        <field name="model_id" ref="model_riverflow_state_record" />
+        <field name="binding_model_id" ref="model_riverflow_state_record" />
+        <field name="state">code</field>
+        <field name="code">action = model.action_recompute_company_id()</field>
+        <field name="binding_view_types">list</field>
+    </record>
+
     <menuitem id='riverflow.tracker_root'
         web_icon='riverflow,static/description/radar.png' action="riverflow.radar_action" sequence="5">
         <menuitem id="riverflow.radar_radar"
             name="Radar"
             action="riverflow.radar_action" sequence="10" />
     </menuitem>
+
+    <menuitem id="menu_riverflow_maintenance"
+        name="Maintenance"
+        parent="riverflow.tracker_root"
+        sequence="100"
+        groups="base.group_no_one" />
+    <menuitem id="menu_recompute_company_id"
+        name="Recompute Companies"
+        action="action_recompute_company_id"
+        parent="menu_riverflow_maintenance"
+        sequence="10" />
+
 </odoo>
