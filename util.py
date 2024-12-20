@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from odoo.http import request
 import ipaddress
 import time

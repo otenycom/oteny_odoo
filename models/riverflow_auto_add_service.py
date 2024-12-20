@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from odoo import api, fields, models, tools
 from odoo.osv import expression
 from odoo.tools.safe_eval import safe_eval
