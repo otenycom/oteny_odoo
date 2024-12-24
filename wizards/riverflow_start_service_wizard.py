@@ -56,6 +56,14 @@ class ServiceNewWizard(models.TransientModel):
             ),
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
+            "is_supply_order": template_service.is_supply_order,
+            "supplier_partner_id": template_service.supplier_partner_id.id,
+            "supply_date": template_service.supply_date,
+            "supply_from": template_service.supply_from,
+            "supply_to": template_service.supply_to,
+            "supply_mode": template_service.supply_mode,
+            "supply_order_instructions": template_service.supply_order_instructions,
+            "supply_quantity": template_service.supply_quantity,
             "tag_ids": [
                 Command.link(tag_id) for tag_id in template_service.tag_ids.ids
             ],

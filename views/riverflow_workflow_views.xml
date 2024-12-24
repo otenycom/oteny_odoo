@@ -22,6 +22,7 @@
                             <field name="description" />
                             <field name="icon" on_change="1" />
                             <field name="icon_name_html" readonly="1" />
+                            <field name="is_supply_order" />
                         </group>
                     </group>
                     <group>

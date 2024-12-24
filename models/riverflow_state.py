@@ -16,6 +16,14 @@ class RiverflowWorkflowState(models.Model):
     sequence = fields.Integer(default=10)
     hide_in_statusbar = fields.Boolean("Hide in Statusbar", default=False)
     is_end_state = fields.Boolean("Is End State", default=False)
+
+    # todo: add to radar.
+    # Extend filters, 'Is Pending' should be 'Pending in Front Office' and 'Pending in Back Office'
+    is_back_office_state = fields.Boolean(
+        "Is Back Office State",
+        help="If true, this state is for back office use; to handle the financial aspect of the workflow.",
+        default=False,
+    )
     is_cancelled_state = fields.Boolean("Is Cancelled State", default=False)
 
     from_transition_ids = fields.One2many(

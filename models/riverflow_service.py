@@ -66,11 +66,12 @@ class Service(models.Model):
         help="The Send Email workflow transition uses this email template. "
         "Templates can be created in Odoo's Email Templates module.",
     )
+
+    # todo: add to rivermen module
     add_operator_as_recipient = fields.Boolean(
-        string="Add operator as recipient",
+        string="Send to operator",
         default=False,
-        help="The recipients for the email can be set by adding followers to the chatter, "
-        "and by checking 'Add operator as recipient' below.",
+        help="The recipients for the email can also be set by adding followers to the chatter",
     )
 
     root_id = fields.Many2one(
@@ -226,6 +227,72 @@ class Service(models.Model):
         inverse="_set_resource_ref",
     )
 
+    # we take this flag from the workflow, computed field
+    is_supply_order = fields.Boolean(
+        "Is Supply Order",
+        help="If checked, the service is a supply order, e.g a Taxi Order",
+        required=False,
+        tracking=True,
+        compute="_compute_is_supply_order",
+        store=True,
+    )
+
+    supplier_partner_id = fields.Many2one(
+        "res.partner",
+        string="Supplier",
+        help="The partner that is supplying the service",
+        required=False,
+        tracking=True,
+    )
+
+    supply_date = fields.Date(
+        "Supply Date",
+        help="The date the service is expected to be supplied",
+        required=False,
+        tracking=True,
+    )
+
+    supply_date_formatted = fields.Char(
+        "Supply Date Formatted",
+        compute="_compute_supply_date_formatted",
+        store=False,
+    )
+
+    supply_from = fields.Char(
+        "Supply From",
+        help="The location where the service is expected to be supplied from",
+        required=False,
+        tracking=True,
+    )
+
+    supply_to = fields.Char(
+        "Supply To",
+        help="The location where the service is expected to be supplied to",
+        required=False,
+        tracking=True,
+    )
+
+    supply_order_instructions = fields.Text(
+        "Instructions for the supplier",
+        help="Instructions for the supply order",
+        required=False,
+        tracking=True,
+    )
+
+    supply_quantity = fields.Float(
+        "Supply Quantity",
+        help="The quantity of the service to be supplied (e.g. distance in km)",
+        required=False,
+        tracking=True,
+    )
+
+    supply_mode = fields.Char(
+        "Supply Mode",
+        help="The mode of the supply (e.g. taxi, train, delivery, etc)",
+        required=False,
+        tracking=True,
+    )
+
     @api.depends("res_model", "res_id")  # , "is_unlinked")
     def _compute_resource_ref(self):
         for service in self:
@@ -255,6 +322,11 @@ class Service(models.Model):
             if not isRootService:
                 service.res_id = service.root_id.res_id
                 service.res_model = service.root_id.res_model
+
+    @api.depends("workflow_id.is_supply_order")
+    def _compute_is_supply_order(self):
+        for service in self:
+            service.is_supply_order = service.workflow_id.is_supply_order
 
     # inheriting classes can override this method to add their own dependencies, "resource_ref.display_name"
     @api.depends("res_model", "res_id")
@@ -642,13 +714,16 @@ class Service(models.Model):
         comment_subtype_id = self.env["ir.model.data"]._xmlid_to_res_id(
             "mail.mt_comment"
         )
-        return self.message_follower_ids.filtered(
+        recipients = self.message_follower_ids.filtered(
             lambda f: (
                 f.partner_id
                 and f.partner_id.active
                 and comment_subtype_id in f.subtype_ids.ids
             )
         ).mapped("partner_id")
+        if self.is_supply_order and self.supplier_partner_id:
+            recipients = recipients.union(self.supplier_partner_id)
+        return recipients
 
     def _compute_company_id(self):
         """Default company is the current user's company, unless overridden"""
@@ -660,3 +735,11 @@ class Service(models.Model):
         """Allow manual override of computed company"""
         # This is a flag method that allows the field to be written
         pass
+
+    def _compute_supply_date_formatted(self):
+        for record in self:
+            record.supply_date_formatted = (
+                record.supply_date.strftime(Service.DATE_FORMAT)
+                if record.supply_date
+                else ""
+            )

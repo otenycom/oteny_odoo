@@ -46,6 +46,13 @@ class RiverflowWorkflow(models.Model):
         "Display Name", compute="_compute_display_name", store=True, index=True
     )
 
+    is_supply_order = fields.Boolean(
+        "Is Supply Order",
+        help="If checked, this workflow is for a supply order, e.g a Taxi Order",
+        required=False,
+        tracking=True,
+    )
+
     _sql_constraints = [("name_uniq", "unique (name)", "Workflow name already exists!")]
 
     @api.depends("icon", "name")

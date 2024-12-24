@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.330",
+    "version": "18.0.1.331",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -27,6 +27,8 @@
         "views/res_config_settings_views.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
+        "data/riverflow_back_office_workflow.xml",
+        "data/riverflow_taxi_order_workflow.xml",
     ],
     "assets": {
         "web.assets_backend": [

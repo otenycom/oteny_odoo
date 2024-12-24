@@ -7,13 +7,33 @@
             <form string="Send Email">
                 <sheet>
                     <group>
-                        <field name="records_to_transition_ids" invisible="1" />
-                        <field name="transition_id" invisible="1" />
-                        <field name="email_template_id" options="{'no_create': False, 'no_open': False}" />
-                        <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" />
-                        <field name="subject_updatable" />
-                        <field name="res_id" invisible="1"></field>
-                        <field name="res_model" invisible="1"></field>
+                        <group string="Supply Order" invisible="not is_supply_order">
+                            <field name="supplier_partner_id" />
+                            <field name="supply_date" />
+                            <field name="supply_from" />
+                            <field name="supply_to" />
+                            <field name="supply_mode" invisible="1" />
+                            <field name="supply_order_instructions" />
+                        </group>
+                        <group string="Recipients">
+                            <!-- <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" /> -->
+                            <field name="supplier_email_formatted" />
+                            <field name="recipient_partner_ids" nolabel="1">
+                                <list>
+                                    <field name="name" string="Recipient" />
+                                    <field name="email" />
+                                </list>
+                            </field>
+                        </group>
+                        <group string="Email">
+                            <field name="email_template_id" options="{'no_create': False, 'no_open': False}" />
+                            <field name="subject_updatable" />
+                            <field name="res_id" invisible="1"></field>
+                            <field name="res_model" invisible="1"></field>
+                            <field name="is_supply_order" invisible="1" />
+                            <field name="records_to_transition_ids" invisible="1" />
+                            <field name="transition_id" invisible="1" />
+                        </group>
                     </group>
                     <notebook>
                         <page string="Message" name="message">

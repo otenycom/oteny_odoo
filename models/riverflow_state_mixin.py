@@ -205,6 +205,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
             json = {"states": []}
             is_first = True
+            is_last = False
 
             for state in state_ids:
                 if current_state_id:
@@ -222,6 +223,29 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                             "isSelected": is_current_state,
                         }
                     )
+
+            record.state_id_statusbar_json = json
+
+            # Check if last state has transition to another workflow
+            if not json["states"]:
+                continue
+
+            last_state = self.env["riverflow.state"].browse(json["states"][-1]["value"])
+            if not last_state.from_transition_ids:
+                continue
+
+            first_transition = last_state.from_transition_ids[0]
+            if first_transition.to_state_id.workflow_id != last_state.workflow_id:
+                # Add the target state to next workflow (e.g 'Registered' of 'Back office' workflow)
+                target_state = first_transition.to_state_id
+                json["states"].append(
+                    {
+                        "value": target_state.id,
+                        "label": target_state.name,
+                        "isFolded": target_state.hide_in_statusbar,
+                        "isSelected": False,
+                    }
+                )
 
             record.state_id_statusbar_json = json
 

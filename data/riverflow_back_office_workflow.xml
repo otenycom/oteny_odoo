@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<odoo noupdate="0">
+    <!-- Workflow -->
+    <record id="workflow_service_back_office" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Back-office</field>
+        <field name="description">Workflow for financial processing of services</field>
+        <field name="icon">fa-book</field>
+    </record>
+
+    <!-- States -->
+    <record id="back_office_state_registered" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_back_office" />
+        <field name="name">Registered</field>
+        <field name="sequence">10</field>
+        <field name="is_back_office_state">True</field>
+    </record>
+
+    <record id="back_office_state_booked" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_back_office" />
+        <field name="name">Booked</field>
+        <field name="sequence">20</field>
+        <field name="is_end_state">True</field>
+        <field name="is_back_office_state">True</field>
+    </record>
+
+    <!-- Transition from Registered to Booked -->
+    <record id="back_office_registered_to_booked" model="riverflow.transition">
+        <field name="name">Book</field>
+        <field name="description">Book the service, e.g. add it to a sales invoice</field>
+        <field name="from_state_id" ref="back_office_state_registered" />
+        <field name="to_state_id" ref="back_office_state_booked" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+
+</odoo>

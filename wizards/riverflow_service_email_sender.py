@@ -72,6 +72,61 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         store=True,
     )
 
+    is_supply_order = fields.Boolean(
+        "Is Supply Order",
+        help="If checked, the service is a supply order, e.g a Taxi Order",
+        required=False,
+    )
+
+    supplier_partner_id = fields.Many2one(
+        "res.partner",
+        string="Supplier",
+        help="The partner that is supplying the service",
+        required=False,
+    )
+
+    supplier_email_formatted = fields.Char(
+        "Supplier Email",
+        compute="_compute_supplier_email_formatted",
+        store=False,
+    )
+
+    supply_date = fields.Date(
+        "Supply Date",
+        help="The date the service is expected to be supplied",
+        required=False,
+    )
+
+    supply_from = fields.Char(
+        "Supply From",
+        help="The location where the service is expected to be supplied from",
+        required=False,
+    )
+
+    supply_to = fields.Char(
+        "Supply To",
+        help="The location where the service is expected to be supplied to",
+        required=False,
+    )
+
+    supply_order_instructions = fields.Text(
+        "Instructions for the supplier",
+        help="Instructions for the supply order",
+        required=False,
+    )
+
+    supply_quantity = fields.Float(
+        "Supply Quantity",
+        help="The quantity of the service to be supplied (e.g. distance in km)",
+        required=False,
+    )
+
+    supply_mode = fields.Char(
+        "Supply Mode",
+        help="The mode of the supply (e.g. taxi, train, delivery, etc)",
+        required=False,
+    )
+
     @api.depends("subject_rendered", "body_rendered", "subject", "body")
     def _compute_updatable_content(self):
         for wizard in self:
@@ -89,6 +144,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         # This method allows manual updates to body_updatable to persist
         pass
 
+    @api.depends("supplier_partner_id")
+    def _compute_supplier_email_formatted(self):
+        for wizard in self:
+            wizard.supplier_email_formatted = wizard.supplier_partner_id.email_formatted
+
     @api.depends("email_template_id")
     def _compute_attachment_ids(self):
         for wizard in self:
@@ -96,6 +156,10 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                 wizard.attachment_ids = wizard.email_template_id.attachment_ids
             else:
                 wizard.attachment_ids = False
+
+    def render(self):
+        self._compute_rendered_content()
+        self._compute_updatable_content()
 
     @api.depends("subject", "body", "records_to_transition_ids")
     def _compute_rendered_content(self):
@@ -155,9 +219,24 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if self.email_template_id:
             self.subject = self.email_template_id.subject
             self.body = self.email_template_id.body_html
-            # Force immediate UI update
-            self._compute_rendered_content()
-            self._compute_updatable_content()
+            self.render()
+
+    @api.onchange(
+        "supplier_partner_id",
+    )
+    def onchange_supply_fields(self):
+        self.render()
+
+    @api.onchange(
+        "supply_date",
+        "supply_from",
+        "supply_to",
+        "supply_order_instructions",
+        "supply_quantity",
+        "supply_mode",
+    )
+    def onchange_supply_fields(self):
+        self.render()
 
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
@@ -166,11 +245,24 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             log_entry_id = self.env["rivermen.log.entry"].browse(res_id)
         else:
             log_entry_id = None
-        return {
-            "service": service,
-            "log_entry": log_entry_id,
-            "company": service.company_id,
-        }
+
+        if self.is_supply_order:
+            write_vals = {}
+            self.update_write_values(service, write_vals)
+            service.write(write_vals)
+
+        if self.is_supply_order:
+            return {
+                "service": service,
+                "log_entry": log_entry_id,
+                "company": service.company_id,
+            }
+        else:
+            return {
+                "service": service,
+                "log_entry": log_entry_id,
+                "company": service.company_id,
+            }
 
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(
@@ -182,12 +274,26 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             subject = self.subject_updatable
             vals["name"] = subject
 
+        if self.is_supply_order:
+            vals["supplier_partner_id"] = self.supplier_partner_id.id
+            vals["supply_date"] = self.supply_date
+            vals["supply_from"] = self.supply_from
+            vals["supply_to"] = self.supply_to
+            vals["supply_mode"] = self.supply_mode
+            vals["supply_order_instructions"] = self.supply_order_instructions
+            vals["supply_quantity"] = self.supply_quantity
+
     def create_related_records(self, service):
         super(RiverflowServiceEmailSenderWizard, self).create_related_records(service)
         self._send_email(service)
 
     def _send_email(self, service):
-        if not self.recipient_partner_ids:
+        recipient_ids = self.recipient_partner_ids
+
+        if self.is_supply_order:
+            recipient_ids = recipient_ids.union(self.supplier_partner_id)
+
+        if not recipient_ids:
             raise UserError(_("Please select at least one recipient."))
 
         # Use updatable content for sending
@@ -204,7 +310,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         ]
 
         if allowed_domains:
-            invalid_recipients = self.recipient_partner_ids.filtered(
+            invalid_recipients = recipient_ids.filtered(
                 lambda partner: partner.email
                 and not any(
                     partner.email.lower().endswith(f"@{domain}")
@@ -220,7 +326,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                     )
                     % (
                         ", ".join(allowed_domains),
-                        ", ".join(invalid_recipients.mapped("name")),
+                        ", ".join(invalid_recipients.mapped("email_formatted")),
                     )
                 )
 
@@ -230,7 +336,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         ).message_post(
             message_type="email",
             subject=self.subject_updatable,
-            partner_ids=self.recipient_partner_ids.ids,
+            partner_ids=recipient_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=False,

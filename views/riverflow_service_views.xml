@@ -83,6 +83,17 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
+                            <group>
+                                <field name="supplier_partner_id" />
+                                <field name="supply_date" />
+                                <field name="supply_from" />
+                                <field name="supply_to" />
+                                <field name="supply_mode" />
+                                <field name="supply_order_instructions" />
+                                <field name="supply_quantity" />
+                            </group>
+                        </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages">
                             <group>
                                 <group>
@@ -121,11 +132,14 @@
                         </page>
                         <page string="Template Settings" name="template_settings" invisible="not is_root_a_template and not email_template_id">
                             <group>
-                                <group>
+                                <group string="Email Settings">
                                     <field name="email_template_id" />
                                     <field name="add_operator_as_recipient" />
                                 </group>
-                                <group groups="base.group_no_one">
+                                <group string="Supply Order Settings">
+                                    <field name="is_supply_order" />
+                                </group>
+                                <group string="Template Settings">
                                     <field name="is_root_a_template" />
                                     <field name="is_this_a_template" />
                                 </group>
@@ -133,8 +147,8 @@
                         </page>
                         <page string="Workflow Override" name="workflow" groups="base.group_no_one">
                             <group>
-                                <field name="workflow_id" on_change="1" />
-                                <field name="state_id" on_change="1" />
+                                <field name="workflow_id" on_change="1" options="{'no_create': True}" />
+                                <field name="state_id" on_change="1" options="{'no_create': True}" />
                             </group>
                         </page>
                     </notebook>
