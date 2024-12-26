@@ -34,6 +34,10 @@
                             <field name="records_to_transition_ids" invisible="1" />
                             <field name="transition_id" invisible="1" />
                         </group>
+                        <group string="Sender">
+                            <field name="responsible_team_id" required="1" invisible="responsible_team_id_invisible" />
+                            <field name="responsible_team_id_invisible" invisible="1" />
+                        </group>
                     </group>
                     <notebook>
                         <page string="Message" name="message">

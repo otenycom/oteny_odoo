@@ -48,12 +48,6 @@
                             <field name="parent_id" on_change="1" can_create="False"
                                 can_write="True" invisible="1" />
                             <field name="active" invisible="1" />
-                            <field name="use_project_deadline_from" required="1" />
-                            <field name="project_deadline" invisible="use_project_deadline_from != 'self'" on_change="1" />
-                            <field name="related_project_deadline" invisible="use_project_deadline_from != 'root'" />
-                            <field name="days_relative_to_project" invisible="use_project_deadline_from == 'self'"
-                                on_change="1" />
-                            <field name="deadline" readonly="1" />
                             <field name="timing_json" widget="timing_widget" />
                         </group>
                     </group>
@@ -83,6 +77,18 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Date Details" name="date_details">
+                            <group>
+                                <field name="is_days_relative_to_project_applicable" invisible="1" />
+                                <field name="use_project_deadline_from" required="1" on_change="1" />
+                                <field name="project_deadline" string="Deadline" invisible="is_days_relative_to_project_applicable" on_change="1" />
+                                <field name="related_project_deadline" invisible="not is_days_relative_to_project_applicable" />
+                                <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
+                                    on_change="1" />
+                                <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable" />
+                            </group>
+                        </page>
+
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
                             <group>
                                 <field name="supplier_partner_id" />
@@ -178,6 +184,7 @@
                 <field name="unreviewed_message_count" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                     readonly="1" />
+                <field name="front_office_workflow_id" optional="hide" />
 
                 <!-- Uncomment to see how the padding and margin styles are applied -->
                 <!-- <button name='action_button_click' type='object' string='Server'

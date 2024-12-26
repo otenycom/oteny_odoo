@@ -3,29 +3,41 @@ from odoo import fields, models, api
 
 class RiverflowTeam(models.Model):
     _name = "riverflow.team"
-    # mail.thread is needed for the change tracking to work
-    _inherit = ["mail.thread", "avatar.mixin"]
+    _inherits = {"res.partner": "partner_id"}
     _description = "Team"
     _order = "name"
+    _inherit = ["mail.thread", "avatar.mixin"]
 
-    name = fields.Char(
-        "Team Name",
-        store=True,
+    # Link to the partner record that stores the team's contact information
+    partner_id = fields.Many2one(
+        "res.partner",
         required=True,
-        tracking=True,
+        ondelete="restrict",
+        auto_join=True,
+        string="Related Partner",
+        help="Partner record storing the team's contact information",
     )
-    active = fields.Boolean("Active", tracking=True, default=True)
-    color = fields.Char("Color", default="#FFA500")  # Fresh orange color
+
+    # Team-specific fields
     discuss_channel_id = fields.Many2one(
         "discuss.channel",
         "Discuss Channel",
         required=False,
         help="This channel is used to alert the team of new unreviewed external messages.",
     )
-    company_id = fields.Many2one(
-        "res.company",
-        "Company",
-        default=lambda self: self.env.company,
-        required=True,
-        help="The company that this team is associated with.",
-    )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Ensure partner is created as a company"""
+        for vals in vals_list:
+            vals["is_company"] = True
+        return super().create(vals_list)
+
+    def action_related_contact(self):
+        return {
+            "type": "ir.actions.act_window",
+            "res_model": "res.partner",
+            "res_id": self.partner_id.id,
+            "view_mode": "form",
+            "target": "main",
+        }

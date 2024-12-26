@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_service_register_form" model="ir.ui.view">
+        <field name="name">riverflow.service.register.wizard.form</field>
+        <field name="model">riverflow.service.register.wizard</field>
+        <field name="inherit_id" ref="riverflow.view_service_transition_action_default_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <div class="alert alert-warning" role="alert" invisible="not supply_quantity_required or supply_quantity != 0.0">
+                    A non-zero quantity is required for this service.
+                </div>
+
+                <field name="supply_quantity" invisible="supply_quantity_invisible" required="supply_quantity_required" />
+                <field name="supply_quantity_invisible" invisible="1" />
+                <field name="supply_quantity_required" invisible="1" />
+            </xpath>
+        </field>
+    </record>
+</odoo> 

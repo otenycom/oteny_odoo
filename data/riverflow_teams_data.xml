@@ -1,32 +1,37 @@
 <?xml version="1.0"?>
 <odoo noupdate="0">
     <record id="team_logistics" model="riverflow.team">
-        <field name="name">Logistics</field>
-        <field name="color">#4CAF50</field>
+        <field name="name">Operations Team</field>
         <field name="company_id" ref="base.main_company" />
+        <field name="email">operations@vriend.com</field>
+        <field name="phone">+31 6 55 55 55 51</field>
     </record>
 
     <record id="team_planning" model="riverflow.team">
-        <field name="name">Planning</field>
-        <field name="color">#2196F3</field>
+        <field name="name">Planning Team</field>
+        <field name="email">planning@vriend.com</field>
+        <field name="phone">+31 6 55 55 55 52</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
     <record id="team_finance" model="riverflow.team">
-        <field name="name">Finance</field>
-        <field name="color">#FFC107</field>
+        <field name="name">Finance Team</field>
+        <field name="email">finance@vriend.com</field>
+        <field name="phone">+31 6 55 55 55 53</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
     <record id="team_sales" model="riverflow.team">
-        <field name="name">Sales</field>
-        <field name="color">#FF5722</field>
+        <field name="name">Sales Team</field>
+        <field name="email">sales@vriend.com</field>
+        <field name="phone">+31 6 55 55 55 54</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
     <record id="team_recruitment" model="riverflow.team">
-        <field name="name">Recruitment</field>
-        <field name="color">#9C27B0</field>
+        <field name="name">Recruitment Team</field>
+        <field name="email">recruitment@vriend.com</field>
+        <field name="phone">+31 6 55 55 55 55</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 </odoo>

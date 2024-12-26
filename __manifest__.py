@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.331",
+    "version": "18.0.1.332",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -16,6 +16,8 @@
         "wizards/riverflow_service_wizard_view.xml",
         "wizards/riverflow_start_service_view.xml",
         "wizards/riverflow_service_email_sender_view.xml",
+        "wizards/riverflow_service_register_wizard_view.xml",
+        "wizards/riverflow_supplier_confirmed_view.xml",
         "views/riverflow_service_views.xml",
         "views/riverflow_workflow_views.xml",
         "views/riverflow_state_views.xml",

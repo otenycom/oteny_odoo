@@ -51,6 +51,13 @@ class RiverflowTransition(models.Model):
         store=True,
     )
 
+    to_responsible_team_id = fields.Many2one(
+        "riverflow.team",
+        "Assign to Responsible Team",
+        help="Team to assign the service to",
+        required=False,
+    )
+
     @api.depends("workflow_id")
     def _compute_workflow_name(self):
         for transition in self:

@@ -26,6 +26,7 @@
                             <field name="from_state_id" invisible="context.get('is_start_transition', False)" />
                             <field name="to_state_id" />
                             <field name="action_id" required="1" />
+                            <field name="to_responsible_team_id" />
                             <field name="action_context" />
                         </group>
                     </group>
@@ -53,6 +54,8 @@
                 <field name="from_state_id" />
                 <field name="to_state_id" />
                 <field name="action_id" />
+                <field name="to_responsible_team_id" optional="hide" />
+                <field name="action_context" optional="hide" />
                 <field name="description" />
             </list>
         </field>

@@ -222,18 +222,14 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.render()
 
     @api.onchange(
-        "supplier_partner_id",
-    )
-    def onchange_supply_fields(self):
-        self.render()
-
-    @api.onchange(
         "supply_date",
         "supply_from",
         "supply_to",
         "supply_order_instructions",
         "supply_quantity",
         "supply_mode",
+        "responsible_team_id",
+        "supplier_partner_id",
     )
     def onchange_supply_fields(self):
         self.render()
@@ -282,6 +278,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             vals["supply_mode"] = self.supply_mode
             vals["supply_order_instructions"] = self.supply_order_instructions
             vals["supply_quantity"] = self.supply_quantity
+            # deadline is set today to await the confirmation of the supplier
+            vals["use_project_deadline_from"] = "self"
+            vals["project_deadline"] = fields.Date.context_today(self)
 
     def create_related_records(self, service):
         super(RiverflowServiceEmailSenderWizard, self).create_related_records(service)

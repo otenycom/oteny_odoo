@@ -7,7 +7,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     _name = "riverflow.state.mixin"
     _description = "Mixin to support workflow state in any model"
 
-    # initial workflow. Not a computed field, so it can be set in the form view
+    # Current workflow. Not a computed field, so it can be set in the form view
     # and the user can then select the state. If state is change later in write/create, we keep
     # the workflow_id as it was set initially, so it represents the front office workflow/work status
     workflow_id = fields.Many2one(
@@ -16,6 +16,15 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         string="Workflow",
         tracking=True,
         index=True,
+    )
+
+    front_office_workflow_id = fields.Many2one(
+        "riverflow.workflow",
+        domain="[('model', '=', model)]",
+        string="Front Office Workflow",
+        help="Used to remember the front office workflow, once the state is set to a back office workflow. The front office workflow is used to flag if the service is a supply order.",
+        compute="_compute_front_office_workflow_id",
+        store=True,
     )
 
     state_id = fields.Many2one(
@@ -308,3 +317,15 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             else:
                 # start transitions are not end states
                 record.is_end_state = len(record.from_transition_ids) == 0
+
+    @api.depends("state_id", "workflow_id")
+    def _compute_front_office_workflow_id(self):
+        for record in self:
+            has_front_office_workflow = (
+                record.state_id and not record.state_id.is_back_office_state
+            )
+            if has_front_office_workflow:
+                record.front_office_workflow_id = record.state_id.workflow_id
+            else:
+                # Odoo requires compute methods to set the field, or else it will disable the compute
+                record.front_office_workflow_id = record.front_office_workflow_id

@@ -1,8 +1,5 @@
 from odoo import models, fields, api, _, Command
 from odoo.exceptions import UserError, ValidationError
-import logging
-
-_logger = logging.getLogger(__name__)
 
 
 class TransitionWizard(models.AbstractModel):
@@ -15,6 +12,7 @@ class TransitionWizard(models.AbstractModel):
     transition_description = fields.Text(
         "Description", compute="_compute_transition_description"
     )
+    transition_description_invisible = fields.Boolean()
 
     # in each derived class, define the records_to_transition_ids field to be of the correct co-model
     records_to_transition_ids = fields.Many2many(
@@ -22,8 +20,8 @@ class TransitionWizard(models.AbstractModel):
     )  # to be overridden
     responsible_team_id = fields.Many2one(
         "riverflow.team",
-        string="Responsible Team",
-        help="Team executing the workflow of this record.",
+        string="Assign to Team",
+        help="Team responsible for the next step of the workflow",
     )
     responsible_team_id_invisible = fields.Boolean()
     new_note = fields.Text(string="Internal Note")
@@ -36,6 +34,11 @@ class TransitionWizard(models.AbstractModel):
         transition_id = self.env.context.get("transition_id")
         transition_id = self.env["riverflow.transition"].browse(transition_id)
         defaultValues["transition_id"] = transition_id.id
+
+        if transition_id.to_responsible_team_id:
+            defaultValues["responsible_team_id"] = (
+                transition_id.to_responsible_team_id.id
+            )
 
         records_to_transition = self.env[self._workflow_model]
         records_to_transition_ids = []
@@ -73,7 +76,7 @@ class TransitionWizard(models.AbstractModel):
             transition = wizard.transition_id
 
             if not transition:
-                raise exceptions.ValidationError("Workflow Transition not specified")
+                raise ValidationError("Workflow Transition not specified")
 
             recordsToTransition = wizard.records_to_transition_ids
 

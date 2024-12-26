@@ -11,6 +11,9 @@ class ServiceWizard(models.TransientModel):
 
     # from service record
     name = fields.Char("Service Name")
+    name_invisible = fields.Boolean()
+
+    days_relative_to_project_invisible = fields.Boolean()
     use_project_deadline_from = fields.Selection(
         [
             ("self", "Self"),
@@ -60,9 +63,13 @@ class ServiceWizard(models.TransientModel):
 
     def get_visibility_defaults(self, transition_id):
         visibility_defaults = super().get_visibility_defaults(transition_id)
-        is_end_state = transition_id.to_state_id.is_end_state
-        visibility_defaults["project_deadline_invisible"] = is_end_state
-        visibility_defaults["use_project_deadline_from_invisible"] = is_end_state
-        visibility_defaults["days_relative_to_project_invisible"] = is_end_state
+        # todo: consider a computed field 'hide_timing_fields' in the state and/or transition to hide the fields
+        hide_timing_fields = (
+            transition_id.to_state_id.is_end_state
+            or transition_id.to_state_id.is_back_office_state
+        )
+        visibility_defaults["project_deadline_invisible"] = hide_timing_fields
+        visibility_defaults["use_project_deadline_from_invisible"] = hide_timing_fields
+        visibility_defaults["days_relative_to_project_invisible"] = hide_timing_fields
 
         return visibility_defaults

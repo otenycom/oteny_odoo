@@ -128,6 +128,13 @@ class Service(models.Model):
         default="self",
     )
 
+    is_days_relative_to_project_applicable = fields.Boolean(
+        "Use relative days",
+        compute="_compute_is_days_relative_to_project_applicable",
+        help="Whether this service should use relative days to calculate its deadline",
+        store=True,
+    )
+
     # This field is either set manually (if use_project_deadline_from is set to 'self')
     # or it is set to the project_deadline of the root service, or some other related entity in an inherited class
     project_deadline = fields.Date(
@@ -230,7 +237,7 @@ class Service(models.Model):
     # we take this flag from the workflow, computed field
     is_supply_order = fields.Boolean(
         "Is Supply Order",
-        help="If checked, the service is a supply order, e.g a Taxi Order",
+        help="Enables data entry for supply order details, such as supplier and supply date. For example, a Taxi Order. This flag is taken from the workflow.",
         required=False,
         tracking=True,
         compute="_compute_is_supply_order",
@@ -274,7 +281,7 @@ class Service(models.Model):
 
     supply_order_instructions = fields.Text(
         "Instructions for the supplier",
-        help="Instructions for the supply order",
+        help="E.g. what to supply, extra information, etc",
         required=False,
         tracking=True,
     )
@@ -323,10 +330,10 @@ class Service(models.Model):
                 service.res_id = service.root_id.res_id
                 service.res_model = service.root_id.res_model
 
-    @api.depends("workflow_id.is_supply_order")
+    @api.depends("front_office_workflow_id.is_supply_order")
     def _compute_is_supply_order(self):
         for service in self:
-            service.is_supply_order = service.workflow_id.is_supply_order
+            service.is_supply_order = service.front_office_workflow_id.is_supply_order
 
     # inheriting classes can override this method to add their own dependencies, "resource_ref.display_name"
     @api.depends("res_model", "res_id")
@@ -428,28 +435,39 @@ class Service(models.Model):
         # this is a flag method specifying the user is allowed to store the project_deadline
         pass
 
+    @api.depends("use_project_deadline_from", "root_id")
+    def _compute_is_days_relative_to_project_applicable(self):
+        for service in self:
+            service.is_days_relative_to_project_applicable = (
+                service.use_project_deadline_from != "self"
+                and not (
+                    service.use_project_deadline_from == "root"
+                    and service.root_id.ids == service.ids
+                )
+            )
+
     @api.depends(
-        "project_deadline", "days_relative_to_project", "use_project_deadline_from"
+        "project_deadline",
+        "days_relative_to_project",
+        "use_project_deadline_from",
+        "is_days_relative_to_project_applicable",
     )
     def _compute_deadline(self):
         for service in self:
-            project_deadline = self.project_deadline
-            if not project_deadline:
+            if not service.project_deadline:
                 service.deadline = False
-            else:
-                service.deadline = project_deadline + timedelta(
+            elif service.is_days_relative_to_project_applicable:
+                service.deadline = self.project_deadline + timedelta(
                     days=service.days_relative_to_project
                 )
+            else:
+                service.deadline = service.project_deadline
 
     @api.depends("deadline")
     def _compute_timing_json(self):
         for service in self:
             relative_days = ""
-            if (
-                service.use_project_deadline_from != "self"
-                and service.days_relative_to_project
-            ):
-
+            if service.is_days_relative_to_project_applicable:
                 relative_days = f"{self.relative_to_project_days_prefix()}{service.days_relative_to_project:+02d}d"
 
             if not service.deadline:

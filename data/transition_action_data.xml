@@ -5,7 +5,6 @@
         <field name="description">Optionally prompts for new remark</field>
         <field name="odoo_view">view_service_transition_action_default_form</field>
         <field name="model_id" ref="riverflow.model_riverflow_service" />
-        <!-- <field name="icon" /> -->
     </record>
 
     <record id="transition_action_email_sender" model="riverflow.transition.action">
@@ -13,6 +12,19 @@
         <field name="description">Sends an email related to the service</field>
         <field name="odoo_view">view_service_email_sender_form</field>
         <field name="model_id" ref="riverflow.model_riverflow_service" />
-        <!-- <field name="icon" /> -->
+    </record>
+
+    <record id="transition_action_supplier_confirmed" model="riverflow.transition.action">
+        <field name="name">Supplier Confirmed</field>
+        <field name="description">Supplier Confirmation Received</field>
+        <field name="odoo_view">view_supplier_confirmed_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_register_service" model="riverflow.transition.action">
+        <field name="name">Register Service</field>
+        <field name="description">Hand over the service to back-office</field>
+        <field name="odoo_view">view_service_register_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
     </record>
 </odoo>

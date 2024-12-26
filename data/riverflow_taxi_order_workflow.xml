@@ -78,7 +78,7 @@
         <field name="name">Confirmed by Supplier</field>
         <field name="from_state_id" ref="state_taxi_not_started" />
         <field name="to_state_id" ref="state_taxi_confirmed" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="action_id" ref="riverflow.transition_action_supplier_confirmed" />
         <field name="icon">fa-check</field>
         <field name="sequence">30</field>
     </record>
@@ -97,7 +97,7 @@
         <field name="name">Confirmed</field>
         <field name="from_state_id" ref="state_taxi_ordered" />
         <field name="to_state_id" ref="state_taxi_confirmed" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="action_id" ref="riverflow.transition_action_supplier_confirmed" />
         <field name="icon">fa-check</field>
         <field name="sequence">10</field>
     </record>
@@ -106,9 +106,11 @@
         <field name="name">Register</field>
         <field name="from_state_id" ref="state_taxi_ordered" />
         <field name="to_state_id" ref="riverflow.back_office_state_registered" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="icon">fa-book</field>
         <field name="sequence">20</field>
+        <field name="to_responsible_team_id" ref="riverflow.team_finance" />
+        <field name="action_context">{ "default_supply_quantity_required": True }</field>
     </record>
 
     <record id="trans_taxi_ordered_to_ordered" model="riverflow.transition">
@@ -134,8 +136,10 @@
         <field name="name">Register</field>
         <field name="from_state_id" ref="state_taxi_confirmed" />
         <field name="to_state_id" ref="riverflow.back_office_state_registered" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
+        <field name="to_responsible_team_id" ref="riverflow.team_finance" />
+        <field name="action_context">{ "default_supply_quantity_required": True }</field>
     </record>
 
     <record id="trans_taxi_confirmed_to_ordered" model="riverflow.transition">

@@ -5,7 +5,8 @@
         <field name="inherit_id" ref="riverflow.view_transition_wizard_form" />
         <field name="arch" type="xml">
             <xpath expr="//field[@name='transition_id']" position="after">
-                <field name="name" required="1" />
+                <field name="name" required="1" invisible="name_invisible" />
+                <field name="name_invisible" invisible="1" />
                 <field name="use_project_deadline_from" required="1" invisible="use_project_deadline_from_invisible" />
                 <field name="use_project_deadline_from_invisible" invisible="1" />
                 <field name="project_deadline" invisible="use_project_deadline_from != 'self' or use_project_deadline_from_invisible" />
