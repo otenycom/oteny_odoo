@@ -50,7 +50,7 @@ class AutoAddService(models.Model):
     service_use_project_deadline_from = fields.Selection(
         [
             ("self", "Self"),
-            ("root", "Root Service"),
+            ("root", "Top-level service"),
         ],
         string="Deadline From",
         required=True,

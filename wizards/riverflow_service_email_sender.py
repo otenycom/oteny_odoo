@@ -177,7 +177,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             # Render subject
             wizard.subject_rendered = wizard._render_template(
-                wizard.subject or "",
+                wizard.subject or self.email_template_id.subject,
                 "riverflow.service",
                 [service.id],
                 engine="inline_template",
@@ -186,7 +186,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             # Render body
             wizard.body_rendered = wizard._render_template(
-                wizard.body,
+                wizard.body or self.email_template_id.body_html,
                 "riverflow.service",
                 [service.id],
                 engine="qweb",
@@ -340,4 +340,5 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=False,
             email_layout_xmlid=self.email_template_id.email_layout_xmlid,
+            attachment_ids=[Command.set(self.attachment_ids.ids)],
         )

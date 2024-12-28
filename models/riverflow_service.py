@@ -51,7 +51,7 @@ class Service(models.Model):
     is_this_a_template = fields.Boolean(
         string="Is This a Template",
         default=False,
-        help="Applies to root services only. If checked, this service and its descendants will be used as a template for creating new services",
+        help="Applies to Top-level services only. If checked, this service and its descendants will be used as a template for creating new services",
     )
     is_root_a_template = fields.Boolean(
         string="Is Root a Template",
@@ -78,9 +78,9 @@ class Service(models.Model):
         "riverflow.service", compute="_compute_root_id", store=True, recursive=True
     )
     root_name = fields.Char(
-        "Root service name",
+        "Top-level service name",
         compute="_compute_root_name",
-        help="Name of the root node, for sorting the list of services",
+        help="Name of the top-level service, for sorting the list of services",
         store=True,
         index=True,
         recursive=True,
@@ -120,12 +120,16 @@ class Service(models.Model):
     use_project_deadline_from = fields.Selection(
         [
             ("self", "Self"),
-            ("root", "Root Service"),
+            ("root", "Top-level service"),
         ],
         string="Deadline From",
         required=True,
         tracking=True,
         default="self",
+    )
+
+    use_project_deadline_from_options = fields.Json(
+        compute="_compute_use_project_deadline_from_options"
     )
 
     is_days_relative_to_project_applicable = fields.Boolean(
@@ -146,10 +150,10 @@ class Service(models.Model):
         store=True,
         recursive=True,
     )
-    related_project_deadline = fields.Date(
-        "Related deadline",
+    root_service_deadline = fields.Date(
+        "Top-level service deadline",
         related="root_id.deadline",
-        help="Deadline of the project at the root of the tree",
+        help="Deadline of the top-level parent of this service",
         store=False,
         index=True,
         recursive=True,
@@ -208,7 +212,7 @@ class Service(models.Model):
         compute="_compute_res_id_computed",
         store=False,
         recursive=True,
-        help="Syncs the service's subject reference (ref_id) with the root service. All decendending services reference the same subject.",
+        help="Syncs the service's subject reference (ref_id) with the Top-level service. All decendending services reference the same subject.",
     )
     res_name = fields.Char(
         string="Subject of Service",
@@ -468,7 +472,7 @@ class Service(models.Model):
         for service in self:
             relative_days = ""
             if service.is_days_relative_to_project_applicable:
-                relative_days = f"{self.relative_to_project_days_prefix()}{service.days_relative_to_project:+02d}d"
+                relative_days = f"{self.relative_to_project_days_prefix()} {'+' if service.days_relative_to_project >= 0 else '-'} {abs(service.days_relative_to_project)}d"
 
             if not service.deadline:
                 date_str = ""
@@ -496,7 +500,7 @@ class Service(models.Model):
         if self.use_project_deadline_from == "self":
             return ""
         elif self.use_project_deadline_from == "root":
-            return self.root_name
+            return f"Root ({self.root_id.name})"
         else:
             return "(unknown: use_project_deadline_from)"
 
@@ -651,7 +655,7 @@ class Service(models.Model):
             "context": {
                 "default_parent_id": self.id,
                 "default_company_id": self.company_id.id,
-                "default_use_project_deadline_from": "root",
+                "default_use_project_deadline_from": "self",
                 "default_res_model": self.res_model,
                 "default_res_id": self.res_id,
             },
@@ -760,4 +764,31 @@ class Service(models.Model):
                 record.supply_date.strftime(Service.DATE_FORMAT)
                 if record.supply_date
                 else ""
+            )
+
+    @api.model
+    def calculate_use_project_deadline_from_options_for_new_service(
+        self, parent_id, res_model, res_id
+    ):
+        """Calculate deadline options for a new service being created
+        Used by both the start transition wizard and existing services to determine available options
+        """
+        options = [("self", "Self")]
+        if parent_id:
+            options.append(("root", "Top-level service"))
+
+        return list(dict(options))
+
+    def _compute_use_project_deadline_from_options(self):
+        """Calculate deadline options for existing services"""
+        for service in self:
+            # Convert current service state into parameters for the model method
+            parent_id = service.parent_id
+            res_model = service.res_model
+            res_id = service.res_id
+
+            service.use_project_deadline_from_options = (
+                self.calculate_use_project_deadline_from_options_for_new_service(
+                    parent_id, res_model, res_id
+                )
             )

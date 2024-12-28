@@ -17,12 +17,14 @@ class ServiceWizard(models.TransientModel):
     use_project_deadline_from = fields.Selection(
         [
             ("self", "Self"),
-            ("root", "Root Service"),
+            ("root", "Top-level service"),
         ],
         string="Deadline From",
         required=False,
     )
     use_project_deadline_from_invisible = fields.Boolean()
+    use_project_deadline_from_options = fields.Json()
+
     project_deadline = fields.Date(
         "Project deadline",
         help="The services are timed relative to this deadline",
@@ -40,6 +42,31 @@ class ServiceWizard(models.TransientModel):
 
     tag_ids = fields.Many2many("riverflow.service.tag", string="Tags")
     tag_ids_invisible = fields.Boolean()
+
+    def default_get_using_records(self, defaultValues, records_to_transition):
+        super().default_get_using_records(defaultValues, records_to_transition)
+        if len(records_to_transition) == 0:
+            ctx = self.env.context
+            parent_id = self.env["riverflow.service"].browse(
+                ctx.get("default_parent_id", 0)
+            )
+            res_model = ctx.get("default_res_model", False)
+            res_id = ctx.get("default_res_id", 0)
+            use_project_deadline_from_options = self.env[
+                "riverflow.service"
+            ].calculate_use_project_deadline_from_options_for_new_service(
+                parent_id, res_model, res_id
+            )
+            defaultValues["use_project_deadline_from_options"] = (
+                use_project_deadline_from_options
+            )
+
+        else:
+            # This is not a stored field, so it is not in the defaultValues
+            # but it is needed for the filterable_selection widget
+            defaultValues["use_project_deadline_from_options"] = records_to_transition[
+                0
+            ].use_project_deadline_from_options
 
     def update_write_values(self, service, vals):
         super().update_write_values(service, vals)
