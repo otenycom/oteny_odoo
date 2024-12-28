@@ -500,7 +500,7 @@ class Service(models.Model):
         if self.use_project_deadline_from == "self":
             return ""
         elif self.use_project_deadline_from == "root":
-            return f"Root ({self.root_id.name})"
+            return f"Top-level service"
         else:
             return "(unknown: use_project_deadline_from)"
 
