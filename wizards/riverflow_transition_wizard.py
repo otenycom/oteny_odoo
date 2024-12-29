@@ -152,18 +152,11 @@ class TransitionWizard(models.AbstractModel):
     @api.depends("transition_id")
     def _compute_transition_description(self):
         for wizard in self:
-            if wizard.transition_id.from_state_id:
-                wizard.transition_description = (
-                    wizard.transition_id.from_state_id.name
-                    + " → "
-                    + wizard.transition_id.to_state_id.name
-                )
-            else:  # start transition
-                wizard.transition_description = wizard.transition_id.to_state_id.name
+            description = ""
             if wizard.transition_id.description:
-                wizard.transition_description += (
-                    f" | {wizard.transition_id.description}"
-                )
+                description = wizard.transition_id.description
+
+            wizard.transition_description = description
 
     def default_get_using_records(self, defaultValues, records_to_transition):
         pass

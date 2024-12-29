@@ -11,7 +11,7 @@
         <t t-if="this.useFullListLayout()">
             <div class="transition-selection-group full-list-layout">
                 <t t-if="this.buttonDefs().some(button => button.is_template)">
-                    <h3>Templates</h3>
+                    <h3>Select one or more service templates</h3>
 
                     <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
                         <t t-if="button.is_template">
@@ -34,12 +34,12 @@
                         </t>
                     </t>
                     <br />
-                    <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Use Selected Templates</button>
+                    <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
                     <br />
                 </t>
                 <t t-if="this.buttonDefs().some(button => !button.is_template)">
                     <t t-if="this.buttonDefs().some(button => button.is_template)">
-                        <h3>Or start with a blank service</h3>
+                        <h3>Or click an item below to create a blank service</h3>
                     </t>
                     <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
                         <t t-if="!button.is_template">

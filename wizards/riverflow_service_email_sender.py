@@ -127,6 +127,13 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         required=False,
     )
 
+    def get_visibility_defaults(self, transition_id):
+        # normally the responsible team is hidden for end-states, but here it is visible
+        # because we use it as the sender of the email
+        default_values = super().get_visibility_defaults(transition_id)
+        default_values["responsible_team_id_invisible"] = False
+        return default_values
+
     @api.depends("subject_rendered", "body_rendered", "subject", "body")
     def _compute_updatable_content(self):
         for wizard in self:
@@ -318,7 +325,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             )
 
             if invalid_recipients:
-                raise UserError(
+                raise ValueError(
                     _(
                         "Email sending is restricted to specific domains (%s). "
                         "The following recipients have invalid email domains: %s"
@@ -328,6 +335,12 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                         ", ".join(invalid_recipients.mapped("email_formatted")),
                     )
                 )
+
+        if not self.subject_updatable:
+            raise ValueError(_("Subject is required"))
+
+        if not self.body_updatable:
+            raise ValueError(_("Body is required"))
 
         # Post the message, add followers to the chatter, and don't subscribe them to the chatter
         service.with_context(
@@ -340,5 +353,5 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=False,
             email_layout_xmlid=self.email_template_id.email_layout_xmlid,
-            attachment_ids=[Command.set(self.attachment_ids.ids)],
+            attachment_ids=self.attachment_ids.ids,
         )

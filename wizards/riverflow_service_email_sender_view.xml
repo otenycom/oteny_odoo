@@ -16,8 +16,7 @@
                             <field name="supply_order_instructions" />
                         </group>
                         <group string="Recipients">
-                            <!-- <field name="recipient_partner_ids" widget="many2many_tags" options="{'no_create': True}" /> -->
-                            <field name="supplier_email_formatted" />
+                            <field name="supplier_email_formatted" invisible="not is_supply_order" />
                             <field name="recipient_partner_ids" nolabel="1">
                                 <list>
                                     <field name="name" string="Recipient" />
@@ -26,27 +25,29 @@
                             </field>
                         </group>
                         <group string="Email">
+                            <field name="responsible_team_id" string="Sender Team" required="1" invisible="responsible_team_id_invisible" />
+                            <field name="responsible_team_id_invisible" invisible="1" />
                             <field name="email_template_id" options="{'no_create': False, 'no_open': False}" />
-                            <field name="subject_updatable" />
                             <field name="res_id" invisible="1"></field>
                             <field name="res_model" invisible="1"></field>
                             <field name="is_supply_order" invisible="1" />
                             <field name="records_to_transition_ids" invisible="1" />
                             <field name="transition_id" invisible="1" />
                         </group>
-                        <group string="Sender">
-                            <field name="responsible_team_id" required="1" invisible="responsible_team_id_invisible" />
-                            <field name="responsible_team_id_invisible" invisible="1" />
-                        </group>
+                        <!-- <group string="Sender">
+                        </group> -->
+                    </group>
+                    <group colspan="2">
+                        <field name="subject_updatable" required="1" />
                     </group>
                     <notebook>
                         <page string="Message" name="message">
-                            <field name="body_updatable" widget="html" options="{'style-inline': true}" />
+                            <field name="body_updatable" widget="html" options="{'style-inline': true}" required="1" />
                             <field name="attachment_ids" widget="many2many_binary" />
                         </page>
                         <page string="Template" name="template" groups="base.group_no_one">
                             <group>
-                                <field name="subject" required="1" />
+                                <field name="subject" />
                             </group>
                             <field name="body" widget="html" options="{'style-inline': true, 'codeview': true, 'dynamic_placeholder': true}" />
                         </page>

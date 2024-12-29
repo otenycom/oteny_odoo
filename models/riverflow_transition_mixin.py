@@ -50,9 +50,12 @@ class RiverflowTransitionMixin(models.AbstractModel):
         view = self.sudo().env.ref(odoo_view)
         res_model = view.model
 
+        title = transition.workflow_name
+        if transition.from_state_id:
+            title += f" | {transition.name}"
         action = {
             "type": "ir.actions.act_window",
-            "name": f"{transition.name}",
+            "name": title,
             "res_model": res_model,
             "view_mode": "form",
             "views": [(view.id, "form")],

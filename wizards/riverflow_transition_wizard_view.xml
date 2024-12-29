@@ -10,9 +10,9 @@
                         <field name="transition_description_invisible" invisible="1" />
                         <field name="records_to_transition_ids" invisible="1" />
                         <field name="transition_id" invisible="1" />
-
                         <field name="responsible_team_id" required="1" invisible="responsible_team_id_invisible" />
                         <field name="responsible_team_id_invisible" invisible="1" />
+
                         <field name="new_note" required="0" invisible="new_note_invisible" widget="html" />
                         <field name="new_note_invisible" invisible="1" />
                     </group>

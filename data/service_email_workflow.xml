@@ -37,14 +37,6 @@
         <field name="sequence">10</field>
     </record>
 
-    <record id="trans_se_2" model="riverflow.transition">
-        <field name="name">Now</field>
-        <field name="from_state_id" ref="" />
-        <field name="to_state_id" ref="state_service_se_sent" />
-        <field name="action_id" ref="riverflow.transition_action_email_sender" />
-        <field name="sequence">20</field>
-    </record>
-
     <record id="trans_se_3" model="riverflow.transition">
         <field name="name">Send Email</field>
         <field name="from_state_id" ref="state_service_se_not_started" />

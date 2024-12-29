@@ -2,7 +2,7 @@
 <odoo noupdate="0">
     <record id="transition_action_default" model="riverflow.transition.action">
         <field name="name">Default Transition Action</field>
-        <field name="description">Optionally prompts for new remark</field>
+        <field name="description"></field>
         <field name="odoo_view">view_service_transition_action_default_form</field>
         <field name="model_id" ref="riverflow.model_riverflow_service" />
     </record>

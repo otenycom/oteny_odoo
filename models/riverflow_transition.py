@@ -107,9 +107,7 @@ class RiverflowTransition(models.Model):
                 if transition.from_state_id
                 else "Start"
             )
-            transition.display_name = (
-                f"{transition.name}: {fromState}->{transition.to_state_id.display_name}"
-            )
+            transition.display_name = f"{transition.name}: {fromState} → {transition.to_state_id.display_name}"
 
     @api.depends("icon", "name", "action_id.icon")
     def _compute_icon_name_html(self):
@@ -119,3 +117,16 @@ class RiverflowTransition(models.Model):
                 record.icon_name_html = f'<span><span class="fa {escape(icon)}"></span>&nbsp;{escape(record.name)}</span>'
             else:
                 record.icon_name_html = escape(record.name)
+
+    @api.model
+    def _get_transition_description(self, transition):
+        if self.transition_id.from_state_id:
+            transition_description = (
+                self.transition_id.from_state_id.name
+                + " → "
+                + self.transition_id.to_state_id.name
+            )
+        else:  # start transition
+            transition_description = self.transition_id.to_state_id.name
+        if self.transition_id.description:
+            transition_description += f" | {self.transition_id.description}"

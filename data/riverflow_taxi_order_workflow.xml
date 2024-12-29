@@ -46,15 +46,6 @@
         <field name="sequence">10</field>
     </record>
 
-    <record id="trans_taxi_initial_to_ordered" model="riverflow.transition">
-        <field name="name">Order Now</field>
-        <field name="from_state_id" ref="" />
-        <field name="to_state_id" ref="state_taxi_ordered" />
-        <field name="action_id" ref="riverflow.transition_action_email_sender" />
-        <field name="icon">fa-taxi</field>
-        <field name="sequence">20</field>
-    </record>
-
     <!-- Transitions from Not Started -->
     <record id="trans_taxi_not_started_email_to_ordered" model="riverflow.transition">
         <field name="name">Order Now</field>

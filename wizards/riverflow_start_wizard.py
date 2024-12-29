@@ -42,6 +42,14 @@ class StartWizard(RiverflowTransitionMixin):
                 defaults_context[key] = value
 
         self._add_template_start_transitions(transition_buttons, defaults_context)
+
+        # Count transitions per workflow to determine if we need to show transition names
+        workflow_transition_count = {}
+        for transition in wizard.start_transition_ids:
+            workflow_transition_count[transition.workflow_name] = (
+                workflow_transition_count.get(transition.workflow_name, 0) + 1
+            )
+
         offset = len(transition_buttons["buttons"])
 
         for index, transition in enumerate(wizard.start_transition_ids):
@@ -57,11 +65,18 @@ class StartWizard(RiverflowTransitionMixin):
             if not icon:
                 icon = "plus"  # for 'create new record'
 
+            # Only include transition name if multiple transitions exist for this workflow
+            caption = (
+                f"{transition.workflow_name} - {transition.name}"
+                if workflow_transition_count[transition.workflow_name] > 1
+                else transition.workflow_name
+            )
+
             transition_buttons["buttons"].append(
                 {
                     "index": index + offset,
                     "icon": icon,
-                    "caption": f"{transition.workflow_name} - {transition.name}",
+                    "caption": caption,
                     "help": transition.description,
                     "action": "action_start_transition",
                     "context": button_context,

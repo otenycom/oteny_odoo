@@ -55,7 +55,7 @@ class ServiceWizard(models.TransientModel):
             use_project_deadline_from_options = self.env[
                 "riverflow.service"
             ].calculate_use_project_deadline_from_options_for_new_service(
-                parent_id, res_model, res_id
+                parent_id, res_model, res_id, parent_id.is_root_a_template
             )
             defaultValues["use_project_deadline_from_options"] = (
                 use_project_deadline_from_options

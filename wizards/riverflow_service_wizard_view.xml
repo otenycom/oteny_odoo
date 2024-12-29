@@ -4,9 +4,11 @@
         <field name="model">riverflow.service.wizard</field>
         <field name="inherit_id" ref="riverflow.view_transition_wizard_form" />
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='transition_id']" position="after">
+            <xpath expr="//field[@name='responsible_team_id']" position="before">
                 <field name="name" required="1" invisible="name_invisible" />
                 <field name="name_invisible" invisible="1" />
+            </xpath>
+            <xpath expr="//field[@name='responsible_team_id']" position="after">
                 <field name="use_project_deadline_from_options" invisible="1" on_change="1" />
                 <field name="use_project_deadline_from" widget="filterable_selection"
                     options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" invisible="use_project_deadline_from_invisible" />
