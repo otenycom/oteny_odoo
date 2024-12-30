@@ -67,7 +67,7 @@
         </field>
     </record>
 
-    <record id="workflow_view_tree" model="ir.ui.view">
+    <record id="workflow_view_list" model="ir.ui.view">
         <field name="name">riverflow.workflow.list</field>
         <field name="model">riverflow.workflow</field>
         <field name="arch" type="xml">

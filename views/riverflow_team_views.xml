@@ -39,7 +39,7 @@
         </field>
     </record>
 
-    <record id="team_view_tree" model="ir.ui.view">
+    <record id="team_view_list" model="ir.ui.view">
         <field name="name">riverflow.team.list</field>
         <field name="model">riverflow.team</field>
         <field name="arch" type="xml">

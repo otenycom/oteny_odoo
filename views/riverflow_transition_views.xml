@@ -35,7 +35,7 @@
         </field>
     </record>
 
-    <record id="transition_view_tree" model="ir.ui.view">
+    <record id="transition_view_list" model="ir.ui.view">
         <field name="name">riverflow.transition.list</field>
         <field name="model">riverflow.transition</field>
         <field name="arch" type="xml">

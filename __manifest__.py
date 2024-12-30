@@ -27,6 +27,7 @@
         "views/riverflow_team_views.xml",
         "views/auto_add_service_views.xml",
         "views/res_config_settings_views.xml",
+        "data/workflow_service_task.xml",
         "data/transition_action_data.xml",
         "data/service_email_workflow.xml",
         "data/riverflow_back_office_workflow.xml",

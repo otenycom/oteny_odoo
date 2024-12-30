@@ -13,12 +13,10 @@ class AutoAddService(models.Model):
     _name = "riverflow.auto.add.service"
     _description = "Auto Add Service"
 
-    name = fields.Char(
-        string="Rule Name", compute="_compute_name", store=True, index=True
-    )
+    name = fields.Char(string="Name", compute="_compute_name", store=True, index=True)
     active = fields.Boolean(
         default=True,
-        help="If unchecked, the rule will be disabled without removing it.",
+        help="If unchecked, the auto-add rule will be disabled without removing it.",
     )
     applies_to_model_id = fields.Many2one(
         "ir.model",
@@ -37,46 +35,27 @@ class AutoAddService(models.Model):
         string="Condition",
         required=True,
         default="[]",
-        help="Domain filter to determine when the service should be added.",
+        help="Specifies when the service should be added.",
     )
     description = fields.Text(
         string="Description",
         help="Internal notes about the rule's purpose or behavior.",
     )
-    service_name = fields.Char(string="Service Name", required=True)
-    service_workflow_id = fields.Many2one(
-        "riverflow.workflow", string="Workflow", required=True
-    )
-    service_use_project_deadline_from = fields.Selection(
-        [
-            ("self", "Self"),
-            ("root", "Top-level service"),
-        ],
-        string="Deadline From",
+    service_template_id = fields.Many2one(
+        "riverflow.service",
+        string="Service Template",
         required=True,
-        default="self",
-    )
-    service_days_relative_to_project = fields.Integer(
-        "Days relative",
-        help="Number of days before or after the project deadline for this service to be completed, e.g. -1 for the day before",
-        required=False,
-    )
-    service_note = fields.Char(string="Service Note")
-    service_responsible_team_id = fields.Many2one(
-        "riverflow.team",
-        string="Responsible Team",
-        help="Team executing the workflow of the service. If blank, taken from the subject record.",
+        domain=[("is_this_a_template", "=", True)],
+        help="Template that will be copied to create the auto-added service",
     )
 
-    @api.depends("service_name", "service_workflow_id.name")
+    @api.depends("service_template_id.name")
     def _compute_name(self):
         for record in self:
-            if record.service_name and record.service_workflow_id.name:
-                record.name = (
-                    f"{record.service_name} - {record.service_workflow_id.name}"
-                )
+            if record.service_template_id:
+                record.name = f"Auto-add: {record.service_template_id.name}"
             else:
-                record.name = f"New Auto Add Service"
+                record.name = "New Auto Add Service"
 
     @api.model
     def _eval_context(self):
@@ -88,28 +67,6 @@ class AutoAddService(models.Model):
             "company_id": self.env.company.id,
             "ref": self.env.ref,
         }
-
-    @api.model
-    def prepare_services_to_create(self, to_create):
-        """
-        Hook method to prepare or modify service values before creation.
-        This method can be overridden in inherited models to customize service values.
-        """
-        pass
-
-    @api.model
-    def service_created(self, service):
-        """
-        Hook method to perform actions after a service is created.
-        This method can be overridden in inherited models to customize post-creation actions.
-        """
-        if service.created_by_auto_add_service_id.service_note:
-            # post the note as a comment on the chatter
-            service.message_post(
-                body=service.created_by_auto_add_service_id.service_note,
-                message_type="comment",
-                subtype_xmlid="mail.mt_note",
-            )
 
     @api.model
     @log_execution_time
@@ -152,29 +109,22 @@ class AutoAddService(models.Model):
                     f"Error evaluating domain for rule {auto_add_rule.name}: {e}"
                 )
 
-        for record in subjects:
+        for subject in subjects:
             for auto_add_rule, domain in rule_domains.items():
                 try:
-                    if record.sudo().filtered_domain(domain):
+                    if subject.sudo().filtered_domain(domain):
+                        # Instead of creating immediately, collect the values
                         new_services.append(
                             {
-                                "name": auto_add_rule.service_name,
-                                "workflow_id": auto_add_rule.service_workflow_id.id,
-                                "res_model": record._name,
-                                "res_id": record.id,
+                                "res_id": subject.id,
+                                "res_model": subject._name,
                                 "created_by_auto_add_service_id": auto_add_rule.id,
-                                "responsible_team_id": (
-                                    auto_add_rule.service_responsible_team_id.id
-                                    if auto_add_rule.service_responsible_team_id
-                                    else record.responsible_team_id.id
-                                ),
-                                "use_project_deadline_from": auto_add_rule.service_use_project_deadline_from,
-                                "days_relative_to_project": auto_add_rule.service_days_relative_to_project,
+                                "template_id": auto_add_rule.service_template_id.id,
                             }
                         )
                 except Exception as e:
                     _logger.error(
-                        f"Error applying domain for rule {auto_add_rule.name} to record {record}: {e}"
+                        f"Error applying domain for rule {auto_add_rule.name} to record {subject}: {e}"
                     )
 
         # Sync the generated services with the existing services
@@ -190,7 +140,7 @@ class AutoAddService(models.Model):
             )
         )
 
-        # Create sets for easy comparison
+        # Create sets for easy comparison using template_id instead of the created service
         new_services_set = {
             (ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services
         }
@@ -227,8 +177,18 @@ class AutoAddService(models.Model):
             to_deactivate.write({"active": False})
 
         if to_create:
-            # Allow inherited classes to update service values
-            self.prepare_services_to_create(to_create)
-            created_services = self.env["riverflow.service"].create(to_create)
-            for created_service in created_services:
-                self.service_created(created_service)
+            created_services = []
+            for service_vals in to_create:
+                service_context = self.env["riverflow.service"].with_context(
+                    {
+                        "default_res_id": service_vals["res_id"],
+                        "default_res_model": service_vals["res_model"],
+                        "default_created_by_auto_add_service_id": service_vals[
+                            "created_by_auto_add_service_id"
+                        ],
+                    }
+                )
+                created_service = service_context._create_service_from_template(
+                    service_vals["template_id"]
+                )
+                created_services.append(created_service)

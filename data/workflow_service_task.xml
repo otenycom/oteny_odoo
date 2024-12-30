@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<odoo noupdate="0">
+    <!-- Workflow -->
+    <record id="workflow_service_task" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Task</field>
+        <field name="description">Not started / In progress / Done</field>
+        <field name="icon">fa-check</field>
+    </record>
+
+    <!-- States -->
+    <record id="state_task_not_started" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_task" />
+        <field name="name">Not started</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="state_task_in_progress" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_task" />
+        <field name="name">In Progress</field>
+        <field name="sequence">15</field>
+    </record>
+    <record id="state_task_done" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_task" />
+        <field name="name">Done</field>
+        <field name="sequence">20</field>
+        <field name="is_end_state">True</field>
+    </record>
+
+    <!-- Transitions from null state -->
+    <record id="trans_task_new_to_not_started" model="riverflow.transition">
+        <field name="name">Not Started</field>
+        <field name="from_state_id" ref="" />
+        <field name="to_state_id" ref="state_task_not_started"></field>
+        <field name="action_id" ref="riverflow.transition_action_default"></field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_task_new_to_done" model="riverflow.transition">
+        <field name="name">Done</field>
+        <field name="from_state_id" ref="" />
+        <field name="to_state_id" ref="state_task_done"></field>
+        <field name="action_id" ref="riverflow.transition_action_default"></field>
+        <field name="icon">fa-check</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from Not Started -->
+    <record id="trans_task_not_started_to_in_progress" model="riverflow.transition">
+        <field name="name">Start Progress</field>
+        <field name="from_state_id" ref="state_task_not_started" />
+        <field name="to_state_id" ref="state_task_in_progress" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-play</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_task_not_started_to_not_started" model="riverflow.transition">
+        <field name="name">Edit</field>
+        <field name="from_state_id" ref="state_task_not_started" />
+        <field name="to_state_id" ref="state_task_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">15</field>
+    </record>
+    <record id="trans_task_not_started_to_done" model="riverflow.transition">
+        <field name="name">Done</field>
+        <field name="from_state_id" ref="state_task_not_started" />
+        <field name="to_state_id" ref="state_task_done"></field>
+        <field name="action_id" ref="riverflow.transition_action_default"></field>
+        <field name="icon">fa-check</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from In Progress -->
+    <record id="trans_task_in_progress_to_done" model="riverflow.transition">
+        <field name="name">Done</field>
+        <field name="from_state_id" ref="state_task_in_progress" />
+        <field name="to_state_id" ref="state_task_done" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-check</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="trans_task_in_progress_to_not_started" model="riverflow.transition">
+        <field name="name">Stop Progress</field>
+        <field name="from_state_id" ref="state_task_in_progress" />
+        <field name="to_state_id" ref="state_task_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-undo</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from Done -->
+    <record id="trans_task_done_to_not_started" model="riverflow.transition">
+        <field name="name">Re-start</field>
+        <field name="from_state_id" ref="state_task_done" />
+        <field name="to_state_id" ref="state_task_not_started"></field>
+        <field name="action_id" ref="riverflow.transition_action_default"></field>
+        <field name="icon">fa-check</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="trans_task_done_to_in_progress" model="riverflow.transition">
+        <field name="name">Back to In Progress</field>
+        <field name="from_state_id" ref="state_task_done" />
+        <field name="to_state_id" ref="state_task_in_progress" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-undo</field>
+        <field name="sequence">20</field>
+    </record>
+</odoo>

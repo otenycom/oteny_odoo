@@ -169,7 +169,7 @@
         </field>
     </record>
 
-    <record id='service_view_tree' model='ir.ui.view'>
+    <record id='service_view_list' model='ir.ui.view'>
         <field name='name'>riverflow.service.list</field>
         <field name='model'>riverflow.service</field>
         <field name='arch' type='xml'>
@@ -180,9 +180,10 @@
                 <field name="deadline_formatted" optional="hide" />
                 <field name="transition_buttons_json" widget="transition_buttons" />
                 <field name="res_name" optional="show" />
-                <!-- <field name="resource_ref" /> -->
                 <field name="display_name" optional="hide" />
                 <field name="responsible_team_id" optional="show" string="Responsible" />
+                <field name="write_uid" string="Updated By" optional="hide" />
+                <field name="write_date" string="Updated On" optional="hide" />
                 <field name="company_id" optional="hide" width="100px" />
                 <field name='internal_notes_summary' width="180px" />
                 <field name="external_messages_summary" width="180px" />
@@ -190,10 +191,6 @@
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
                     readonly="1" />
                 <field name="front_office_workflow_id" optional="hide" />
-
-                <!-- Uncomment to see how the padding and margin styles are applied -->
-                <!-- <button name='action_button_click' type='object' string='Server'
-                class='btn-primary' /> -->
             </list>
         </field>
     </record>
@@ -285,7 +282,7 @@
         </field>
     </record>
 
-    <record id="service_tag_view_view_tree" model="ir.ui.view">
+    <record id="service_tag_view_view_list" model="ir.ui.view">
         <field name="name">riverflow.service.tag.list</field>
         <field name="model">riverflow.service.tag</field>
         <field name="arch" type="xml">

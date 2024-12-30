@@ -49,7 +49,7 @@
         </field>
     </record>
 
-    <record id="state_record_view_tree" model="ir.ui.view">
+    <record id="state_record_view_list" model="ir.ui.view">
         <field name="name">riverflow.state.record.list</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
@@ -73,6 +73,8 @@
                 <field name="state_json" widget="transition_buttons" optional="show" width="140px" />
                 <field name="state_id" optional="hide" />
                 <field name="responsible_team_id" optional="show" string="Responsible" />
+                <field name="write_uid" string="Updated By" optional="hide" />
+                <field name="write_date" string="Updated On" optional="hide" />
                 <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name='internal_notes_summary' width="180px" optional="show" />
                 <field name="external_messages_summary" width="180px" optional="show" />
@@ -161,7 +163,6 @@
         </field>
     </record>
 
-    <!-- Add this before the closing </odoo> tag -->
     <record id="action_recompute_company_id" model="ir.actions.server">
         <field name="name">Recompute Company</field>
         <field name="model_id" ref="model_riverflow_state_record" />
@@ -178,7 +179,7 @@
             action="riverflow.radar_action" sequence="10" />
     </menuitem>
 
-    <menuitem id="menu_riverflow_maintenance"
+    <!-- <menuitem id="menu_riverflow_maintenance"
         name="Maintenance"
         parent="riverflow.tracker_root"
         sequence="100"
@@ -187,6 +188,6 @@
         name="Recompute Companies"
         action="action_recompute_company_id"
         parent="menu_riverflow_maintenance"
-        sequence="10" />
+        sequence="10" /> -->
 
 </odoo>

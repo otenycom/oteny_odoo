@@ -50,7 +50,7 @@
         </field>
     </record>
 
-    <record id="state_view_tree" model="ir.ui.view">
+    <record id="state_view_list" model="ir.ui.view">
         <field name="name">riverflow.state.list</field>
         <field name="model">riverflow.state</field>
         <field name="arch" type="xml">
