@@ -1,3 +1,4 @@
+import random
 from odoo import api, fields, models, tools, _
 from odoo.tools import html2plaintext, html_escape
 from markupsafe import Markup
@@ -99,12 +100,6 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_external_messages_summary",
         store=True,
         index="trigram",
-    )
-
-    # Add field to track last notification time
-    last_external_message_notification_time = fields.Datetime(
-        string="Last External Message Notification",
-        help="Timestamp of the last notification sent to the team about new messages",
     )
 
     def _get_filtered_messages(self, select_internal):
@@ -232,89 +227,6 @@ class MailThreadReviewMixin(models.AbstractModel):
         for record in self:
             record.unreviewed_message_count = len(record.unreviewed_message_ids)
 
-            # Get messages since last notification
-            new_messages = record.unreviewed_message_ids.filtered(
-                lambda m: not record.last_external_message_notification_time
-                or m.create_date > record.last_external_message_notification_time
-            )
-            if new_messages:
-                record._notify_team_unreviewed_messages(new_messages)
-
-    def _notify_team_unreviewed_messages(self, new_messages):
-        """Send notification to team's discuss channel about new unreviewed messages"""
-        self.ensure_one()
-
-        if (
-            not self.responsible_team_id
-            or not self.responsible_team_id.discuss_channel_id
-        ):
-            return
-
-        try:
-            base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
-            record_url = (
-                f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
-            )
-
-            # Get display name and res_name (subject of the service) if available
-            display_text = html_escape(self.display_name)
-            if hasattr(self, "res_name") and self.res_name:
-                display_text = f"{display_text} ({html_escape(self.res_name)})"
-
-            # Format the notification message using HTML
-            message_parts = [
-                f'<div style="margin-bottom: 8px;">💬 New message on <a href="{record_url}">{display_text}</a></div>'
-            ]
-
-            for msg in new_messages:
-                sender = (
-                    msg.author_id.name
-                    if msg.author_id
-                    else (
-                        email_split_and_format(msg.email_from)[0]
-                        if msg.email_from and email_split_and_format(msg.email_from)
-                        else msg.email_from or _("Unknown")
-                    )
-                )
-
-                # Get subject or first line of body
-                subject = msg.subject
-                if not subject and msg.body:
-                    body_text = tools.html2plaintext(msg.body)
-                    subject = (
-                        (body_text.split("\n")[0][:100] + "...")
-                        if len(body_text) > 100
-                        else body_text
-                    )
-
-                message_parts.append(
-                    f'<div style="margin-bottom: 4px;">'
-                    f"<strong>{html_escape(sender)}</strong>: {html_escape(subject)}"
-                    f"</div>"
-                )
-
-            # Post the message to the team's discuss channel using Markup
-            system_user = self.sudo().env.ref("base.user_root")
-            self.sudo().responsible_team_id.discuss_channel_id.with_context(
-                mail_create_nosubscribe=True
-            ).message_post(
-                body=Markup("".join(message_parts)),
-                message_type="notification",
-                subtype_xmlid="mail.mt_comment",
-                author_id=system_user.partner_id.id,
-            )
-            # Update the notification timestamp to the most recent message date
-            self.last_external_message_notification_time = max(
-                new_messages.mapped("create_date")
-            )
-
-        except Exception:
-            _logger.exception(
-                "Failed to send team notification for messages on %s:%s",
-                self._name,
-                self.id,
-            )
-
     def action_mark_external_messages_reviewed(self):
         self.write({"last_external_message_review_time": fields.Datetime.now()})
 
@@ -334,17 +246,111 @@ class MailThreadReviewMixin(models.AbstractModel):
             action["context"]["default_res_id"] = self.id
         return action
 
-    # rely on  @api.depends decorators
-    # def _message_create(self, values_list):
-    #     messages = super()._message_create(values_list)
-    #     self.invalidate_recordset(
-    #         [
-    #             "external_message_ids",
-    #             "unreviewed_message_ids",
-    #             "external_messages_summary",
-    #         ]
-    #     )
-    #     return messages
+    def _message_create(self, values_list):
+        """Override to notify team's discuss channel about new external messages"""
+        messages = super()._message_create(values_list)
+
+        # Early return if no messages
+        if not messages:
+            return messages
+
+        # Group messages by record to avoid multiple notifications
+        messages_by_record = {}
+        for message in messages:
+            # Skip internal notes and system notifications
+            if message.message_type not in ("email", "comment"):
+                continue
+
+            # Skip messages from internal users
+            if message.author_id and message.author_id.user_ids.filtered(
+                lambda u: u.has_group("base.group_user")
+            ):
+                continue
+
+            # Get the record this message belongs to
+            try:
+                record = self.browse(message.res_id).exists()
+                if (
+                    not record
+                    or not record.responsible_team_id
+                    or not record.responsible_team_id.discuss_channel_id
+                ):
+                    continue
+            except Exception:
+                _logger.exception("Failed to process message for team notification")
+                continue
+
+            messages_by_record.setdefault(record, []).append(message)
+
+        # Send notifications for each record with new messages
+        for record, new_messages in messages_by_record.items():
+            try:
+                base_url = (
+                    self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+                )
+                record_url = (
+                    f"{base_url}/web#id={record.id}&model={record._name}&view_type=form"
+                )
+
+                # Get display name and res_name (subject of the service) if available
+                display_text = html_escape(record.display_name)
+                if hasattr(record, "res_name") and record.res_name:
+                    display_text = f"{display_text} | {html_escape(record.res_name)})"
+
+                # Format the notification message using HTML
+                message_parts = [
+                    f'<div class="o_mail_notification">'
+                    f'<div style="margin-bottom: 8px;">💬 <a href="{record_url}">{display_text}</a></div>'
+                ]
+
+                for msg in new_messages:
+                    sender = (
+                        msg.author_id.name
+                        if msg.author_id
+                        else (
+                            email_split_and_format(msg.email_from)[0]
+                            if msg.email_from and email_split_and_format(msg.email_from)
+                            else msg.email_from or _("Unknown")
+                        )
+                    )
+
+                    # Get subject or first line of body
+                    subject = msg.subject
+                    if not subject and msg.body:
+                        body_text = tools.html2plaintext(msg.body)
+                        subject = (
+                            (body_text.split("\n")[0][:100] + "...")
+                            if len(body_text) > 100
+                            else body_text
+                        )
+
+                    message_parts.append(
+                        f'<div style="margin-bottom: 4px;">'
+                        f"<strong>{html_escape(sender)}</strong>: {html_escape(subject)}"
+                        f"</div>"
+                    )
+
+                message_parts.append("</div>")  # Close o_mail_notification div
+
+                # Post the message to the team's discuss channel using Markup
+                system_user = self.sudo().env.ref("base.user_root")
+                record.sudo().responsible_team_id.discuss_channel_id.with_context(
+                    mail_create_nosubscribe=True
+                ).message_post(
+                    body=Markup("".join(message_parts)),
+                    message_type="notification",
+                    subtype_xmlid="mail.mt_comment",
+                    author_id=system_user.partner_id.id,
+                )
+
+            except Exception:
+                _logger.exception(
+                    "Failed to send team notification for messages on %s:%s",
+                    record._name,
+                    record.id,
+                )
+
+        return messages
 
     def _send_dummy_external_message(self):
         """Send a dummy external message for testing purposes.
@@ -352,22 +358,23 @@ class MailThreadReviewMixin(models.AbstractModel):
         self.ensure_one()
 
         # Create message as system user to simulate external sender
+        test_number = str(random.randint(10000, 99999))
         message = self.with_user(self._get_system_user_id()).message_post(
-            body="<p>This is a test external message</p>",
-            subject="Test External Message",
+            body=f"External test message #{test_number}",
+            subject=f"Test Message #{test_number}",
             message_type="email",
             subtype_xmlid="mail.mt_comment",  # Non-internal subtype
             email_from="external@example.com",
         )
 
-        # Force update counters
-        self.invalidate_recordset(
-            [
-                "external_message_ids",
-                "message_from_external_sender_ids",
-                "unreviewed_message_ids",
-                "external_messages_summary",
-            ]
-        )
+        # # Force update counters
+        # self.invalidate_recordset(
+        #     [
+        #         "external_message_ids",
+        #         "message_from_external_sender_ids",
+        #         "unreviewed_message_ids",
+        #         "external_messages_summary",
+        #     ]
+        # )
 
         return message

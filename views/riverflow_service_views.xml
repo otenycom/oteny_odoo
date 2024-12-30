@@ -33,25 +33,27 @@
                     </div>
                     <group>
                         <group colspan="1">
+                            <field name="state_name" invisible="1" on_change="1" />
+                            <field name="state_id" on_change="1" invisible="1" />
                             <field name="model" invisible="1" />
                             <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
                             <field name="responsible_team_id" />
                             <field name="tag_ids" widget="many2many_tags"
                                 options="{'color_field': 'color', 'no_create_edit': True}" />
-                            <field name="company_id" />
-                            <field name="state_name" invisible="1" on_change="1" />
-                            <field name="state_id" on_change="1" invisible="1" />
+                            <field name="internal_notes_summary" invisible="not internal_notes_summary" readonly="1" />
+                            <field name="external_messages_summary" invisible="not external_messages_summary" readonly="1" />
                         </group>
                         <group colspan="1">
                             <field name="parent_id" on_change="1" can_create="False"
                                 can_write="True" invisible="1" />
                             <field name="active" invisible="1" />
+                            <field name="company_id" />
                             <field name="timing_json" widget="timing_widget" />
-                        </group>
-                        <group colspan="2" invisible="not internal_notes_summary and not external_messages_summary">
-                            <div class="border-top my-1" />
-                            <field name="internal_notes_summary" invisible="not internal_notes_summary" readonly="1" />
-                            <field name="external_messages_summary" invisible="not external_messages_summary" readonly="1" />
+                            <field name="unreviewed_message_count" string="Unreviewed Messages" invisible="not unreviewed_message_count" />
+                            <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
+                                invisible="not unreviewed_message_count"
+                                string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
+                                    and once done and followup is complete, mark them as Reviewed" />
                         </group>
                     </group>
                     <notebook>
@@ -105,7 +107,7 @@
                                 <field name="supply_quantity" />
                             </group>
                         </page>
-                        <page string="Unreviewed External Messages" name="unreviewed_messages">
+                        <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
                             <group>
                                 <group>
                                     <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
@@ -347,7 +349,7 @@
         <field name="state">code</field>
         <field name="code">
             for record in records:
-                record._send_dummy_external_message()
+            record._send_dummy_external_message()
         </field>
         <field name="groups_id" eval="[(4, ref('base.group_no_one'))]" />
     </record>
