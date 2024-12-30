@@ -340,5 +340,16 @@
             action="riverflow.action_riverflow_start_service" sequence="30" />
     </menuitem>
 
+    <record id="action_send_dummy_external_message" model="ir.actions.server">
+        <field name="name">Create Dummy External Message</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="code">
+            for record in records:
+                record._send_dummy_external_message()
+        </field>
+        <field name="groups_id" eval="[(4, ref('base.group_no_one'))]" />
+    </record>
 
 </odoo>
