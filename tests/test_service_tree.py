@@ -424,7 +424,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         )
 
     def test_create_service_with_deadline(self):
-        # Test deadline derivation from self: Verify deadline is set correctly when use_project_deadline_from is 'self'
+        # days_relative_to_project should be ignored when use_project_deadline_from is 'self'
         services = self.env["riverflow.service"].create(
             {
                 "name": "Service 1",
@@ -439,7 +439,7 @@ class ServiceDeadlineTestCase(TransactionCase):
                 {
                     "name": "Service 1",
                     "use_project_deadline_from": "self",
-                    "project_deadline": date(2024, 1, 2),
+                    "project_deadline": date(2024, 1, 1),
                     "days_relative_to_project": -1,
                     "deadline": date(2024, 1, 1),
                 }

@@ -925,3 +925,8 @@ class Service(models.Model):
         clone_children(template_service, new_service)
 
         return new_service
+
+    @api.model
+    def _add_state_record(self, record):
+        """We don't want template services in the Radar screen"""
+        return not record.is_root_a_template
