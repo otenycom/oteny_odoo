@@ -1,13 +1,13 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.334",
+    "version": "18.0.1.335",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
     "description": """
     Task manager for the Service Industry
     """,
-    # data files always loaded at installation
+    # data files always loaded at installation.
     "data": [
         "security/riverflow_security.xml",
         "security/ir.model.access.csv",
