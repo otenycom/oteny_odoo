@@ -143,7 +143,7 @@
                         <page string="Internal Notes" name="internal_notes" invisible="1">
                             <field name="internal_note_ids" />
                         </page>
-                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template and not email_template_id">
+                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template">
                             <group>
                                 <group string="Email Settings">
                                     <field name="email_template_id" />
@@ -152,7 +152,7 @@
                                 <group string="Supply Order Settings">
                                     <field name="is_supply_order" />
                                 </group>
-                                <group string="Template Settings">
+                                <group string="Template Settings" groups="base.group_no_one">
                                     <field name="is_root_a_template" />
                                     <field name="is_this_a_template" />
                                 </group>
