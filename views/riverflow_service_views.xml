@@ -166,7 +166,7 @@
                         </page>
                     </notebook>
                 </sheet>
-                <chatter reload_on_post="False" />
+                <chatter reload_on_post="True" />
             </form>
         </field>
     </record>

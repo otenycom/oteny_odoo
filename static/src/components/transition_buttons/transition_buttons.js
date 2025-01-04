@@ -90,12 +90,7 @@ export class TransitionButtons extends Component {
 
 
     maxButtons() {
-        return parseInt(this.props.maxButtons) || 2;
-    }
-
-
-    maxButtons() {
-        return parseInt(this.props.maxButtons) || 2;
+        return parseInt(this.props.maxButtons) || 3;
     }
 
     async saveRecord(node) {
@@ -245,7 +240,7 @@ export const transitionButtons = {
     displayName: "Transition Buttons",
     supportedTypes: ["json"],
     extractProps: ({ attrs, options, viewType }, dynamicInfo) => ({
-        maxButtons: attrs.max_buttons || "2",
+        maxButtons: attrs.max_buttons || "3",
         layout: attrs.layout || "list",
     }),
 };
