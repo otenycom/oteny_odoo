@@ -7,6 +7,9 @@
         <field name="description">Workflow for managing taxi orders</field>
         <field name="icon">fa-taxi</field>
         <field name="is_supply_order">True</field>
+        <field name="has_supply_quantity">True</field>
+        <field name="has_supplier">True</field>
+        <field name="has_supply_unit_price">False</field>
     </record>
 
     <!-- Define all states first (to prevent forward references) -->
@@ -44,6 +47,9 @@
         <field name="to_state_id" ref="state_taxi_not_started" />
         <field name="action_id" ref="riverflow.transition_action_default" />
         <field name="sequence">10</field>
+        <field name="action_context">{
+            "default_supply_quantity": 0,
+            }</field>
     </record>
 
     <!-- Transitions from Not Started -->
@@ -103,7 +109,6 @@
         <field name="icon">fa-book</field>
         <field name="sequence">20</field>
         <field name="to_responsible_team_id" ref="riverflow.team_finance" />
-        <field name="action_context">{ "default_supply_quantity_required": True }</field>
     </record>
 
     <record id="trans_taxi_ordered_to_ordered" model="riverflow.transition">

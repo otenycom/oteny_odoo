@@ -34,10 +34,10 @@
     <!-- Transitions from Registered -->
     <record id="back_office_registered_to_approved" model="riverflow.transition">
         <field name="name">Approve</field>
-        <field name="description">Approve the service for booking</field>
+        <field name="description">Approve the service for accounting</field>
         <field name="from_state_id" ref="back_office_state_registered" />
         <field name="to_state_id" ref="back_office_state_approved" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
     </record>
 

@@ -52,6 +52,24 @@ class RiverflowWorkflow(models.Model):
         required=False,
         tracking=True,
     )
+    has_supply_quantity = fields.Boolean(
+        "Has Supply Quantity",
+        help="If checked, this workflow has a supply quantity field",
+        tracking=True,
+        default=False,
+    )
+    has_supply_unit_price = fields.Boolean(
+        "Has Supply Unit Price",
+        help="If checked, this workflow has a supply unit price field",
+        tracking=True,
+        default=False,
+    )
+    has_supplier = fields.Boolean(
+        "Has Supplier",
+        help="If checked, this workflow has a supplier field. If not, it is a self arranged service such as a flight booking.",
+        tracking=True,
+        default=False,
+    )
 
     _sql_constraints = [("name_uniq", "unique (name)", "Workflow name already exists!")]
 

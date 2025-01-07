@@ -6,7 +6,7 @@
             <form string="Transition Wizard">
                 <sheet>
                     <group>
-                        <field name="transition_description" readonly="1" invisible="transition_description_invisible or not transition_description" />
+                        <field name="transition_description" widget="html" readonly="1" invisible="transition_description_invisible or not transition_description" />
                         <field name="transition_description_invisible" invisible="1" />
                         <field name="records_to_transition_ids" invisible="1" />
                         <field name="transition_id" invisible="1" />

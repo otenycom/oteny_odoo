@@ -23,6 +23,9 @@
                             <field name="icon" on_change="1" />
                             <field name="icon_name_html" readonly="1" />
                             <field name="is_supply_order" />
+                            <field name="has_supply_quantity" />
+                            <field name="has_supply_unit_price" />
+                            <field name="has_supplier" />
                         </group>
                     </group>
                     <group>

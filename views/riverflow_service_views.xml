@@ -105,6 +105,7 @@
                                 <field name="supply_mode" />
                                 <field name="supply_order_instructions" />
                                 <field name="supply_quantity" />
+                                <field name="supply_unit_price" />
                             </group>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">

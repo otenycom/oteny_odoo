@@ -296,6 +296,16 @@ class Service(models.Model):
         help="The quantity of the service to be supplied (e.g. distance in km)",
         required=False,
         tracking=True,
+        compute="_compute_supply_quantity",
+        inverse="_inverse_supply_quantity",
+        store=True,
+    )
+
+    supply_unit_price = fields.Float(
+        "Unit Price",
+        help="The price per unit of the supplied service",
+        required=False,
+        tracking=True,
     )
 
     supply_mode = fields.Char(
@@ -930,3 +940,33 @@ class Service(models.Model):
     def _add_state_record(self, record):
         """We don't want template services in the Radar screen"""
         return not record.is_root_a_template
+
+    @api.depends(
+        "workflow_id.is_supply_order",
+        "workflow_id.has_supply_quantity",
+    )
+    def _compute_supply_quantity(self):
+        for service in self:
+            if (
+                service.front_office_workflow_id.is_supply_order
+                and service.front_office_workflow_id.has_supply_quantity
+            ):
+                # keep user supplied value
+                pass
+            else:
+                # If the service has no supply quantity, set it to 1
+                # e.g. a flight booking for which we only need the price but not the quantity
+                service.supply_quantity = 1
+
+    def _inverse_supply_quantity(self):
+        for service in self:
+            if (
+                service.front_office_workflow_id.is_supply_order
+                and service.front_office_workflow_id.has_supply_quantity
+            ):
+                # Allow manual updates only when has_supply_quantity is True, e.g manual entry of distance for a taxi order
+                continue
+            else:
+                # Reset to 1 if someone tries to change it when has_supply_quantity is False,
+                #  e.g. a flight booking for which we only need the price but not the quantity
+                service.supply_quantity = 1

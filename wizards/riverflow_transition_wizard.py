@@ -9,7 +9,7 @@ class TransitionWizard(models.AbstractModel):
     _workflow_model = "definedInDerivedClass"
 
     transition_id = fields.Many2one("riverflow.transition", "Transition")
-    transition_description = fields.Text(
+    transition_description = fields.Html(
         "Description", compute="_compute_transition_description"
     )
     transition_description_invisible = fields.Boolean()

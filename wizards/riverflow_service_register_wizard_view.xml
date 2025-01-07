@@ -6,13 +6,20 @@
         <field name="inherit_id" ref="riverflow.view_service_transition_action_default_form" />
         <field name="arch" type="xml">
             <xpath expr="//field[@name='name']" position="after">
-                <div class="alert alert-warning" role="alert" invisible="not supply_quantity_required or supply_quantity != 0.0">
+                <!-- <div class="alert alert-warning" role="alert" invisible="not supply_quantity_required or supply_quantity != 0.0">
                     A non-zero quantity is required for this service.
                 </div>
+                <div class="alert alert-warning" role="alert" invisible="not supply_unit_price_required or supply_unit_price != 0.0">
+                    A non-zero unit price is required for this service.
+                </div> -->
 
                 <field name="supply_quantity" invisible="supply_quantity_invisible" required="supply_quantity_required" />
                 <field name="supply_quantity_invisible" invisible="1" />
                 <field name="supply_quantity_required" invisible="1" />
+
+                <field name="supply_unit_price" invisible="supply_unit_price_invisible" required="supply_unit_price_required" />
+                <field name="supply_unit_price_invisible" invisible="1" />
+                <field name="supply_unit_price_required" invisible="1" />
             </xpath>
         </field>
     </record>

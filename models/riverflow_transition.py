@@ -9,7 +9,7 @@ class RiverflowTransition(models.Model):
     _rec_name = "display_name"
 
     name = fields.Char("Transition name", required=True)
-    description = fields.Text("Description", required=False)
+    description = fields.Html("Description", required=False, sanitize_style=True)
     sequence = fields.Integer(default=10)
     icon = fields.Char("Icon", help="Font awesome icon e.g. fa-tasks")
     icon_name_html = fields.Html(
