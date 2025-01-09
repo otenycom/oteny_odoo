@@ -109,8 +109,14 @@ class Service(models.Model):
     )
 
     active = fields.Boolean(
-        default=True, help="Set active to false to archive the service", tracking=True
+        compute="_compute_active",
+        inverse="_inverse_active",
+        store=True,
+        default=True,
+        help="Set active to false to archive the service",
+        tracking=True,
     )
+
     days_relative_to_project = fields.Integer(
         "Day",
         help="Number of days before or after the project deadline for this service to be completed, e.g. -1 for the day before",
@@ -313,6 +319,13 @@ class Service(models.Model):
         help="The mode of the supply (e.g. taxi, train, delivery, etc)",
         required=False,
         tracking=True,
+    )
+
+    subject_active = fields.Boolean(
+        string="Subject Active",
+        compute="_compute_subject_active",
+        store=True,
+        help="Technical field to track if the subject record is active",
     )
 
     @api.depends("res_model", "res_id")  # , "is_unlinked")
@@ -970,3 +983,31 @@ class Service(models.Model):
                 # Reset to 1 if someone tries to change it when has_supply_quantity is False,
                 #  e.g. a flight booking for which we only need the price but not the quantity
                 service.supply_quantity = 1
+
+    @api.depends("res_model", "res_id")
+    def _compute_subject_active(self):
+        """Track the active state of the subject record"""
+        for service in self:
+            if not service.res_model or not service.res_id:
+                service.subject_active = True
+                continue
+            if service.res_model not in self.env:
+                service.subject_active = True
+                continue
+            record = self.env[service.res_model].sudo().browse(service.res_id)
+            if not record.exists():
+                service.subject_active = True
+                continue
+            service.subject_active = record.active if "active" in record else True
+
+    @api.depends("subject_active")
+    def _compute_active(self):
+        """Ensure service is archived when its subject is archived"""
+        for service in self:
+            if not service.subject_active:
+                service.active = False
+
+    def _inverse_active(self):
+        """Allow manual override of computed active field"""
+        # This is a flag method that allows the field to be written
+        pass
