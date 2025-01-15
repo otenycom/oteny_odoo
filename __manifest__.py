@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.350",
+    "version": "18.0.1.351",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -27,8 +27,8 @@
         "views/riverflow_team_views.xml",
         "views/auto_add_service_views.xml",
         "views/res_config_settings_views.xml",
-        "data/workflow_service_task.xml",
         "data/transition_action_data.xml",
+        "data/workflow_service_task.xml",
         "data/service_email_workflow.xml",
         "data/riverflow_back_office_workflow.xml",
         "data/riverflow_taxi_order_workflow.xml",
