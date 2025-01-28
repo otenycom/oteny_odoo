@@ -263,11 +263,15 @@ class Service(models.Model):
         tracking=True,
     )
 
-    supply_date = fields.Date(
-        "Supply Date",
-        help="The date the service is expected to be supplied",
+    supply_order_instructions = fields.Text(
+        "Instructions for the supplier",
+        help="E.g. what to supply, extra information, etc",
         required=False,
         tracking=True,
+    )
+
+    supply_date = fields.Date(
+        "Supply Date",
     )
 
     supply_date_formatted = fields.Char(
@@ -276,56 +280,15 @@ class Service(models.Model):
         store=False,
     )
 
-    supply_from = fields.Char(
-        "Supply From",
-        help="The location where the service is expected to be supplied from",
-        required=False,
-        tracking=True,
-    )
-
-    supply_to = fields.Char(
-        "Supply To",
-        help="The location where the service is expected to be supplied to",
-        required=False,
-        tracking=True,
-    )
-
-    supply_order_instructions = fields.Text(
-        "Instructions for the supplier",
-        help="E.g. what to supply, extra information, etc",
-        required=False,
-        tracking=True,
-    )
-
-    supply_quantity = fields.Float(
-        "Supply Quantity",
-        help="The quantity of the service to be supplied (e.g. distance in km)",
-        required=False,
-        tracking=True,
-        compute="_compute_supply_quantity",
-        inverse="_inverse_supply_quantity",
-        store=True,
-    )
-
-    supply_unit_price = fields.Float(
-        "Unit Price",
-        help="The price per unit of the supplied service",
-        required=False,
-        tracking=True,
-    )
-
-    supply_mode = fields.Char(
-        "Supply Mode",
-        help="The mode of the supply (e.g. taxi, train, delivery, etc)",
-        required=False,
-        tracking=True,
-    )
-
     subject_active = fields.Boolean(
         string="Subject Active",
         compute="_compute_subject_active",
         store=True,
         help="Technical field to track if the subject record is active",
+    )
+
+    leg_ids = fields.One2many(
+        "riverflow.service.leg", "service_id", string="Supply Legs"
     )
 
     @api.depends("res_model", "res_id")  # , "is_unlinked")
@@ -843,12 +806,7 @@ class Service(models.Model):
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
             "is_supply_order": template_service.is_supply_order,
             "supplier_partner_id": template_service.supplier_partner_id.id,
-            "supply_date": template_service.supply_date,
-            "supply_from": template_service.supply_from,
-            "supply_to": template_service.supply_to,
-            "supply_mode": template_service.supply_mode,
             "supply_order_instructions": template_service.supply_order_instructions,
-            "supply_quantity": template_service.supply_quantity,
             "tag_ids": [
                 Command.link(tag_id) for tag_id in template_service.tag_ids.ids
             ],
@@ -861,6 +819,20 @@ class Service(models.Model):
             .with_context(context={"mail_create_nosubscribe": True})
             .create(vals)
         )
+
+        # Copy the legs from the template
+        for leg in template_service.leg_ids:
+            self.env["riverflow.service.leg"].create(
+                {
+                    "service_id": new_service.id,
+                    "sequence": leg.sequence,
+                    "supply_from": leg.supply_from,
+                    "supply_to": leg.supply_to,
+                    "supply_date": leg.supply_date,
+                    "supply_cost_amount": leg.supply_cost_amount,
+                    "supply_instructions": leg.supply_instructions,
+                }
+            )
 
         # Clone direct attachments from the template service
         template_attachments = self.env["ir.attachment"].search(
@@ -1011,3 +983,29 @@ class Service(models.Model):
         """Allow manual override of computed active field"""
         # This is a flag method that allows the field to be written
         pass
+
+
+class ServiceLeg(models.Model):
+    _name = "riverflow.service.leg"
+    _description = "Supply Order Leg"
+    _order = "sequence,id"
+
+    service_id = fields.Many2one(
+        "riverflow.service", required=True, ondelete="cascade", index=True
+    )
+    sequence = fields.Integer(default=10)
+    supply_from = fields.Char("From")
+    supply_to = fields.Char("To")
+    supply_cost_amount = fields.Monetary(
+        "Cost", currency_field="supply_cost_currency_id"
+    )
+    supply_cost_currency_id = fields.Many2one(
+        comodel_name="res.currency",
+        string="Cost Currency",
+        related="service_id.company_id.currency_id",
+        store=True,
+    )
+    supply_instructions = fields.Text(
+        "Instructions",
+        help="Instructions to the supplier about this leg of the supply order",
+    )

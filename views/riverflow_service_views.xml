@@ -99,13 +99,19 @@
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
                             <group>
                                 <field name="supplier_partner_id" />
-                                <field name="supply_date" />
-                                <field name="supply_from" />
-                                <field name="supply_to" />
-                                <field name="supply_mode" />
                                 <field name="supply_order_instructions" />
-                                <field name="supply_quantity" />
-                                <field name="supply_unit_price" />
+                            </group>
+                            <group string="Legs">
+                                <field name="leg_ids" nolabel="1">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle" />
+                                        <field name="supply_from" />
+                                        <field name="supply_to" />
+                                        <field name="supply_instructions" />
+                                        <field name="supply_cost_currency_id" column_invisible="1" />
+                                        <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
+                                    </list>
+                                </field>
                             </group>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">

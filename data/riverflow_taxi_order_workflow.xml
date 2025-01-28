@@ -66,7 +66,7 @@
     <record id="trans_taxi_skip_send_not_started_to_ordered" model="riverflow.transition">
         <field name="name">Ordered already</field>
         <field name="from_state_id" ref="state_taxi_not_started" />
-        <field name="to_state_id" ref="state_taxi_ordered" />
+        <field name="to_state_id" ref="state_taxi_confirmed" />
         <field name="action_id" ref="riverflow.transition_action_default" />
         <field name="icon">fa-taxi</field>
         <field name="sequence">20</field>
