@@ -738,6 +738,11 @@ class Service(models.Model):
         """Default company is the current user's company, unless overridden"""
         for record in self:
             if not record.company_id:
+                # we do this because the company who is ordering the service
+                # is driven by the user's company; not by the subject record (log entry)
+                # e.g. Log Entry is for Company Germany with German Employee, but the user is from Company Netherlands
+                # the supplier of a third party service will be billing to the user's company, and the user's company
+                # will do an intra-company invoice to the German company
                 record.company_id = self.env.company
 
     def _inverse_company_id(self):
