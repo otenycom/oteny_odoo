@@ -102,6 +102,7 @@ class Service(models.Model):
         string="Company",
         compute="_compute_company_id",
         inverse="_inverse_company_id",
+        recursive=True,
         store=True,
         required=False,
         index=True,
@@ -288,7 +289,26 @@ class Service(models.Model):
     )
 
     leg_ids = fields.One2many(
-        "riverflow.service.leg", "service_id", string="Supply Legs"
+        "riverflow.service.leg",
+        "service_id",
+        string="Supply Legs",
+        help="The legs of a supply order service",
+    )
+
+    supply_leg_id = fields.Many2one(
+        "riverflow.service.leg",
+        "Supply Order Leg",
+        readonly=True,
+        help="Links back to a 'taxi leg' sales-invoice service back to the the 'taxi booking' supply order service",
+    )
+
+    supply_order_service_id = fields.Many2one(
+        "riverflow.service",
+        "Supply Order for Leg",
+        related="supply_leg_id.service_id",
+        readonly=True,
+        recursive=True,
+        help="Links back to the 'taxi booking' that generated this sales-invoice service",
     )
 
     @api.depends("res_model", "res_id")  # , "is_unlinked")
@@ -370,9 +390,12 @@ class Service(models.Model):
                 # Handle the case where conversion to int fails
                 service.root_id = service.id  # Or handle as appropriate
 
-    @api.depends("name", "parent_id.display_name")
+    @api.depends("name", "parent_id.display_name", "supply_leg_id.name")
     def _compute_display_name(self):
         for service in self.sudo():
+            if service.supply_leg_id:
+                service.name = service.supply_leg_id.name
+
             if service.parent_id:
                 service.display_name = "%s | %s" % (
                     service.parent_id.display_name,
@@ -442,10 +465,13 @@ class Service(models.Model):
         "days_relative_to_project",
         "use_project_deadline_from",
         "is_days_relative_to_project_applicable",
+        "supply_order_service_id.deadline",
     )
     def _compute_deadline(self):
         for service in self:
-            if not service.project_deadline:
+            if service.supply_order_service_id:
+                service.deadline = service.supply_order_service_id.deadline
+            elif not service.project_deadline:
                 service.deadline = False
             elif service.is_days_relative_to_project_applicable:
                 service.deadline = self.project_deadline + timedelta(
@@ -734,10 +760,13 @@ class Service(models.Model):
             recipients = recipients.union(self.supplier_partner_id)
         return recipients
 
+    @api.depends("supply_order_service_id.company_id")
     def _compute_company_id(self):
         """Default company is the current user's company, unless overridden"""
         for record in self:
-            if not record.company_id:
+            if record.supply_order_service_id:
+                record.company_id = record.supply_order_service_id.company_id
+            elif not record.company_id:
                 # we do this because the company who is ordering the service
                 # is driven by the user's company; not by the subject record (log entry)
                 # e.g. Log Entry is for Company Germany with German Employee, but the user is from Company Netherlands
@@ -995,6 +1024,12 @@ class ServiceLeg(models.Model):
     _description = "Supply Order Leg"
     _order = "sequence,id"
 
+    name = fields.Char(
+        string="Name",
+        compute="_compute_name",
+        store=True,
+    )
+
     service_id = fields.Many2one(
         "riverflow.service", required=True, ondelete="cascade", index=True
     )
@@ -1014,3 +1049,8 @@ class ServiceLeg(models.Model):
         "Instructions",
         help="Instructions to the supplier about this leg of the supply order",
     )
+
+    @api.depends("supply_from", "supply_to")
+    def _compute_name(self):
+        for leg in self:
+            leg.name = f"Taxi leg: {leg.supply_from} → {leg.supply_to}"

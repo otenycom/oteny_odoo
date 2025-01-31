@@ -316,7 +316,9 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 record.is_end_state = record.state_id.is_end_state
             else:
                 # start transitions are not end states
-                record.is_end_state = len(record.from_transition_ids) == 0
+                # = len(record.from_transition_ids) == 0
+                # however, a blank state is considered to be 'always active' therefore not an end state
+                record.is_end_state = False
 
     @api.depends("state_id", "workflow_id")
     def _compute_front_office_workflow_id(self):
