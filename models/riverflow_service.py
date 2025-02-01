@@ -299,19 +299,19 @@ class Service(models.Model):
         "riverflow.service.leg",
         "Supply Order Leg",
         readonly=True,
-        help="Links back to a 'taxi leg' sales-invoice service back to the the 'taxi booking' supply order service",
+        help="Links back to a 'taxi leg info' service back to the the 'taxi booking' supply order service",
     )
 
     supply_order_service_id = fields.Many2one(
         "riverflow.service",
-        "Supply Order for Leg",
+        "Supply Order",
         related="supply_leg_id.service_id",
         readonly=True,
         recursive=True,
-        help="Links back to the 'taxi booking' that generated this sales-invoice service",
+        help="Links back to the 'taxi booking' that generated this leg-info service",
     )
 
-    @api.depends("res_model", "res_id")  # , "is_unlinked")
+    @api.depends("res_model", "res_id")
     def _compute_resource_ref(self):
         for service in self:
             if not service.res_model or not service.res_id:
@@ -1018,6 +1018,20 @@ class Service(models.Model):
         # This is a flag method that allows the field to be written
         pass
 
+    def unlink(self):
+        """Prevent manual deletion of invoice-related services unless in debug mode"""
+        if not self.env.context.get("bypass_user_unlink_check"):
+            if self.supply_leg_id.ids and not self.env.user.has_group(
+                "base.group_no_one"
+            ):
+                raise UserError(
+                    _(
+                        "C  annot delete invoice-related services are created for invoicing legs on a supply order. Delete the leg from the supply order instead."
+                    )
+                )
+
+        return super().unlink()
+
 
 class ServiceLeg(models.Model):
     _name = "riverflow.service.leg"
@@ -1054,3 +1068,12 @@ class ServiceLeg(models.Model):
     def _compute_name(self):
         for leg in self:
             leg.name = f"Taxi leg: {leg.supply_from} → {leg.supply_to}"
+
+    def unlink(self):
+        # Delete any taxi leg services linked to these legs
+        sales_services = self.env["riverflow.service"].search(
+            [("supply_leg_id", "in", self.ids)]
+        )
+        sales_services.with_context(bypass_user_unlink_check=True).unlink()
+
+        return super().unlink()

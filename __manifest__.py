@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.394",
+    "version": "18.0.1.395",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -32,6 +32,8 @@
         "data/service_email_workflow.xml",
         "data/riverflow_back_office_workflow.xml",
         "data/riverflow_taxi_order_workflow.xml",
+        "data/riverflow_to_be_invoiced_workflow.xml",
+        "data/riverflow_taxi_leg_workflow.xml",
     ],
     "assets": {
         "web.assets_backend": [

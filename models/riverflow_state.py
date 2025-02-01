@@ -40,9 +40,7 @@ class RiverflowWorkflowState(models.Model):
     @api.depends("name", "workflow_id.name")
     def _compute_display_name(self):
         for state in self:
-            state.display_name = (
-                f"{state.workflow_id.display_name} | {state.name}"  # fmt: off
-            )
+            state.display_name = f"{state.name} | {state.workflow_id.name}"
 
     def workflow_add_from_transition(self):
         return {
