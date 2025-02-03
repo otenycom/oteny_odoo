@@ -1045,8 +1045,18 @@ class ServiceLeg(models.Model):
     )
 
     service_id = fields.Many2one(
-        "riverflow.service", required=True, ondelete="cascade", index=True
+        "riverflow.service",
+        required=True,
+        ondelete="cascade",
+        index=True,
+        help="Supply Order",
     )
+
+    supply_date = fields.Date(
+        string="Deadline",
+        related="service_id.supply_date",
+    )
+
     sequence = fields.Integer(default=10)
     supply_from = fields.Char("From")
     supply_to = fields.Char("To")
