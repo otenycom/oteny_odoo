@@ -95,6 +95,7 @@
                                         <field name="supply_from" />
                                         <field name="supply_to" />
                                         <field name="supply_instructions" />
+                                        <field name="is_reviewed_for_invoicing" readonly="1" />
                                         <field name="supply_cost_currency_id" column_invisible="1" />
                                         <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
                                     </list>

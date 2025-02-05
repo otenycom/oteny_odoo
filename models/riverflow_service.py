@@ -1073,6 +1073,11 @@ class ServiceLeg(models.Model):
         "Instructions",
         help="Instructions to the supplier about this leg of the supply order",
     )
+    is_reviewed_for_invoicing = fields.Boolean(
+        string="Reviewed for Invoicing",
+        default=False,
+        help="If True, the leg is considered for invoicing",
+    )
 
     @api.depends("supply_from", "supply_to")
     def _compute_name(self):
