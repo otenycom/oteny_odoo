@@ -84,18 +84,21 @@
 
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
                             <group>
-                                <field name="supply_date" />
-                                <field name="supplier_partner_id" />
-                                <field name="supply_order_instructions" />
+                                <group>
+                                    <field name="supply_date" />
+                                    <field name="supplier_partner_id" />
+                                </group>
+                                <group>
+                                    <field name="supply_order_instructions" />
+                                </group>
                             </group>
                             <group string="Legs">
                                 <field name="leg_ids" nolabel="1">
-                                    <list editable="bottom">
+                                    <list>
                                         <field name="sequence" widget="handle" />
                                         <field name="supply_from" />
                                         <field name="supply_to" />
                                         <field name="supply_instructions" />
-                                        <field name="is_reviewed_for_invoicing" readonly="1" />
                                         <field name="supply_cost_currency_id" column_invisible="1" />
                                         <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
                                     </list>
@@ -196,6 +199,33 @@
             </form>
         </field>
     </record>
+
+    <!-- Add form view for service legs -->
+    <record id="view_service_leg_form" model="ir.ui.view">
+        <field name="name">riverflow.service.leg.form</field>
+        <field name="model">riverflow.service.leg</field>
+        <field name="arch" type="xml">
+            <form string="Supply Leg">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="supply_from" />
+                            <field name="supply_to" />
+                            <field name="supply_instructions" />
+                        </group>
+                        <group>
+                            <field name="supply_cost_amount" string="Cost" />
+                            <field name="supply_cost_currency_id" invisible="1" />
+                        </group>
+                    </group>
+                    <group colspan="2">
+                        <field name="name" invisible="1" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
 
     <record id='service_view_list' model='ir.ui.view'>
         <field name='name'>riverflow.service.list</field>
@@ -389,5 +419,6 @@
         <field name="state">code</field>
         <field name="code">action = records.add_child_service()</field>
     </record>
+
 
 </odoo>

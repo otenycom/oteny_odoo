@@ -294,7 +294,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                     "supply_from": leg.supply_from,
                     "supply_to": leg.supply_to,
                     "supply_instructions": leg.supply_instructions,
-                    "supply_log_entry_id": leg.supply_log_entry_id.id,
+                    "pax_ids": [(6, 0, leg.pax_ids.ids)],
                 }
                 leg_commands.append(Command.create(leg_vals))
 
