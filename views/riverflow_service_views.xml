@@ -85,7 +85,6 @@
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
                             <group>
                                 <group>
-                                    <field name="supply_date" />
                                     <field name="supplier_partner_id" />
                                 </group>
                                 <group>

@@ -271,16 +271,6 @@ class Service(models.Model):
         tracking=True,
     )
 
-    supply_date = fields.Date(
-        "Supply Date",
-    )
-
-    supply_date_formatted = fields.Char(
-        "Supply Date Formatted",
-        compute="_compute_supply_date_formatted",
-        store=False,
-    )
-
     subject_active = fields.Boolean(
         string="Subject Active",
         compute="_compute_subject_active",
@@ -779,14 +769,6 @@ class Service(models.Model):
         # This is a flag method that allows the field to be written
         pass
 
-    def _compute_supply_date_formatted(self):
-        for record in self:
-            record.supply_date_formatted = (
-                record.supply_date.strftime(Service.DATE_FORMAT)
-                if record.supply_date
-                else ""
-            )
-
     @api.model
     def calculate_use_project_deadline_from_options_for_new_service(
         self, parent_id, res_model, res_id, is_root_a_template
@@ -862,7 +844,6 @@ class Service(models.Model):
                     "sequence": leg.sequence,
                     "supply_from": leg.supply_from,
                     "supply_to": leg.supply_to,
-                    "supply_date": leg.supply_date,
                     "supply_cost_amount": leg.supply_cost_amount,
                     "supply_instructions": leg.supply_instructions,
                 }
@@ -1051,11 +1032,6 @@ class ServiceLeg(models.Model):
         help="Supply Order",
     )
 
-    supply_date = fields.Date(
-        string="Deadline",
-        related="service_id.supply_date",
-    )
-
     sequence = fields.Integer(default=10)
     supply_from = fields.Char("From")
     supply_to = fields.Char("To")
@@ -1078,7 +1054,7 @@ class ServiceLeg(models.Model):
         help="If True, the leg is considered for invoicing",
     )
 
-    @api.depends("supply_from", "supply_to", "supply_date")
+    @api.depends("supply_from", "supply_to", "service_id.deadline")
     def _compute_name(self):
         for leg in self:
             name = "Taxi"
@@ -1088,6 +1064,6 @@ class ServiceLeg(models.Model):
                 name += f": {leg.supply_from}"
             elif leg.supply_to:
                 name += f": {leg.supply_to}"
-            if leg.supply_date:
-                name += f" | {leg.supply_date.strftime(Service.DATE_FORMAT)}"
+            if leg.service_id.deadline:
+                name += f" | {leg.service_id.deadline.strftime(Service.DATE_FORMAT)}"
             leg.name = name
