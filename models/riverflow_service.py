@@ -1091,12 +1091,3 @@ class ServiceLeg(models.Model):
             if leg.supply_date:
                 name += f" | {leg.supply_date.strftime(Service.DATE_FORMAT)}"
             leg.name = name
-
-    def unlink(self):
-        # Delete any taxi leg services linked to these legs
-        sales_services = self.env["riverflow.service"].search(
-            [("leg_pax_id", "in", self.ids)]
-        )
-        sales_services.with_context(bypass_user_unlink_check=True).unlink()
-
-        return super().unlink()
