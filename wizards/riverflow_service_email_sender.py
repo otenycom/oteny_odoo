@@ -227,8 +227,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.update_write_values(service, write_vals)
             service.write(write_vals)
 
-            print(service.leg_ids[0].deadline)
-
         if self.is_supply_order:
             return {
                 "service": service,
