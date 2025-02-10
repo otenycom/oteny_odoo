@@ -104,10 +104,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         required=False,
     )
 
-    leg_ids = fields.One2many(
-        "riverflow.service.email.sender.wizard.leg", "wizard_id", string="Supply Legs"
-    )
-
     def get_visibility_defaults(self, transition_id):
         # normally the responsible team is hidden for end-states, but here it is visible
         # because we use it as the sender of the email
@@ -173,14 +169,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             )[service.id]
 
             # Render body
-            # Add logging for service legs
-            for leg in service.leg_ids:
-                _logger.info(
-                    f"Service {service.id} leg: sequence={leg.sequence}, "
-                    f"from={leg.supply_from}, to={leg.supply_to}, "
-                    f"supply_log_entry_id={leg.supply_log_entry_id.id if leg.supply_log_entry_id else None}"
-                )
-
             wizard.body_rendered = wizard._render_template(
                 wizard.body or self.email_template_id.body_html,
                 "riverflow.service",
@@ -210,23 +198,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                 else:
                     defaultValues["recipient_partner_ids"] = recipients
 
-            # Initialize leg_ids from service's existing legs
-            if service.leg_ids:
-                leg_commands = []
-                for leg in service.leg_ids:
-                    leg_commands.append(
-                        Command.create(
-                            {
-                                "sequence": leg.sequence,
-                                "supply_from": leg.supply_from,
-                                "supply_to": leg.supply_to,
-                                "supply_instructions": leg.supply_instructions,
-                                "supply_log_entry_id": leg.supply_log_entry_id.id,
-                            }
-                        )
-                    )
-                defaultValues["leg_ids"] = leg_commands
-
     @api.onchange("email_template_id")
     def onchange_email_template_id(self):
         if self.email_template_id:
@@ -235,7 +206,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.render()
 
     @api.onchange(
-        "leg_ids",
         "supply_date",
         "responsible_team_id",
         "supplier_partner_id",
@@ -285,20 +255,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             vals["supplier_partner_id"] = self.supplier_partner_id.id
             vals["supply_date"] = self.supply_date
             vals["supply_order_instructions"] = self.supply_order_instructions
-
-            # Sync legs with service - first remove existing legs then add new ones
-            leg_commands = [Command.clear()]
-            for leg in self.leg_ids:
-                leg_vals = {
-                    "sequence": leg.sequence,
-                    "supply_from": leg.supply_from,
-                    "supply_to": leg.supply_to,
-                    "supply_instructions": leg.supply_instructions,
-                    "pax_ids": [(6, 0, leg.pax_ids.ids)],
-                }
-                leg_commands.append(Command.create(leg_vals))
-
-            vals["leg_ids"] = leg_commands
 
             # Set initial deadline
             vals["use_project_deadline_from"] = "self"
@@ -370,20 +326,3 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             email_layout_xmlid=self.email_template_id.email_layout_xmlid,
             attachment_ids=self.attachment_ids.ids,
         )
-
-
-class RiverflowServiceEmailSenderWizardLeg(models.TransientModel):
-    _name = "riverflow.service.email.sender.wizard.leg"
-    _description = "Supply Order Leg in Email Wizard"
-    _order = "sequence,id"
-
-    wizard_id = fields.Many2one(
-        "riverflow.service.email.sender.wizard", required=True, ondelete="cascade"
-    )
-    sequence = fields.Integer(default=10)
-    supply_from = fields.Char("From")
-    supply_to = fields.Char("To")
-    supply_instructions = fields.Text(
-        "Instructions",
-        help="Instructions to the supplier about this leg of the supply order",
-    )

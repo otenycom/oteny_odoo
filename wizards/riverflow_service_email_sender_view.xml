@@ -11,16 +11,7 @@
                         <field name="supply_date" />
                         <field name="supply_order_instructions" />
                     </group>
-                    <group string="Legs (trip segments)" colspan="2" invisible="not is_supply_order">
-                        <field name="leg_ids" nolabel="1">
-                            <list editable="bottom" multi_edit="1">
-                                <field name="sequence" widget="handle" />
-                                <field name="supply_from" />
-                                <field name="supply_to" />
-                                <field name="supply_instructions" />
-                            </list>
-                        </field>
-                    </group>
+
                     <group>
                         <group string="Recipients">
                             <field name="supplier_email_formatted" invisible="not is_supply_order" />

@@ -7,7 +7,7 @@
         <field name="description">Workflow for managing taxi orders</field>
         <field name="icon">fa-taxi</field>
         <field name="is_supply_order">True</field>
-        <field name="has_supply_quantity">True</field>
+        <field name="has_supply_quantity">False</field>
         <field name="has_supplier">True</field>
         <field name="has_supply_unit_price">False</field>
     </record>
@@ -137,7 +137,7 @@
         <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
         <field name="to_responsible_team_id" ref="riverflow.team_finance" />
-        <field name="action_context">{ "default_supply_quantity_required": True }</field>
+        <!-- <field name="action_context">{ "default_supply_quantity_required": False }</field> -->
     </record>
 
     <record id="trans_taxi_confirmed_to_ordered" model="riverflow.transition">
