@@ -8,7 +8,7 @@
                 <sheet>
                     <group string="Supply Order" invisible="not is_supply_order" colspan="2">
                         <field name="supplier_partner_id" />
-                        <field name="supply_date" />
+                        <field name="deadline" string="Supply Date" />
                         <field name="supply_order_instructions" />
                     </group>
 

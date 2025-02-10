@@ -8,8 +8,6 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="supply_date" required="1" />
-                            <field name="project_deadline" required="1" />
                             <field name="unreviewed_message_count" invisible="not unreviewed_message_count" readonly="1" />
                             <field name="mark_external_messages_as_reviewed" invisible="not unreviewed_message_count" widget="boolean_toggle" />
                             <field name="new_note" required="0" invisible="new_note_invisible" widget="html" />

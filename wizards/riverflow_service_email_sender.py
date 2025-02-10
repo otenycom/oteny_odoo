@@ -92,7 +92,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         store=False,
     )
 
-    supply_date = fields.Date(
+    deadline = fields.Date(
         "Supply Date",
         help="The date the service is expected to be supplied",
         required=False,
@@ -206,7 +206,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             self.render()
 
     @api.onchange(
-        "supply_date",
+        "deadline",
         "responsible_team_id",
         "supplier_partner_id",
         "is_supply_order",
@@ -253,12 +253,10 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if self.is_supply_order:
             # Write supplier reference to service
             vals["supplier_partner_id"] = self.supplier_partner_id.id
-            vals["supply_date"] = self.supply_date
             vals["supply_order_instructions"] = self.supply_order_instructions
 
-            # Set initial deadline
             vals["use_project_deadline_from"] = "self"
-            vals["project_deadline"] = fields.Date.context_today(self)
+            vals["project_deadline"] = self.deadline
 
     def create_related_records(self, service):
         super(RiverflowServiceEmailSenderWizard, self).create_related_records(service)
