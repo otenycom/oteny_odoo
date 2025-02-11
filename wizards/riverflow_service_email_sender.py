@@ -258,6 +258,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             vals["use_project_deadline_from"] = "self"
             vals["project_deadline"] = self.deadline
 
+        # for leg in service.leg_ids:
+        #     # HACK: if we access leg.service_id, we get the old data without the UI updates, this line would workaround it.
+        #     # leg.service_id = service
+        #     leg.supply_from = "New From"  # leg.supply_from
+
     def create_related_records(self, service):
         super(RiverflowServiceEmailSenderWizard, self).create_related_records(service)
         self._send_email(service)

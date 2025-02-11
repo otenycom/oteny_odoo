@@ -109,6 +109,7 @@
         <field name="icon">fa-book</field>
         <field name="sequence">20</field>
         <field name="to_responsible_team_id" ref="riverflow.team_finance" />
+        <field name="action_context">{ }</field>
     </record>
 
     <record id="trans_taxi_ordered_to_ordered" model="riverflow.transition">

@@ -3,7 +3,7 @@
     <!-- Workflow -->
     <record id="workflow_taxi_leg" model="riverflow.workflow">
         <field name="model_id" ref="riverflow.model_riverflow_service" />
-        <field name="name">Taxi Leg</field>
+        <field name="name">Travel Leg</field>
         <field name="description">For-information only workflow</field>
         <field name="icon">fa-info-circle</field>
         <field name="is_supply_order">False</field>

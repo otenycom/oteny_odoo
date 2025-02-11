@@ -380,11 +380,19 @@ class Service(models.Model):
                 # Handle the case where conversion to int fails
                 service.root_id = service.id  # Or handle as appropriate
 
-    @api.depends("name", "parent_id.display_name", "supply_leg_id.name")
+    @api.depends(
+        "name",
+        "parent_id.display_name",
+        "supply_leg_id.name",
+        "supply_leg_id.service_id.name",
+    )
     def _compute_display_name(self):
         for service in self.sudo():
             if service.supply_leg_id:
-                service.name = service.supply_leg_id.name
+                name = service.supply_leg_id.name
+                if not service.parent_id:
+                    name = f"{service.supply_leg_id.service_id.name} | {name}"
+                service.name = name
 
             if service.parent_id:
                 service.display_name = "%s | %s" % (
@@ -426,14 +434,23 @@ class Service(models.Model):
                 service.name,
             )
 
-    @api.depends("use_project_deadline_from", "root_id.deadline", "root_id")
+    @api.depends(
+        "use_project_deadline_from",
+        "root_id.deadline",
+        "root_id",
+        "supply_order_service_id.deadline",
+    )
     def _compute_project_deadline(self):
         for service in self:
-            use_project_deadline_from = service.use_project_deadline_from
-            if use_project_deadline_from == "self":
-                service.project_deadline = service.project_deadline
-            elif use_project_deadline_from == "root":
-                service.project_deadline = service.root_id.deadline
+            if service.supply_order_service_id:
+                service.use_project_deadline_from = "self"
+                service.project_deadline = service.supply_order_service_id.deadline
+            else:
+                use_project_deadline_from = service.use_project_deadline_from
+                if use_project_deadline_from == "self":
+                    service.project_deadline = service.project_deadline
+                elif use_project_deadline_from == "root":
+                    service.project_deadline = service.root_id.deadline
 
     def _inverse_project_deadline(self):
         # this is a flag method specifying the user is allowed to store the project_deadline
@@ -459,9 +476,7 @@ class Service(models.Model):
     )
     def _compute_deadline(self):
         for service in self:
-            if service.supply_order_service_id:
-                service.deadline = service.supply_order_service_id.deadline
-            elif not service.project_deadline:
+            if not service.project_deadline:
                 service.deadline = False
             elif service.is_days_relative_to_project_applicable:
                 service.deadline = self.project_deadline + timedelta(
@@ -1054,16 +1069,19 @@ class ServiceLeg(models.Model):
         help="If True, the leg is considered for invoicing",
     )
 
-    @api.depends("supply_from", "supply_to", "service_id.deadline")
+    @api.depends("supply_from", "supply_to", "service_id.deadline", "service_id.name")
     def _compute_name(self):
         for leg in self:
-            name = "Taxi"
+            name_parts = []
+
             if leg.supply_from and leg.supply_to:
-                name += f": {leg.supply_from} → {leg.supply_to}"
+                name_parts.append(f"{leg.supply_from} → {leg.supply_to}")
             elif leg.supply_from:
-                name += f": {leg.supply_from}"
+                name_parts.append(leg.supply_from)
             elif leg.supply_to:
-                name += f": {leg.supply_to}"
+                name_parts.append(leg.supply_to)
+
             if leg.service_id.deadline:
-                name += f" | {leg.service_id.deadline.strftime(Service.DATE_FORMAT)}"
-            leg.name = name
+                name_parts.append(leg.service_id.deadline.strftime(Service.DATE_FORMAT))
+
+            leg.name = " | ".join(name_parts)
