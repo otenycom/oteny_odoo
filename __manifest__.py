@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.421",
+    "version": "18.0.1.422",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -18,6 +18,7 @@
         "wizards/riverflow_service_email_sender_view.xml",
         "wizards/riverflow_service_register_wizard_view.xml",
         "wizards/riverflow_supplier_confirmed_view.xml",
+        "wizards/riverflow_enter_train_ticket_view.xml",
         "views/riverflow_service_views.xml",
         "views/riverflow_workflow_views.xml",
         "views/riverflow_state_views.xml",
@@ -34,6 +35,7 @@
         "data/riverflow_taxi_order_workflow.xml",
         "data/riverflow_to_be_invoiced_workflow.xml",
         "data/riverflow_taxi_leg_workflow.xml",
+        "data/riverflow_train_ticket_workflow.xml",
     ],
     "assets": {
         "web.assets_backend": [
