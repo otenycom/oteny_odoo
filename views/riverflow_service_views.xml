@@ -211,6 +211,7 @@
                             <field name="supply_from" />
                             <field name="supply_to" />
                             <field name="supply_instructions" />
+                            <field name="service_id" readonly="1" string="Supply Order" options="{'no_create': True, 'no_open': False}" />
                         </group>
                         <group>
                             <field name="supply_cost_amount" string="Cost" />
