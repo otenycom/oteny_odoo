@@ -102,6 +102,22 @@ class MailThreadReviewMixin(models.AbstractModel):
         index="trigram",
     )
 
+    most_recent_attachment_id = fields.Many2one(
+        comodel_name="ir.attachment",
+        string="Most Recent Attachment",
+        compute="_compute_most_recent_attachment_id",
+    )
+
+    def _compute_most_recent_attachment_id(self):
+        for record in self:
+            attachments = record.message_ids.attachment_ids.sorted(
+                key=lambda a: a.create_date, reverse=True
+            )
+            if len(attachments) > 0:
+                record.most_recent_attachment_id = attachments[0]
+            else:
+                record.most_recent_attachment_id = False
+
     def _get_filtered_messages(self, select_internal):
         """
         Helper function to get message IDs based on message type and subtype internal flag.

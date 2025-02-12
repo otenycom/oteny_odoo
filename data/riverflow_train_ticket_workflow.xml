@@ -75,6 +75,14 @@
         <field name="sequence">10</field>
     </record>
 
+    <record id="trans_train_booked_to_booked" model="riverflow.transition">
+        <field name="name">Update Booking</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_booked" />
+        <field name="action_id" ref="riverflow.transition_action_enter_train_ticket" />
+        <field name="sequence">20</field>
+    </record>
+
     <!-- Transitions from Sent -->
     <record id="trans_train_sent_to_registered" model="riverflow.transition">
         <field name="name">Register</field>

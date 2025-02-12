@@ -15,7 +15,8 @@
                         <field name="price" />
                         <field name="notes" />
 
-                        <field name="attachment_ids" widget="many2many_binary" />
+                        <field name="attachment_ids" widget="many2many_binary" invisible="use_existing_attachment" />
+                        <field name="use_existing_attachment" />
                     </group>
                 </sheet>
                 <footer>
