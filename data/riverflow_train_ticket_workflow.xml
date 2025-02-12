@@ -25,12 +25,6 @@
         <field name="sequence">20</field>
     </record>
 
-    <record id="state_train_sent" model="riverflow.state">
-        <field name="workflow_id" ref="workflow_service_train_ticket" />
-        <field name="name">Sent</field>
-        <field name="sequence">30</field>
-    </record>
-
     <record id="state_train_cancelled" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_train_ticket" />
         <field name="name">Cancelled</field>
@@ -67,11 +61,11 @@
     </record>
 
     <!-- Transitions from Booked -->
-    <record id="trans_train_booked_to_sent" model="riverflow.transition">
-        <field name="name">Send to Employee</field>
+    <record id="trans_train_booked_to_registered" model="riverflow.transition">
+        <field name="name">Register</field>
         <field name="from_state_id" ref="state_train_booked" />
-        <field name="to_state_id" ref="state_train_sent" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="to_state_id" ref="riverflow.back_office_state_registered" />
+        <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
     </record>
 
@@ -83,15 +77,6 @@
         <field name="sequence">20</field>
     </record>
 
-    <!-- Transitions from Sent -->
-    <record id="trans_train_sent_to_registered" model="riverflow.transition">
-        <field name="name">Register</field>
-        <field name="from_state_id" ref="state_train_sent" />
-        <field name="to_state_id" ref="riverflow.back_office_state_registered" />
-        <field name="action_id" ref="riverflow.transition_action_register_service" />
-        <field name="sequence">10</field>
-        <field name="to_responsible_team_id" ref="riverflow.team_finance" />
-    </record>
 
     <!-- Transitions from Cancelled -->
     <record id="trans_train_cancelled_to_not_started" model="riverflow.transition">
