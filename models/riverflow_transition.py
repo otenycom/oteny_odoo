@@ -61,9 +61,7 @@ class RiverflowTransition(models.Model):
     @api.depends("workflow_id")
     def _compute_workflow_name(self):
         for transition in self:
-            transition.workflow_name = (
-                transition.workflow_id.name if transition.workflow_id else False
-            )
+            transition.workflow_name = transition.workflow_id.name if transition.workflow_id else False
 
     model = fields.Char(
         "Related Model",
@@ -82,9 +80,7 @@ class RiverflowTransition(models.Model):
     action_context = fields.Text(
         "Action context", help="Configuration values for the action screen", copy=True
     )
-    display_name = fields.Char(
-        "Display Name", compute="_compute_display_name", store=True, index="trigram"
-    )
+    display_name = fields.Char("Display Name", compute="_compute_display_name", store=True, index="trigram")
 
     # email_template_id = fields.Many2one('mail.template', 'Email Template', copy=True, domain=[
     #                                     ('model', '=', 'riverflow.workflow')])
@@ -102,19 +98,19 @@ class RiverflowTransition(models.Model):
     @api.depends("name", "from_state_id", "from_state_id")
     def _compute_display_name(self):
         for transition in self:
-            fromState = (
-                transition.from_state_id.display_name
-                if transition.from_state_id
-                else "Start"
+            fromState = transition.from_state_id.display_name if transition.from_state_id else "Start"
+            transition.display_name = (
+                f"{transition.name}: {fromState} → {transition.to_state_id.display_name}"
             )
-            transition.display_name = f"{transition.name}: {fromState} → {transition.to_state_id.display_name}"
 
     @api.depends("icon", "name", "action_id.icon")
     def _compute_icon_name_html(self):
         for record in self:
             icon = record.icon or record.action_id.icon
             if icon:
-                record.icon_name_html = f'<span><span class="fa {escape(icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                record.icon_name_html = (
+                    f'<span><span class="fa {escape(icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                )
             else:
                 record.icon_name_html = escape(record.name)
 
@@ -122,9 +118,7 @@ class RiverflowTransition(models.Model):
     def _get_transition_description(self, transition):
         if self.transition_id.from_state_id:
             transition_description = (
-                self.transition_id.from_state_id.name
-                + " → "
-                + self.transition_id.to_state_id.name
+                self.transition_id.from_state_id.name + " → " + self.transition_id.to_state_id.name
             )
         else:  # start transition
             transition_description = self.transition_id.to_state_id.name

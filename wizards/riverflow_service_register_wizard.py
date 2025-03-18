@@ -33,8 +33,8 @@ class ServiceRegisterWizard(models.TransientModel):
         # visibility_defaults["name_invisible"] = visibility_defaults.get(
         #     "name_invisible", True
         # )
-        visibility_defaults["transition_description_invisible"] = (
-            visibility_defaults.get("transition_description_invisible", True)
+        visibility_defaults["transition_description_invisible"] = visibility_defaults.get(
+            "transition_description_invisible", True
         )
 
         visibility_defaults["supply_quantity_invisible"] = visibility_defaults.get(
@@ -67,8 +67,6 @@ class ServiceRegisterWizard(models.TransientModel):
         """Ensure supply quantity and unit price are provided when required"""
         for wizard in self:
             if wizard.supply_quantity_required and not wizard.supply_quantity:
-                raise ValidationError(
-                    _("Supply quantity is required and cannot be zero.")
-                )
+                raise ValidationError(_("Supply quantity is required and cannot be zero."))
             if wizard.supply_unit_price_required and not wizard.supply_unit_price:
                 raise ValidationError(_("Unit price is required and cannot be zero."))

@@ -10,9 +10,7 @@ class ServiceNewWizard(models.TransientModel):
 
     def _add_template_start_transitions(self, transition_buttons, defaults_context):
         # fetch all services with is_root_a_template=True, sorted by default order (respecting the tree structure)
-        template_services = self.env["riverflow.service"].search(
-            [("is_root_a_template", "=", True)]
-        )
+        template_services = self.env["riverflow.service"].search([("is_root_a_template", "=", True)])
 
         index = 0
         for template_service in template_services:
@@ -38,9 +36,7 @@ class ServiceNewWizard(models.TransientModel):
         self.ensure_one()
 
         template_service_id = self.env.context.get("template_service_id")
-        new_service = self.env["riverflow.service"]._create_service_from_template(
-            template_service_id
-        )
+        new_service = self.env["riverflow.service"]._create_service_from_template(template_service_id)
 
         return {
             "type": "ir.actions.act_window",

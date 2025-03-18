@@ -10,9 +10,7 @@ class RiverflowWorkflowState(models.Model):
     name = fields.Char("State name", required=True)
     description = fields.Text("Description", required=False)
     active = fields.Boolean("Active", default=True)
-    workflow_id = fields.Many2one(
-        "riverflow.workflow", "Workflow", copy=True, index=True, required=True
-    )
+    workflow_id = fields.Many2one("riverflow.workflow", "Workflow", copy=True, index=True, required=True)
     sequence = fields.Integer(default=10)
     hide_in_statusbar = fields.Boolean("Hide in Statusbar", default=False)
     is_end_state = fields.Boolean("Is End State", default=False)
@@ -33,9 +31,7 @@ class RiverflowWorkflowState(models.Model):
         help="Transitions from this state",
     )
 
-    display_name = fields.Char(
-        "Display Name", compute="_compute_display_name", store=True, index="trigram"
-    )
+    display_name = fields.Char("Display Name", compute="_compute_display_name", store=True, index="trigram")
 
     @api.depends("name", "workflow_id.name")
     def _compute_display_name(self):

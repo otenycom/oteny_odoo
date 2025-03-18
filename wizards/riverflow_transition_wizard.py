@@ -9,15 +9,11 @@ class TransitionWizard(models.AbstractModel):
     _workflow_model = "definedInDerivedClass"
 
     transition_id = fields.Many2one("riverflow.transition", "Transition")
-    transition_description = fields.Html(
-        "Description", compute="_compute_transition_description"
-    )
+    transition_description = fields.Html("Description", compute="_compute_transition_description")
     transition_description_invisible = fields.Boolean()
 
     # in each derived class, define the records_to_transition_ids field to be of the correct co-model
-    records_to_transition_ids = fields.Many2many(
-        "riverflow.service"
-    )  # to be overridden
+    records_to_transition_ids = fields.Many2many("riverflow.service")  # to be overridden
     responsible_team_id = fields.Many2one(
         "riverflow.team",
         string="Assign to Team",
@@ -36,9 +32,7 @@ class TransitionWizard(models.AbstractModel):
         defaultValues["transition_id"] = transition_id.id
 
         if transition_id.to_responsible_team_id:
-            defaultValues["responsible_team_id"] = (
-                transition_id.to_responsible_team_id.id
-            )
+            defaultValues["responsible_team_id"] = transition_id.to_responsible_team_id.id
 
         records_to_transition = self.env[self._workflow_model]
         records_to_transition_ids = []
@@ -48,9 +42,7 @@ class TransitionWizard(models.AbstractModel):
         if self.env.context.get("active_model") == self._workflow_model:
             records_to_transition_ids = self.env.context.get("active_ids")
         if records_to_transition_ids:
-            records_to_transition = records_to_transition.browse(
-                records_to_transition_ids
-            )
+            records_to_transition = records_to_transition.browse(records_to_transition_ids)
 
         if records_to_transition.ids:
             defaultValues["records_to_transition_ids"] = records_to_transition.ids
@@ -107,11 +99,7 @@ class TransitionWizard(models.AbstractModel):
             for record in recordsToTransition:
                 current_state = record.state_id
                 if expected_state and current_state != expected_state:
-                    raise UserError(
-                        _(
-                            "Another user just updated this record. Please refresh and try again."
-                        )
-                    )
+                    raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
                 write_vals = {"state_id": transition.to_state_id.id}
                 self.update_write_values(record, write_vals)

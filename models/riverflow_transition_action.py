@@ -22,9 +22,7 @@ class RiverflowTransitionAction(models.Model):
     )
 
     model_id = fields.Many2one("ir.model", "Applies to")
-    model = fields.Char(
-        "Related Model", related="model_id.model", index=True, store=True, readonly=True
-    )
+    model = fields.Char("Related Model", related="model_id.model", index=True, store=True, readonly=True)
 
     odoo_view = fields.Text("Odoo View", help="Odoo wizard form-view")
 
@@ -34,6 +32,8 @@ class RiverflowTransitionAction(models.Model):
     def _compute_icon_name_html(self):
         for record in self:
             if record.icon:
-                record.icon_name_html = f'<span><span class="fa {escape(record.icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                record.icon_name_html = (
+                    f'<span><span class="fa {escape(record.icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                )
             else:
                 record.icon_name_html = escape(record.name)

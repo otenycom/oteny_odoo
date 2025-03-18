@@ -47,9 +47,7 @@ class ServiceWizard(models.TransientModel):
         super().default_get_using_records(defaultValues, records_to_transition)
         if len(records_to_transition) == 0:
             ctx = self.env.context
-            parent_id = self.env["riverflow.service"].browse(
-                ctx.get("default_parent_id", 0)
-            )
+            parent_id = self.env["riverflow.service"].browse(ctx.get("default_parent_id", 0))
             res_model = ctx.get("default_res_model", False)
             res_id = ctx.get("default_res_id", 0)
             use_project_deadline_from_options = self.env[
@@ -57,9 +55,7 @@ class ServiceWizard(models.TransientModel):
             ].calculate_use_project_deadline_from_options_for_new_service(
                 parent_id, res_model, res_id, parent_id.is_root_a_template
             )
-            defaultValues["use_project_deadline_from_options"] = (
-                use_project_deadline_from_options
-            )
+            defaultValues["use_project_deadline_from_options"] = use_project_deadline_from_options
 
         else:
             # This is not a stored field, so it is not in the defaultValues
@@ -92,8 +88,7 @@ class ServiceWizard(models.TransientModel):
         visibility_defaults = super().get_visibility_defaults(transition_id)
         # todo: consider a computed field 'hide_timing_fields' in the state and/or transition to hide the fields
         hide_timing_fields = (
-            transition_id.to_state_id.is_end_state
-            or transition_id.to_state_id.is_back_office_state
+            transition_id.to_state_id.is_end_state or transition_id.to_state_id.is_back_office_state
         )
         visibility_defaults["project_deadline_invisible"] = hide_timing_fields
         visibility_defaults["use_project_deadline_from_invisible"] = hide_timing_fields

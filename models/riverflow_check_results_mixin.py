@@ -39,9 +39,7 @@ class CheckResultsMixin(models.AbstractModel):
     def _refresh_check_results_on_after__write(self, before__write_result):
         pass
 
-    def _sync_check_results(
-        self, existing_check_results, new_check_results, index_field
-    ):
+    def _sync_check_results(self, existing_check_results, new_check_results, index_field):
         CheckResult = self.env["riverflow.check.result"]
 
         # Index existing check results
@@ -60,11 +58,7 @@ class CheckResultsMixin(models.AbstractModel):
             if new_index in existing_indexed:
                 existing_results = existing_indexed[new_index]
                 matching_result = next(
-                    (
-                        result
-                        for result in existing_results
-                        if result.compare(new_result)
-                    ),
+                    (result for result in existing_results if result.compare(new_result)),
                     None,
                 )
 
@@ -79,9 +73,7 @@ class CheckResultsMixin(models.AbstractModel):
         to_unlink.unlink()  # cascade delete
 
     def base_check_results(self):
-        result = self.check_result_ids.filtered(
-            lambda r: r.check_type in ["gap", "overlap", "reversed"]
-        )
+        result = self.check_result_ids.filtered(lambda r: r.check_type in ["gap", "overlap", "reversed"])
         return result
 
     def print_check_results(self):
@@ -90,27 +82,17 @@ class CheckResultsMixin(models.AbstractModel):
         """
         print(f"\nCheck Results for Log Entry: {self.name}")
         print(
-            "{:<10} {:<12} {:<12} {:<10} {:<50}".format(
-                "Type", "Start Date", "End Date", "Severity", "Name"
-            )
+            "{:<10} {:<12} {:<12} {:<10} {:<50}".format("Type", "Start Date", "End Date", "Severity", "Name")
         )
         print("-" * 94)
         for result in self.check_result_ids:
             print(
                 "{:<10} {:<12} {:<12} {:<10} {:<50}".format(
                     result.check_type,
-                    (
-                        result.start_date.strftime("%Y-%m-%d")
-                        if result.start_date
-                        else "N/A"
-                    ),
+                    (result.start_date.strftime("%Y-%m-%d") if result.start_date else "N/A"),
                     result.end_date.strftime("%Y-%m-%d") if result.end_date else "N/A",
                     result.severity,
-                    (
-                        result.name[:47] + "..."
-                        if len(result.name) > 50
-                        else result.name
-                    ),
+                    (result.name[:47] + "..." if len(result.name) > 50 else result.name),
                 )
             )
         print()

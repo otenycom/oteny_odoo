@@ -48,13 +48,9 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         store=True,
         index=True,
     )
-    state_name = fields.Char(
-        "State name", related="state_id.name", store=True, index=True
-    )
+    state_name = fields.Char("State name", related="state_id.name", store=True, index=True)
 
-    state_json = fields.Json(
-        string="Workflow State", compute="_compute_state_json", store=False
-    )
+    state_json = fields.Json(string="Workflow State", compute="_compute_state_json", store=False)
     transition_buttons_json = fields.Json(
         string="Workflow Actions",
         compute="_compute_transition_buttons_json",
@@ -83,9 +79,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     )
 
     # = self._name, made accessible for use in the filter-domain of the workflow dropdown
-    model = fields.Char(
-        compute="_compute_model", help="Model on which the workflow runs."
-    )
+    model = fields.Char(compute="_compute_model", help="Model on which the workflow runs.")
 
     @api.model
     def default_get(self, fields_list):
@@ -169,19 +163,14 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 for transition in transition_ids:
                     # workaround, sometimes transition is a clone? in lookup tables or so
                     transition_id = (
-                        transition.id.origin
-                        if isinstance(record.id, models.NewId)
-                        else int(transition.id)
+                        transition.id.origin if isinstance(record.id, models.NewId) else int(transition.id)
                     )
 
                     if not record.state_id:
                         # The start transition to the first state can be skipped, as that is a no-op
                         # its typically named "Not Started" and used in the Start-new wizard to create a new record in the first state
                         # in these, we are handling a record that is already created and the null state is logically the first state
-                        if (
-                            transition.from_state_id.id == False
-                            and transition.name == "Not Started"
-                        ):
+                        if transition.from_state_id.id == False and transition.name == "Not Started":
                             continue
 
                     transition_buttons["buttons"].append(
@@ -208,9 +197,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             else:
                 workflow_id = record.workflow_id.id
 
-            state_ids = self.env["riverflow.state"].search(
-                [("workflow_id", "=", workflow_id)]
-            )
+            state_ids = self.env["riverflow.state"].search([("workflow_id", "=", workflow_id)])
 
             json = {"states": []}
             is_first = True
@@ -323,9 +310,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
     @api.depends("state_id", "workflow_id")
     def _compute_front_office_workflow_id(self):
         for record in self:
-            has_front_office_workflow = (
-                record.state_id and not record.state_id.is_back_office_state
-            )
+            has_front_office_workflow = record.state_id and not record.state_id.is_back_office_state
             if has_front_office_workflow:
                 record.front_office_workflow_id = record.state_id.workflow_id
             else:

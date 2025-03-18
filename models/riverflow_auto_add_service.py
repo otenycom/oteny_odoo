@@ -105,9 +105,7 @@ class AutoAddService(models.Model):
                 domain = safe_eval(auto_add_rule.condition_domain, eval_context)
                 rule_domains[auto_add_rule] = expression.normalize_domain(domain)
             except Exception as e:
-                raise ValidationError(
-                    f"Error evaluating domain for rule {auto_add_rule.name}: {e}"
-                )
+                raise ValidationError(f"Error evaluating domain for rule {auto_add_rule.name}: {e}")
 
         for subject in subjects:
             for auto_add_rule, domain in rule_domains.items():
@@ -141,33 +139,24 @@ class AutoAddService(models.Model):
         )
 
         # Create sets for easy comparison using template_id instead of the created service
-        new_services_set = {
-            (ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services
-        }
-        current_services_dict = {
-            (s.created_by_auto_add_service_id.id, s.res_id): s for s in current_services
-        }
+        new_services_set = {(ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services}
+        current_services_dict = {(s.created_by_auto_add_service_id.id, s.res_id): s for s in current_services}
 
         # Services to activate (in new_services_set and currently inactive)
         to_activate = current_services.filtered(
-            lambda s: (s.created_by_auto_add_service_id.id, s.res_id)
-            in new_services_set
-            and not s.active
+            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) in new_services_set and not s.active
         )
 
         # Services to deactivate (not in new_services_set and currently active)
         to_deactivate = current_services.filtered(
-            lambda s: (s.created_by_auto_add_service_id.id, s.res_id)
-            not in new_services_set
-            and s.active
+            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) not in new_services_set and s.active
         )
 
         # Services to create (in new_services_set but not in current_services_dict)
         to_create = [
             ns
             for ns in new_services
-            if (ns["created_by_auto_add_service_id"], ns["res_id"])
-            not in current_services_dict
+            if (ns["created_by_auto_add_service_id"], ns["res_id"]) not in current_services_dict
         ]
 
         if to_activate:
@@ -188,7 +177,5 @@ class AutoAddService(models.Model):
                         ],
                     }
                 )
-                created_service = service_context._create_service_from_template(
-                    service_vals["template_id"]
-                )
+                created_service = service_context._create_service_from_template(service_vals["template_id"])
                 created_services.append(created_service)

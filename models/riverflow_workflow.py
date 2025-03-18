@@ -21,9 +21,7 @@ class RiverflowWorkflow(models.Model):
 
     active = fields.Boolean("Active", default=True)
 
-    state_ids = fields.One2many(
-        "riverflow.state", "workflow_id", string="Workflow states"
-    )
+    state_ids = fields.One2many("riverflow.state", "workflow_id", string="Workflow states")
 
     workflow_start_transition_ids = fields.One2many(
         "riverflow.transition",
@@ -32,19 +30,13 @@ class RiverflowWorkflow(models.Model):
         string="Start transitions",
     )
 
-    model_id = fields.Many2one(
-        "ir.model", "Applies to", required=True, ondelete="cascade"
-    )
-    model = fields.Char(
-        "Related Model", related="model_id.model", index=True, store=True, readonly=True
-    )
+    model_id = fields.Many2one("ir.model", "Applies to", required=True, ondelete="cascade")
+    model = fields.Char("Related Model", related="model_id.model", index=True, store=True, readonly=True)
     friendly_model_name = fields.Char(
         "Friendly Model Name", compute="_compute_friendly_model_name", store=True
     )
 
-    display_name = fields.Char(
-        "Display Name", compute="_compute_display_name", store=True, index=True
-    )
+    display_name = fields.Char("Display Name", compute="_compute_display_name", store=True, index=True)
 
     is_supply_order = fields.Boolean(
         "Is Supply Order",
@@ -77,7 +69,9 @@ class RiverflowWorkflow(models.Model):
     def _compute_icon_name_html(self):
         for record in self:
             if record.icon:
-                record.icon_name_html = f'<span><span class="fa {escape(record.icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                record.icon_name_html = (
+                    f'<span><span class="fa {escape(record.icon)}"></span>&nbsp;{escape(record.name)}</span>'
+                )
             else:
                 record.icon_name_html = escape(record.name)
 

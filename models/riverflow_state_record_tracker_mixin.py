@@ -15,9 +15,7 @@ Key features:
 
 class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
     _name = "riverflow.state.record.tracker.mixin"
-    _description = (
-        "Syncs the model with the central Radar table (RiverflowStateRecord)."
-    )
+    _description = "Syncs the model with the central Radar table (RiverflowStateRecord)."
 
     def _get_state_record(self):
         self.ensure_one()
@@ -33,12 +31,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         """
         domain = [("master_model", "=", self._name)]
         domain.append(("master_res_id", "in", ids))
-        return (
-            self.env["riverflow.state.record"]
-            .sudo()
-            .with_context(active_test=False)
-            .search(domain)
-        )
+        return self.env["riverflow.state.record"].sudo().with_context(active_test=False).search(domain)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -65,9 +58,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         state_record_vals = []
         for record in records:
             if self._add_state_record(record):
-                _logger.info(
-                    f"Creating riverflow_state_record for {record._name} with id {record.id}"
-                )
+                _logger.info(f"Creating riverflow_state_record for {record._name} with id {record.id}")
                 # The rest of the values are copied from the record by compute methods in the state record model
                 vals = {
                     "master_model": record._name,

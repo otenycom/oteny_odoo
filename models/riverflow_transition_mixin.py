@@ -19,11 +19,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
             expected_state = transition.from_state_id
 
             if expected_state and current_state != expected_state:
-                raise UserError(
-                    _(
-                        "Another user just updated this record. Please refresh and try again."
-                    )
-                )
+                raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
@@ -86,9 +82,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
                 full_xml_id = value
                 transition_xml_id = transition.get_external_id().get(transition.id, "")
                 if not transition_xml_id:
-                    raise UserError(
-                        _(f"No external ID found for transition '{transition.name}'")
-                    )
+                    raise UserError(_(f"No external ID found for transition '{transition.name}'"))
                 if "." not in value and "." in transition_xml_id:
                     module_name = transition_xml_id.split(".")[0]
                     full_xml_id = f"{module_name}.{value}"

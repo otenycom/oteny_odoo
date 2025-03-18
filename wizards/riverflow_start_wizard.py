@@ -10,13 +10,9 @@ class StartWizard(RiverflowTransitionMixin):
 
     def _default_start_transition_ids(self):
         domain = [("from_state_id", "=", False), ("model", "=", self._workflow_model)]
-        return self.env["riverflow.transition"].search(
-            domain, order="workflow_name,sequence,id"
-        )
+        return self.env["riverflow.transition"].search(domain, order="workflow_name,sequence,id")
 
-    start_transition_ids = fields.Many2many(
-        "riverflow.transition", default=_default_start_transition_ids
-    )
+    start_transition_ids = fields.Many2many("riverflow.transition", default=_default_start_transition_ids)
 
     transition_buttons_json = fields.Json(
         "Start Transitions", compute="_compute_transition_buttons_json", store=False
@@ -54,9 +50,7 @@ class StartWizard(RiverflowTransitionMixin):
 
         for index, transition in enumerate(wizard.start_transition_ids):
             transition_id = (
-                transition.id.origin
-                if isinstance(wizard.id, models.NewId)
-                else int(transition.id)
+                transition.id.origin if isinstance(wizard.id, models.NewId) else int(transition.id)
             )
 
             button_context = defaults_context.copy()

@@ -27,15 +27,9 @@ class Service(models.Model):
     # auto calculated by Odoo in the form of parent_id/parent_id/self_id/
     # see def _get_domain_locations(self)
     parent_path = fields.Char(index="btree")
-    indent_level = fields.Integer(
-        "Indent level", compute="_compute_indent_level", store=True, recursive=True
-    )
-    parent_id = fields.Many2one(
-        "riverflow.service", string="Parent Service", index=True, ondelete="cascade"
-    )
-    child_ids = fields.One2many(
-        "riverflow.service", "parent_id", string="Child Services"
-    )
+    indent_level = fields.Integer("Indent level", compute="_compute_indent_level", store=True, recursive=True)
+    parent_id = fields.Many2one("riverflow.service", string="Parent Service", index=True, ondelete="cascade")
+    child_ids = fields.One2many("riverflow.service", "parent_id", string="Child Services")
     descendant_ids = fields.One2many(
         "riverflow.service",
         "parent_id",
@@ -75,9 +69,7 @@ class Service(models.Model):
         help="The recipients for the email can also be set by adding followers to the chatter",
     )
 
-    root_id = fields.Many2one(
-        "riverflow.service", compute="_compute_root_id", store=True, recursive=True
-    )
+    root_id = fields.Many2one("riverflow.service", compute="_compute_root_id", store=True, recursive=True)
     root_name = fields.Char(
         "Top-level service name",
         compute="_compute_root_name",
@@ -87,9 +79,7 @@ class Service(models.Model):
         recursive=True,
     )
     name = fields.Char("Service Name", index="trigram", required=True, tracking=True)
-    indented_name = fields.Char(
-        "Service", compute="_compute_indented_name", store=False, recursive=True
-    )
+    indented_name = fields.Char("Service", compute="_compute_indented_name", store=False, recursive=True)
     display_name = fields.Char(
         "Display Name",
         compute="_compute_display_name",
@@ -136,9 +126,7 @@ class Service(models.Model):
         default="self",
     )
 
-    use_project_deadline_from_options = fields.Json(
-        compute="_compute_use_project_deadline_from_options"
-    )
+    use_project_deadline_from_options = fields.Json(compute="_compute_use_project_deadline_from_options")
 
     is_days_relative_to_project_applicable = fields.Boolean(
         "Use relative days",
@@ -174,9 +162,7 @@ class Service(models.Model):
         index=True,
         recursive=True,
     )
-    deadline_formatted = fields.Char(
-        "Deadline", compute="_compute_deadline_formatted", store=False
-    )
+    deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
     timing_json = fields.Json(
         "Timing",
         compute="_compute_timing_json",
@@ -234,10 +220,7 @@ class Service(models.Model):
     # up in the riverflow.state.record model
     @api.model
     def _selection_target_model(self):
-        return [
-            (model.model, model.name)
-            for model in self.env["ir.model"].sudo().search([])
-        ]
+        return [(model.model, model.name) for model in self.env["ir.model"].sudo().search([])]
 
     resource_ref = fields.Reference(
         string="Subject Reference",
@@ -359,9 +342,7 @@ class Service(models.Model):
         for service in self:
             root_service = service.root_id
             sortable_deadline = (
-                root_service.deadline.strftime("%Y-%m-%d")
-                if root_service.deadline
-                else "2000-01-01"
+                root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
             service.root_name = f"{sortable_deadline} {root_service.name}"
 
@@ -461,10 +442,7 @@ class Service(models.Model):
         for service in self:
             service.is_days_relative_to_project_applicable = (
                 service.use_project_deadline_from != "self"
-                and not (
-                    service.use_project_deadline_from == "root"
-                    and service.root_id.ids == service.ids
-                )
+                and not (service.use_project_deadline_from == "root" and service.root_id.ids == service.ids)
             )
 
     @api.depends(
@@ -479,9 +457,7 @@ class Service(models.Model):
             if not service.project_deadline:
                 service.deadline = False
             elif service.is_days_relative_to_project_applicable:
-                service.deadline = self.project_deadline + timedelta(
-                    days=service.days_relative_to_project
-                )
+                service.deadline = self.project_deadline + timedelta(days=service.days_relative_to_project)
             else:
                 service.deadline = service.project_deadline
 
@@ -528,9 +504,7 @@ class Service(models.Model):
             if service.deadline == False:
                 service.deadline_formatted = ""
             else:
-                service.deadline_formatted = service.deadline.strftime(
-                    Service.DATE_FORMAT
-                )
+                service.deadline_formatted = service.deadline.strftime(Service.DATE_FORMAT)
 
     def print_compute_sequence_counter(self):
         pass
@@ -703,11 +677,7 @@ class Service(models.Model):
             if record.parent_id and not record.res_id:
                 record.res_id = record.parent_id.res_id
                 record.res_model = record.parent_id.res_model
-            elif (
-                not record.parent_id
-                and record.res_model == self._name
-                and record.res_id
-            ):
+            elif not record.parent_id and record.res_model == self._name and record.res_id:
                 # for auto-adding a child service, they set the parent via res_id
                 # Invalidate the recordset to ensure fresh data
                 record.parent_id = record.res_id
@@ -715,9 +685,7 @@ class Service(models.Model):
                 record.res_model = record.parent_id.res_model
                 record.res_id = record.parent_id.res_id
                 # recalculate the parent_id dependent fields
-                record.invalidate_recordset(
-                    ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
-                )
+                record.invalidate_recordset(["parent_id", "parent_path", "root_id", "res_model", "res_id"])
                 record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
@@ -751,15 +719,9 @@ class Service(models.Model):
         """Get default recipients for email templates based on active followers who receive comments"""
         self.ensure_one()
         # Get followers with comment notification enabled (mail.mt_comment)
-        comment_subtype_id = self.env["ir.model.data"]._xmlid_to_res_id(
-            "mail.mt_comment"
-        )
+        comment_subtype_id = self.env["ir.model.data"]._xmlid_to_res_id("mail.mt_comment")
         recipients = self.message_follower_ids.filtered(
-            lambda f: (
-                f.partner_id
-                and f.partner_id.active
-                and comment_subtype_id in f.subtype_ids.ids
-            )
+            lambda f: (f.partner_id and f.partner_id.active and comment_subtype_id in f.subtype_ids.ids)
         ).mapped("partner_id")
         if self.is_supply_order and self.supplier_partner_id:
             recipients = recipients.union(self.supplier_partner_id)
@@ -830,25 +792,19 @@ class Service(models.Model):
             "company_id": template_service.company_id.id,
             "use_project_deadline_from": template_service.use_project_deadline_from,
             "days_relative_to_project": template_service.days_relative_to_project,
-            "is_this_a_template": self.env.context.get(
-                "default_is_this_a_template", False
-            ),
+            "is_this_a_template": self.env.context.get("default_is_this_a_template", False),
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
             "is_supply_order": template_service.is_supply_order,
             "supplier_partner_id": template_service.supplier_partner_id.id,
             "supply_order_instructions": template_service.supply_order_instructions,
-            "tag_ids": [
-                Command.link(tag_id) for tag_id in template_service.tag_ids.ids
-            ],
+            "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
         }
         if parent_id:
             vals["parent_id"] = parent_id
 
         new_service = (
-            self.env["riverflow.service"]
-            .with_context(context={"mail_create_nosubscribe": True})
-            .create(vals)
+            self.env["riverflow.service"].with_context(context={"mail_create_nosubscribe": True}).create(vals)
         )
 
         # Copy the legs from the template
@@ -1016,9 +972,7 @@ class Service(models.Model):
 
     def unlink(self):
         if not self.env.context.get("bypass_user_unlink_check"):
-            if self.supply_leg_id.ids and not self.env.user.has_group(
-                "base.group_no_one"
-            ):
+            if self.supply_leg_id.ids and not self.env.user.has_group("base.group_no_one"):
                 raise UserError(
                     _(
                         "Cannot delete info-service linked to a supply order leg. Delete the leg from the supply order instead."
@@ -1050,9 +1004,7 @@ class ServiceLeg(models.Model):
     sequence = fields.Integer(default=10)
     supply_from = fields.Char("From")
     supply_to = fields.Char("To")
-    supply_cost_amount = fields.Monetary(
-        "Cost", currency_field="supply_cost_currency_id"
-    )
+    supply_cost_amount = fields.Monetary("Cost", currency_field="supply_cost_currency_id")
     supply_cost_currency_id = fields.Many2one(
         comodel_name="res.currency",
         string="Cost Currency",

@@ -15,17 +15,13 @@ class ServiceDeadlineTestCase(TransactionCase):
         super(ServiceDeadlineTestCase, cls).setUpClass()
 
     def cleanup_test_services(self):
-        self.env["riverflow.service"].search(
-            [("name", "like", f"{self.TEST_PREFIX}%")]
-        ).unlink()
+        self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")]).unlink()
 
     def dump_services_to_console(self, services):
         print("| indented_name              | deadline   |")
         print("|----------------------------|------------|")
         for service in services:
-            print(
-                f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} |"
-            )
+            print(f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} |")
 
     def create_service_tree(self):
         self.cleanup_test_services()
@@ -157,33 +153,21 @@ class ServiceDeadlineTestCase(TransactionCase):
         ) = self.create_service_tree()
 
         # Verify the structure
-        self.assertEqual(
-            len(root_1.child_ids), 0, "Root Service 1 should have no children"
-        )
+        self.assertEqual(len(root_1.child_ids), 0, "Root Service 1 should have no children")
 
-        self.assertEqual(
-            len(root_2.child_ids), 3, "Root Service 2 should have 3 children"
-        )
+        self.assertEqual(len(root_2.child_ids), 3, "Root Service 2 should have 3 children")
         self.assertEqual(root_2.child_ids[0].name, f"{self.TEST_PREFIX}Child 2.1")
         self.assertEqual(root_2.child_ids[1].name, f"{self.TEST_PREFIX}Child 2.2")
         self.assertEqual(root_2.child_ids[2].name, f"{self.TEST_PREFIX}Child 2.3")
 
-        self.assertEqual(
-            len(root_3.child_ids), 3, "Root Service 3 should have 3 children"
-        )
+        self.assertEqual(len(root_3.child_ids), 3, "Root Service 3 should have 3 children")
         self.assertEqual(root_3.child_ids[0].name, f"{self.TEST_PREFIX}Child 3.1")
         self.assertEqual(root_3.child_ids[1].name, f"{self.TEST_PREFIX}Child 3.2")
         self.assertEqual(root_3.child_ids[2].name, f"{self.TEST_PREFIX}Child 3.3")
 
-        self.assertEqual(
-            len(child_3_2.child_ids), 2, "Child 3.2 should have 2 grandchildren"
-        )
-        self.assertEqual(
-            child_3_2.child_ids[0].name, f"{self.TEST_PREFIX}Grandchild 3.2.1"
-        )
-        self.assertEqual(
-            child_3_2.child_ids[1].name, f"{self.TEST_PREFIX}Grandchild 3.2.2"
-        )
+        self.assertEqual(len(child_3_2.child_ids), 2, "Child 3.2 should have 2 grandchildren")
+        self.assertEqual(child_3_2.child_ids[0].name, f"{self.TEST_PREFIX}Grandchild 3.2.1")
+        self.assertEqual(child_3_2.child_ids[1].name, f"{self.TEST_PREFIX}Grandchild 3.2.2")
 
         # Verify the root_id is set correctly for all services
         all_services = (
@@ -201,9 +185,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         )
         for service in all_services:
             if service in [root_1, root_2, root_3]:
-                self.assertEqual(
-                    service.root_id, service, f"{service.name} should be its own root"
-                )
+                self.assertEqual(service.root_id, service, f"{service.name} should be its own root")
             elif service in [child_2_1, child_2_2, child_2_3]:
                 self.assertEqual(
                     service.root_id,
@@ -267,9 +249,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         self.create_service_tree()
 
         # Search for all services created in this test
-        services = self.env["riverflow.service"].search(
-            [("name", "like", f"{self.TEST_PREFIX}%")]
-        )
+        services = self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")])
 
         # Expected order of services: Root services by name, child services by date
         # | indented_name              | deadline   |
@@ -302,9 +282,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         ]
 
         # Verify the number of services
-        self.assertEqual(
-            len(services), len(expected_order), "Incorrect number of services found"
-        )
+        self.assertEqual(len(services), len(expected_order), "Incorrect number of services found")
 
         self.dump_services_to_console(services)
 
@@ -317,25 +295,13 @@ class ServiceDeadlineTestCase(TransactionCase):
             )
 
         # Verify parent-child relationships
-        root_2 = services.filtered(
-            lambda s: s.name == f"{self.TEST_PREFIX}Root Service 2"
-        )
-        root_3 = services.filtered(
-            lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3"
-        )
-        child_3_2 = services.filtered(
-            lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2"
-        )
+        root_2 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Root Service 2")
+        root_3 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3")
+        child_3_2 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2")
 
-        self.assertEqual(
-            len(root_2.child_ids), 3, "Root Service 2 should have 3 children"
-        )
-        self.assertEqual(
-            len(root_3.child_ids), 3, "Root Service 3 should have 3 children"
-        )
-        self.assertEqual(
-            len(child_3_2.child_ids), 2, "Child 3.2 should have 2 children"
-        )
+        self.assertEqual(len(root_2.child_ids), 3, "Root Service 2 should have 3 children")
+        self.assertEqual(len(root_3.child_ids), 3, "Root Service 3 should have 3 children")
+        self.assertEqual(len(child_3_2.child_ids), 2, "Child 3.2 should have 2 children")
 
         # Verify the order of children
         self.assertEqual(
@@ -394,22 +360,14 @@ class ServiceDeadlineTestCase(TransactionCase):
         # |         Grandchild 3.2.2   | 2024-03-03 |
         # |     Child 3.1              | 2024-02-29 |
 
-        child_3_2.write(
-            {"use_project_deadline_from": "self", "project_deadline": False}
-        )
+        child_3_2.write({"use_project_deadline_from": "self", "project_deadline": False})
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
-        services = self.env["riverflow.service"].search(
-            [("name", "like", f"{self.TEST_PREFIX}%")]
-        )
+        services = self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")])
         self.dump_services_to_console(services)
-        child_3_2 = services.filtered(
-            lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2"
-        )
+        child_3_2 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2")
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
-        root_3 = services.filtered(
-            lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3"
-        )
+        root_3 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3")
 
         self.dump_services_to_console(root_3.child_ids)
         self.dump_services_to_console(services)

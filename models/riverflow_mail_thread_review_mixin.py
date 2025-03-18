@@ -110,9 +110,7 @@ class MailThreadReviewMixin(models.AbstractModel):
 
     def _compute_most_recent_attachment_id(self):
         for record in self:
-            attachments = record.message_ids.attachment_ids.sorted(
-                key=lambda a: a.create_date, reverse=True
-            )
+            attachments = record.message_ids.attachment_ids.sorted(key=lambda a: a.create_date, reverse=True)
             if len(attachments) > 0:
                 record.most_recent_attachment_id = attachments[0]
             else:
@@ -127,23 +125,18 @@ class MailThreadReviewMixin(models.AbstractModel):
         """
         valid_message_types = ["email", "comment", "email_outgoing"]
         return self.message_ids.filtered(
-            lambda m: m.message_type in valid_message_types
-            and bool(m.subtype_id.internal) == select_internal
+            lambda m: m.message_type in valid_message_types and bool(m.subtype_id.internal) == select_internal
         )
 
     @api.depends("message_ids")
     def _compute_internal_note_ids(self):
         for record in self:
-            record.internal_note_ids = record._get_filtered_messages(
-                select_internal=True
-            )
+            record.internal_note_ids = record._get_filtered_messages(select_internal=True)
 
     @api.depends("message_ids")
     def _compute_external_message_ids(self):
         for record in self:
-            record.external_message_ids = record._get_filtered_messages(
-                select_internal=False
-            )
+            record.external_message_ids = record._get_filtered_messages(select_internal=False)
 
     @tools.ormcache()
     def _get_system_user_id(self):
@@ -165,9 +158,7 @@ class MailThreadReviewMixin(models.AbstractModel):
             # )
 
             # the inbound message robot posts customer messages as the system user
-            is_created_by_system_user = (
-                message.create_uid.id == self._get_system_user_id()
-            )
+            is_created_by_system_user = message.create_uid.id == self._get_system_user_id()
             return is_created_by_system_user
 
         for record in self:
@@ -199,8 +190,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     def _compute_latest_internal_notes(self):
         for record in self:
             formatted_notes = [
-                self._format_message_body(message.body)
-                for message in record.internal_note_ids[:3]
+                self._format_message_body(message.body) for message in record.internal_note_ids[:3]
             ]
             if len(formatted_notes) > 0:
                 record.internal_notes_summary = "".join(formatted_notes)
@@ -210,9 +200,9 @@ class MailThreadReviewMixin(models.AbstractModel):
     @api.depends("message_ids.body")
     def _compute_external_messages_summary(self):
         for record in self:
-            sorted_messages = record.external_message_ids.sorted(
-                key=lambda m: m.create_date, reverse=True
-            )[:3]
+            sorted_messages = record.external_message_ids.sorted(key=lambda m: m.create_date, reverse=True)[
+                :3
+            ]
             formatted_messages = [
                 self._format_message_body(message.body or message.subject or "")
                 for message in sorted_messages
@@ -225,11 +215,9 @@ class MailThreadReviewMixin(models.AbstractModel):
     @api.depends("message_ids", "last_external_message_review_time")
     def _compute_unreviewed_message_ids(self):
         for record in self:
-            record.unreviewed_message_ids = (
-                record.message_from_external_sender_ids.filtered(
-                    lambda m: not record.last_external_message_review_time
-                    or m.create_date > record.last_external_message_review_time
-                )
+            record.unreviewed_message_ids = record.message_from_external_sender_ids.filtered(
+                lambda m: not record.last_external_message_review_time
+                or m.create_date > record.last_external_message_review_time
             )
 
     @api.depends("message_ids", "external_message_ids")
@@ -301,12 +289,8 @@ class MailThreadReviewMixin(models.AbstractModel):
         # Send notifications for each record with new messages
         for record, new_messages in messages_by_record.items():
             try:
-                base_url = (
-                    self.env["ir.config_parameter"].sudo().get_param("web.base.url")
-                )
-                record_url = (
-                    f"{base_url}/web#id={record.id}&model={record._name}&view_type=form"
-                )
+                base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+                record_url = f"{base_url}/web#id={record.id}&model={record._name}&view_type=form"
 
                 # Get display name and res_name (subject of the service) if available
                 display_text = html_escape(record.display_name)
@@ -335,9 +319,7 @@ class MailThreadReviewMixin(models.AbstractModel):
                     if not subject and msg.body:
                         body_text = tools.html2plaintext(msg.body)
                         subject = (
-                            (body_text.split("\n")[0][:100] + "...")
-                            if len(body_text) > 100
-                            else body_text
+                            (body_text.split("\n")[0][:100] + "...") if len(body_text) > 100 else body_text
                         )
 
                     message_parts.append(

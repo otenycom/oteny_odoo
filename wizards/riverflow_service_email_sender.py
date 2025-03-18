@@ -190,9 +190,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             service = records_to_transition[0]
             default_recipients = service._get_default_recipients()
             if default_recipients:
-                recipients = [
-                    Command.link(partner_id) for partner_id in default_recipients.ids
-                ]
+                recipients = [Command.link(partner_id) for partner_id in default_recipients.ids]
                 if "recipient_partner_ids" in defaultValues:
                     defaultValues["recipient_partner_ids"].extend(recipients)
                 else:
@@ -241,9 +239,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             }
 
     def update_write_values(self, service, vals):
-        super(RiverflowServiceEmailSenderWizard, self).update_write_values(
-            service, vals
-        )
+        super(RiverflowServiceEmailSenderWizard, self).update_write_values(service, vals)
         # new services are automatically assigned a name equal to the email subject
         isNewService = isinstance(service.id, models.NewId)
         if isNewService and not vals.get("name"):
@@ -285,17 +281,12 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             .get_param("riverflow.restrict_email_recipients_to", "")
             .split(",")
         )
-        allowed_domains = [
-            domain.strip().lower() for domain in allowed_domains if domain.strip()
-        ]
+        allowed_domains = [domain.strip().lower() for domain in allowed_domains if domain.strip()]
 
         if allowed_domains:
             invalid_recipients = recipient_ids.filtered(
                 lambda partner: partner.email
-                and not any(
-                    partner.email.lower().endswith(f"@{domain}")
-                    for domain in allowed_domains
-                )
+                and not any(partner.email.lower().endswith(f"@{domain}") for domain in allowed_domains)
             )
 
             if invalid_recipients:
@@ -317,9 +308,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             raise ValueError(_("Body is required"))
 
         # Post the message, add followers to the chatter, and don't subscribe them to the chatter
-        service.with_context(
-            mail_post_autofollow=True, mail_create_nosubscribe=True
-        ).message_post(
+        service.with_context(mail_post_autofollow=True, mail_create_nosubscribe=True).message_post(
             message_type="email",
             subject=self.subject_updatable,
             partner_ids=recipient_ids.ids,

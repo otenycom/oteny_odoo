@@ -9,9 +9,7 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = (
-        "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
-    )
+    _order = "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
 
     active = fields.Boolean(
         default=True,
@@ -33,10 +31,7 @@ class RiverflowStateRecord(models.Model):
 
     @api.model
     def _selection_target_model(self):
-        return [
-            (model.model, model.name)
-            for model in self.env["ir.model"].sudo().search([])
-        ]
+        return [(model.model, model.name) for model in self.env["ir.model"].sudo().search([])]
 
     # Fields to identify the record
     name = fields.Char(
@@ -64,9 +59,7 @@ class RiverflowStateRecord(models.Model):
     def _compute_master_record_reference(self):
         for record in self:
             if record.master_model and record.master_res_id:
-                record.master_record_reference = (
-                    f"{record.master_model},{record.master_res_id}"
-                )
+                record.master_record_reference = f"{record.master_model},{record.master_res_id}"
             else:
                 record.master_record_reference = False
 
@@ -115,9 +108,7 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_deadline",
         store=True,
     )
-    deadline_formatted = fields.Char(
-        "Deadline", compute="_compute_deadline_formatted", store=False
-    )
+    deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
 
     timing_json = fields.Json(
         "Timing",
@@ -154,9 +145,7 @@ class RiverflowStateRecord(models.Model):
         readonly=True,
         index=True,
     )
-    state_name = fields.Char(
-        "State name", related="state_id.name", store=True, index=True
-    )
+    state_name = fields.Char("State name", related="state_id.name", store=True, index=True)
     state_json = fields.Json(
         string="State",
         readonly=True,
@@ -275,9 +264,7 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.internal_notes_summary")
     def _compute_internal_notes_summary(self):
         for record in self:
-            record.internal_notes_summary = (
-                self._compute_internal_notes_summary_for_record(record)
-            )
+            record.internal_notes_summary = self._compute_internal_notes_summary_for_record(record)
 
     @api.model
     def _compute_internal_notes_summary_for_record(self, record):
@@ -288,9 +275,7 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.external_messages_summary")
     def _compute_external_messages_summary(self):
         for record in self:
-            record.external_messages_summary = (
-                self._compute_external_messages_summary_for_record(record)
-            )
+            record.external_messages_summary = self._compute_external_messages_summary_for_record(record)
 
     @api.model
     def _compute_external_messages_summary_for_record(self, record):
@@ -301,9 +286,7 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.unreviewed_message_count")
     def _compute_unreviewed_message_count(self):
         for record in self:
-            record.unreviewed_message_count = (
-                self._compute_unreviewed_message_count_for_record(record)
-            )
+            record.unreviewed_message_count = self._compute_unreviewed_message_count_for_record(record)
 
     @api.model
     def _compute_unreviewed_message_count_for_record(self, record):
@@ -330,9 +313,7 @@ class RiverflowStateRecord(models.Model):
                 if not record.state_name:
                     wf_state_text = "Not Started"
                 else:
-                    wf_state_text = (
-                        record.state_name
-                    )  # " | ".join([wf_state_text, record.state_name])
+                    wf_state_text = record.state_name  # " | ".join([wf_state_text, record.state_name])
 
             # todo: store the icon so its not a lookup
             icon = record.workflow_id.icon or ""
@@ -354,9 +335,7 @@ class RiverflowStateRecord(models.Model):
         for record in self:
             if record.deadline:
                 # Format the deadline date
-                record.deadline_formatted = datetime.strftime(
-                    record.deadline, DATE_FORMAT
-                )
+                record.deadline_formatted = datetime.strftime(record.deadline, DATE_FORMAT)
             else:
                 record.deadline_formatted = False
 
@@ -519,9 +498,7 @@ class RiverflowStateRecord(models.Model):
     @api.depends("service_id.responsible_team_id")
     def _compute_responsible_team_id(self):
         for record in self:
-            record.responsible_team_id = self._compute_responsible_team_id_for_record(
-                record
-            )
+            record.responsible_team_id = self._compute_responsible_team_id_for_record(record)
 
     @api.model
     def _compute_responsible_team_id_for_record(self, record):

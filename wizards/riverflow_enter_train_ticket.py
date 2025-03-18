@@ -48,9 +48,7 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
             if len(service.leg_ids) == 2:
                 defaultValues["is_round_trip"] = True
 
-            defaultValues["price"] = sum(
-                leg.supply_cost_amount for leg in service.leg_ids
-            )
+            defaultValues["price"] = sum(leg.supply_cost_amount for leg in service.leg_ids)
 
     def update_write_values(self, service, vals):
         super().update_write_values(service, vals)
@@ -77,9 +75,7 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
                         {
                             "supply_from": self.from_station,
                             "supply_to": self.to_station,
-                            "supply_cost_amount": (
-                                self.price if not self.is_round_trip else self.price / 2
-                            ),
+                            "supply_cost_amount": (self.price if not self.is_round_trip else self.price / 2),
                             "supply_instructions": self.notes,
                             "pax_ids": [
                                 Command.clear(),
