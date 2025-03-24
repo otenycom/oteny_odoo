@@ -40,10 +40,25 @@
         </field>
     </record>
 
+    <record id="view_auto_add_service_search" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.search</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" />
+                <field name="applies_to_model_id" />
+                <field name="service_template_id" />
+                <separator />
+                <filter string="Archived" name="inactive" domain="[('active','=',False)]" />
+            </search>
+        </field>
+    </record>
+
     <record id="action_auto_add_service" model="ir.actions.act_window">
         <field name="name">Auto Add Services</field>
         <field name="res_model">riverflow.auto.add.service</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_auto_add_service_search" />
     </record>
 
     <menuitem id="menu_auto_add_service"
