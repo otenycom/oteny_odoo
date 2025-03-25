@@ -14,4 +14,5 @@ from . import riverflow_check_result
 from . import riverflow_team
 from . import riverflow_auto_add_service
 from . import riverflow_check_results_mixin
+from . import riverflow_import
 from . import models
