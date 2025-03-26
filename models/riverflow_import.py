@@ -93,6 +93,7 @@ class RiverflowImport(models.AbstractModel):
                         result["skipped"] += 1
                         _logger.info(f"Skipped existing record with external ID {xml_id}")
                 else:
+
                     # Create the record and external ID
                     new_record = Model.create(record)
                     IrModel.create(
