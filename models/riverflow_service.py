@@ -524,7 +524,7 @@ class Service(models.Model):
         # if self.env.context.get("computing_sequence"):
         #     return
 
-        if isinstance(self.id, models.NewId):
+        if any(isinstance(record.id, models.NewId) for record in self):
             return
 
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()
