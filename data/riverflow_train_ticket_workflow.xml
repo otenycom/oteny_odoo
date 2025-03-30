@@ -8,8 +8,9 @@
         <field name="icon">fa-train</field>
         <field name="is_supply_order">True</field>
         <field name="has_supply_quantity">False</field>
-        <field name="has_supplier">True</field>
+        <field name="has_supplier">False</field>
         <field name="has_supply_unit_price">False</field>
+        <field name="has_legs">True</field>
     </record>
 
     <!-- States -->

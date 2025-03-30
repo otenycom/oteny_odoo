@@ -51,14 +51,20 @@ class RiverflowWorkflow(models.Model):
         default=False,
     )
     has_supply_unit_price = fields.Boolean(
-        "Has Supply Unit Price",
-        help="If checked, this workflow has a supply unit price field",
+        "Has Cost Price",
+        help="If checked, this workflow has a cost price field",
         tracking=True,
         default=False,
     )
     has_supplier = fields.Boolean(
         "Has Supplier",
         help="If checked, this workflow has a supplier field. If not, it is a self arranged service such as a flight booking.",
+        tracking=True,
+        default=False,
+    )
+    has_legs = fields.Boolean(
+        "Has Legs",
+        help="If checked, this workflow has route-legs for ground transport services.",
         tracking=True,
         default=False,
     )

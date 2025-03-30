@@ -83,7 +83,11 @@
                         </page> -->
 
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
-                            <group>
+                            <group invisible="not has_supply_unit_price">
+                                <field name="supply_unit_price" widget="monetary" />
+                                <field name="supply_unit_price_currency_id" invisible="1" />
+                            </group>
+                            <group invisible="not has_supplier">
                                 <group>
                                     <field name="supplier_partner_id" />
                                 </group>
@@ -91,7 +95,7 @@
                                     <field name="supply_order_instructions" />
                                 </group>
                             </group>
-                            <group string="Legs">
+                            <group invisible="not has_legs">
                                 <field name="leg_ids" nolabel="1">
                                     <list>
                                         <field name="sequence" widget="handle" />

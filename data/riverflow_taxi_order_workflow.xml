@@ -10,6 +10,7 @@
         <field name="has_supply_quantity">False</field>
         <field name="has_supplier">True</field>
         <field name="has_supply_unit_price">False</field>
+        <field name="has_legs">True</field>
     </record>
 
     <!-- Define all states first (to prevent forward references) -->

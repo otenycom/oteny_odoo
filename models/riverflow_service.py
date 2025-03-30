@@ -229,6 +229,13 @@ class Service(models.Model):
         inverse="_set_resource_ref",
     )
 
+    subject_active = fields.Boolean(
+        string="Subject Active",
+        compute="_compute_subject_active",
+        store=True,
+        help="Technical field to track if the subject record is active",
+    )
+
     # we take this flag from the workflow, computed field
     is_supply_order = fields.Boolean(
         "Is Supply Order",
@@ -236,6 +243,32 @@ class Service(models.Model):
         required=False,
         tracking=True,
         compute="_compute_is_supply_order",
+        store=True,
+    )
+
+    has_supplier = fields.Boolean(
+        "Has Supplier",
+        related="front_office_workflow_id.has_supplier",
+        store=True,
+    )
+
+    has_legs = fields.Boolean(
+        "Has Legs",
+        related="front_office_workflow_id.has_legs",
+        store=True,
+    )
+
+    has_supply_unit_price = fields.Boolean(
+        "Has Cost Price",
+        related="front_office_workflow_id.has_supply_unit_price",
+        store=True,
+    )
+
+    supply_unit_price = fields.Monetary("Cost", currency_field="supply_unit_price_currency_id", tracking=True)
+    supply_unit_price_currency_id = fields.Many2one(
+        comodel_name="res.currency",
+        string="Cost Currency",
+        related="company_id.currency_id",
         store=True,
     )
 
@@ -254,18 +287,11 @@ class Service(models.Model):
         tracking=True,
     )
 
-    subject_active = fields.Boolean(
-        string="Subject Active",
-        compute="_compute_subject_active",
-        store=True,
-        help="Technical field to track if the subject record is active",
-    )
-
     leg_ids = fields.One2many(
         "riverflow.service.leg",
         "service_id",
         string="Supply Legs",
-        help="The legs of a supply order service",
+        help="The legs of a trip booked using a supply order",
     )
 
     supply_leg_id = fields.Many2one(

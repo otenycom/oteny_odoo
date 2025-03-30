@@ -34,4 +34,11 @@
         <field name="odoo_view">view_enter_train_ticket_form</field>
         <field name="model_id" ref="riverflow.model_riverflow_service" />
     </record>
+
+    <record id="transition_action_enter_airline_ticket" model="riverflow.transition.action">
+        <field name="name">Enter Airline Ticket</field>
+        <field name="description">Enter the airline ticket details</field>
+        <field name="odoo_view">view_enter_airline_ticket_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
 </odoo>
