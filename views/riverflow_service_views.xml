@@ -249,6 +249,8 @@
                 <field name="write_uid" string="Updated By" optional="hide" />
                 <field name="write_date" string="Updated On" optional="hide" />
                 <field name="front_office_workflow_id" optional="hide" />
+                <field name="supply_unit_price" optional="hide" />
+                <field name="supply_unit_price_currency_id" column_invisible="1" />
                 <field name="company_id" width="100px" optional="show" />
                 <field name='internal_notes_summary' width="200px" optional="show" />
                 <field name="external_messages_summary" width="200px" optional="show" />
