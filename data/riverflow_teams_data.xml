@@ -3,15 +3,12 @@
     <record id="team_logistics" model="riverflow.team">
         <field name="name">Operations Team</field>
         <field name="company_id" ref="base.main_company" />
-        <field name="email">operations@vriend.com</field>
-        <field name="phone">+31 6 55 55 55 51</field>
+        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
     </record>
 
     <record id="team_planning" model="riverflow.team">
         <field name="name">Planning Team</field>
-        <field name="email">planning@vriend.com</field>
-        <field name="phone">+31 6 55 55 55 52</field>
-        <field name="company_id" ref="base.main_company" />
+        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
     </record>
 
     <record id="team_finance" model="riverflow.team">
