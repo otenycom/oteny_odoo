@@ -154,7 +154,7 @@ class RiverflowImport(models.AbstractModel):
                 result["errors"].append(
                     {
                         "error": f"Batch create failed: {e}",
-                        "details": "Could not create main records. Associated external IDs were not created.",
+                        "details": "",
                         # Cannot easily pinpoint which specific record failed in batch
                     }
                 )
