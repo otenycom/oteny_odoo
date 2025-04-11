@@ -290,6 +290,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             )
 
             if invalid_recipients:
+                # TODO: change the recipient to the email of the current user
                 raise ValueError(
                     _(
                         "Email sending is restricted to specific domains (%s). "

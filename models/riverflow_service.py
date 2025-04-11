@@ -195,6 +195,12 @@ class Service(models.Model):
         help="Combination of Icon and name",
         store=False,
     )
+    state_name = fields.Char(
+        "State Name",
+        related="state_id.name",
+        help="Name of the state",
+        store=False,
+    )
 
     # the container of the service (log_entry, employee, etc)
     res_model = fields.Char(
@@ -408,9 +414,6 @@ class Service(models.Model):
                 )
             else:
                 service.display_name = service.name
-
-            # service.display_name = ' | '.join(
-            #     [service.display_name, self.compute_display_name_suffix(service)])
 
     @api.depends("child_ids")
     def _compute_descendant_ids(self):

@@ -307,11 +307,35 @@
         </field>
     </record>
 
+
+    <record id="service_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.service.calendar</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <calendar string="Services"
+                date_start="project_deadline"
+                color="state_id"
+                create="1" edit="1" delete="0"
+                mode="month"
+                scales="day,week,month,quarter,year"
+                hide_time="true"
+                event_limit="25">
+
+                <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
+                <field name="state_name" invisible="not state_name" string="State" />
+                <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+                <!-- <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" /> -->
+
+            </calendar>
+        </field>
+    </record>
+
     <record id="service_action" model="ir.actions.act_window">
         <field name="name">Services</field>
         <field name="path">services</field>
         <field name="res_model">riverflow.service</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,calendar</field>
         <field name="search_view_id" ref="riverflow.service_view_search" />
         <field name="domain">[('is_root_a_template', '=', False)]</field>
         <field name="context">{'default_is_this_a_template': False}</field>
