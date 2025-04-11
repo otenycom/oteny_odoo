@@ -18,7 +18,6 @@ class RiverflowWorkflow(models.Model):
         help="Combination of Icon and name",
         store=True,
     )
-
     active = fields.Boolean("Active", default=True)
 
     state_ids = fields.One2many("riverflow.state", "workflow_id", string="Workflow states")

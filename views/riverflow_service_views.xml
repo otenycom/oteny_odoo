@@ -314,7 +314,7 @@
         <field name="arch" type="xml">
             <calendar string="Services"
                 date_start="project_deadline"
-                color="state_id"
+                color="color_int"
                 create="1" edit="1" delete="0"
                 mode="month"
                 scales="day,week,month,quarter,year"

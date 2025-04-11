@@ -20,6 +20,9 @@
                         <group>
                             <field name="workflow_id" readonly="1" />
                             <field name="description" />
+                            <field name="color_int" widget="color_picker" />
+                        </group>
+                        <group>
                             <field name="is_end_state" />
                             <field name="is_cancelled_state" />
                             <field name="hide_in_statusbar" />
@@ -59,6 +62,7 @@
                 <field name="sequence" widget="handle" />
                 <field name="workflow_id" />
                 <field name="name" />
+                <field name="color_int" widget="color_picker" />
                 <field name="display_name" optional="hide" />
                 <field name="description" />
                 <field name="is_cancelled_state" />

@@ -18,18 +18,21 @@
         <field name="workflow_id" ref="workflow_service_taxi_order" />
         <field name="name">Not Started</field>
         <field name="sequence">10</field>
+        <field name="color_int">7</field>
     </record>
 
     <record id="state_taxi_ordered" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_taxi_order" />
         <field name="name">Ordered</field>
         <field name="sequence">20</field>
+        <field name="color_int">7</field>
     </record>
 
     <record id="state_taxi_confirmed" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_taxi_order" />
         <field name="name">Confirmed by Supplier</field>
         <field name="sequence">30</field>
+        <field name="color_int">7</field>
     </record>
 
     <record id="state_taxi_cancelled" model="riverflow.state">
@@ -39,6 +42,7 @@
         <field name="hide_in_statusbar">True</field>
         <field name="is_cancelled_state">True</field>
         <field name="is_end_state">True</field>
+        <field name="color_int">1</field>
     </record>
 
     <!-- Then define all transitions -->

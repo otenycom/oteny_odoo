@@ -17,12 +17,14 @@
         <field name="workflow_id" ref="workflow_to_be_invoiced" />
         <field name="name">To Be Invoiced</field>
         <field name="sequence">10</field>
+        <field name="color_int">2</field>
     </record>
 
     <record id="state_ready_for_invoicing" model="riverflow.state">
         <field name="workflow_id" ref="workflow_to_be_invoiced" />
         <field name="name">Ready for Invoicing</field>
         <field name="sequence">20</field>
+        <field name="color_int">2</field>
     </record>
 
     <record id="state_invoiced" model="riverflow.state">
@@ -30,6 +32,7 @@
         <field name="name">Invoiced</field>
         <field name="sequence">30</field>
         <field name="is_end_state">True</field>
+        <field name="color_int">2</field>
     </record>
 
     <!-- Then define all transitions -->
