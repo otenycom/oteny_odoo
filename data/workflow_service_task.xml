@@ -13,18 +13,21 @@
         <field name="workflow_id" ref="workflow_service_task" />
         <field name="name">Not started</field>
         <field name="sequence">10</field>
+        <field name="color_int">9</field>
     </record>
 
     <record id="state_task_in_progress" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_task" />
         <field name="name">In Progress</field>
         <field name="sequence">15</field>
+        <field name="color_int">9</field>
     </record>
     <record id="state_task_done" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_task" />
         <field name="name">Done</field>
         <field name="sequence">20</field>
         <field name="is_end_state">True</field>
+        <field name="color_int">9</field>
     </record>
 
     <!-- Transitions from null state -->

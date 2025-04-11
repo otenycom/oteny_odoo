@@ -18,6 +18,7 @@
         <field name="name">Info</field>
         <field name="sequence">10</field>
         <field name="is_end_state">False</field>
+        <field name="color_int">7</field>
     </record>
 
     <!-- Then define all transitions -->

@@ -158,6 +158,9 @@ class RiverflowStateRecord(models.Model):
         index=True,
     )
     # fields from MailThreadReviewMixin
+    color_int = fields.Integer(
+        related="state_id.color_int",
+    )
     internal_notes_summary = fields.Html(
         string="Internal Notes",
         compute="_compute_internal_notes_summary",

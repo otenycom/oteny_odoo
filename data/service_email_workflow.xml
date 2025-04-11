@@ -13,12 +13,14 @@
         <field name="workflow_id" ref="workflow_service_send_email" />
         <field name="name">Not Started</field>
         <field name="sequence">10</field>
+        <field name="color_int">5</field>
     </record>
     <record id="state_service_se_sent" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_send_email" />
         <field name="name">Sent</field>
         <field name="sequence">20</field>
         <field name="is_end_state">True</field>
+        <field name="color_int">5</field>
     </record>
     <record id="state_service_se_not_needed" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_send_email" />
@@ -26,6 +28,7 @@
         <field name="sequence">30</field>
         <field name="is_end_state">True</field>
         <field name="hide_in_statusbar">True</field>
+        <field name="color_int">5</field>
     </record>
 
     <!-- Send Email Transitions -->

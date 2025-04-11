@@ -202,6 +202,10 @@ class Service(models.Model):
         store=False,
     )
 
+    color_int = fields.Integer(
+        related="state_id.color_int",
+    )
+
     # the container of the service (log_entry, employee, etc)
     res_model = fields.Char(
         string="Subject of Service Model Name",
