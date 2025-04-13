@@ -917,7 +917,7 @@ class Service(models.Model):
         return new_service
 
     @api.model
-    def _create_service_from_template(self, template_service_id, project_deadline):
+    def _create_service_from_template(self, template_service_id, project_deadline=False):
         """Create a new service from a template, including all child services recursively.
 
         Args:
