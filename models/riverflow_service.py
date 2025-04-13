@@ -1014,6 +1014,17 @@ class Service(models.Model):
 
         return super().unlink()
 
+    @api.constrains("use_project_deadline_from", "project_deadline")
+    def _check_project_deadline_if_self(self):
+        """If deadline is set to 'Self', the Project Deadline must be set."""
+        for record in self:
+            if (
+                not record.is_this_a_template
+                and record.use_project_deadline_from == "self"
+                and not record.project_deadline
+            ):
+                raise UserError(_("You must set the Deadline"))
+
 
 class ServiceLeg(models.Model):
     _name = "riverflow.service.leg"

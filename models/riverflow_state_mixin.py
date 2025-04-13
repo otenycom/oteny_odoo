@@ -52,7 +52,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
     state_json = fields.Json(string="Workflow State", compute="_compute_state_json", store=False)
     transition_buttons_json = fields.Json(
-        string="Workflow Actions",
+        string="State Actions",
         compute="_compute_transition_buttons_json",
         store=False,
     )
