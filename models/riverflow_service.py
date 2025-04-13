@@ -807,7 +807,7 @@ class Service(models.Model):
             )
 
     @api.model
-    def _create_service_member_from_template(self, template_service, parent_id=False):
+    def _create_service_member_from_template(self, template_service, parent_id=False, project_deadline=False):
         """Create a new service based on a template service.
 
         Args:
@@ -823,8 +823,11 @@ class Service(models.Model):
             "state_id": template_service.state_id.id,
             "responsible_team_id": template_service.responsible_team_id.id,
             "company_id": template_service.company_id.id,
-            "use_project_deadline_from": template_service.use_project_deadline_from,
-            "days_relative_to_project": template_service.days_relative_to_project,
+            "use_project_deadline_from": (
+                "self" if project_deadline else template_service.use_project_deadline_from
+            ),
+            "project_deadline": project_deadline,
+            "days_relative_to_project": 0 if project_deadline else template_service.days_relative_to_project,
             "is_this_a_template": self.env.context.get("default_is_this_a_template", False),
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
@@ -914,7 +917,7 @@ class Service(models.Model):
         return new_service
 
     @api.model
-    def _create_service_from_template(self, template_service_id):
+    def _create_service_from_template(self, template_service_id, project_deadline):
         """Create a new service from a template, including all child services recursively.
 
         Args:
@@ -928,7 +931,9 @@ class Service(models.Model):
             raise UserError(_("No template service selected."))
 
         # Create main service from template
-        new_service = self._create_service_member_from_template(template_service)
+        new_service = self._create_service_member_from_template(
+            template_service, project_deadline=project_deadline
+        )
 
         # Clone children recursively
         def clone_children(template, parent):

@@ -86,12 +86,15 @@ class ServiceWizard(models.TransientModel):
 
     def get_visibility_defaults(self, transition_id):
         visibility_defaults = super().get_visibility_defaults(transition_id)
-        # todo: consider a computed field 'hide_timing_fields' in the state and/or transition to hide the fields
-        hide_timing_fields = (
-            transition_id.to_state_id.is_end_state or transition_id.to_state_id.is_back_office_state
-        )
-        visibility_defaults["project_deadline_invisible"] = hide_timing_fields
-        visibility_defaults["use_project_deadline_from_invisible"] = hide_timing_fields
-        visibility_defaults["days_relative_to_project_invisible"] = hide_timing_fields
+        # Show the timing fields even in end-states, as an end-state can also be a start-start, and
+        # we require a date for each service
+
+        # # todo: consider a computed field 'hide_timing_fields' in the state and/or transition to hide the fields
+        # hide_timing_fields = (
+        #     transition_id.to_state_id.is_end_state or transition_id.to_state_id.is_back_office_state
+        # )
+        # visibility_defaults["project_deadline_invisible"] = hide_timing_fields
+        # visibility_defaults["use_project_deadline_from_invisible"] = hide_timing_fields
+        # visibility_defaults["days_relative_to_project_invisible"] = hide_timing_fields
 
         return visibility_defaults

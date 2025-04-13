@@ -1,4 +1,5 @@
 from odoo import models, Command, _
+from odoo.exceptions import UserError
 
 
 class ServiceNewWizard(models.TransientModel):
@@ -36,7 +37,15 @@ class ServiceNewWizard(models.TransientModel):
         self.ensure_one()
 
         template_service_id = self.env.context.get("template_service_id")
-        new_service = self.env["riverflow.service"]._create_service_from_template(template_service_id)
+
+        # Read the deadline from the client-side input field
+        project_deadline = self.env.context.get("default_project_deadline")
+        if not project_deadline:
+            raise UserError(_("You must set the Deadline"))
+
+        new_service = self.env["riverflow.service"]._create_service_from_template(
+            template_service_id, project_deadline
+        )
 
         return {
             "type": "ir.actions.act_window",

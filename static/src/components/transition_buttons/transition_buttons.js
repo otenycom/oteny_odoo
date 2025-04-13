@@ -18,6 +18,7 @@ export class TransitionButtons extends Component {
         this.action = useService("action");
         this.notification = useService("notification");
         this.inputRef = useRef("inputElement");
+        this.projectDeadlineInput = useRef("projectDeadlineInput");
         this.expandedTemplates = new Set();
         onWillRender(() => {
             this.fieldValueState = this.fieldValue(this.props);
@@ -215,14 +216,23 @@ export class TransitionButtons extends Component {
 
         await this.saveRecords();
 
+        // Read the deadline from the input field
+        const projectDeadline = this.projectDeadlineInput.el ? this.projectDeadlineInput.el.value : null;
+
         // Execute transitions in sequence
         for (const button of selectedButtons) {
+            // Add the deadline to the context if it exists
+            const context = {
+                ...button.context,
+                ...(projectDeadline && { default_project_deadline: projectDeadline })
+            };
+
             const action = {
                 type: "object",
                 resId: this.props.record.resId,
                 name: button.action,
                 resModel: this.props.record.resModel,
-                context: button.context,
+                context: context,
                 onClose: async () => {
                     if (this.reloadOnClose())
                         await this.props.record.model.root.load();

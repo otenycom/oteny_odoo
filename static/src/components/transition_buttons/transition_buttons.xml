@@ -34,8 +34,11 @@
                         </t>
                     </t>
                     <br />
-                    <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
-                    <br />
+                    <div class="mt-2">
+                        <label for="project_deadline_input" class="form-label">Service Deadline</label>
+                        <input type="date" class="form-control" id="project_deadline_input" t-ref="projectDeadlineInput" />
+                        <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
+                    </div>
                 </t>
                 <t t-if="this.buttonDefs().some(button => !button.is_template)">
                     <t t-if="this.buttonDefs().some(button => button.is_template)">

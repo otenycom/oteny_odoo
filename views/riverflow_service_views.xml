@@ -68,20 +68,37 @@
                         </group>
                     </group>
                     <notebook>
-                        <!-- <page string="Date Details" name="date_details">
-                            <group>
-                                <field name="is_days_relative_to_project_applicable" invisible="1" />
-                                <field name="use_project_deadline_from_options" invisible="1" />
-                                <field name="use_project_deadline_from" widget="filterable_selection"
-                                    options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
-                                <field name="project_deadline" string="Deadline" invisible="is_days_relative_to_project_applicable" on_change="1" />
-                                <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
-                                <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
-                                    on_change="1" />
-                                <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable" />
-                            </group>
-                        </page> -->
-
+                        <!-- invisible by default: keep UI simple. The cog menu still allows creating child services -->
+                        <page string="Child Services" name="services" invisible="not descendant_ids">
+                            <div>
+                                <button name="add_child_service" type="object" data-hotkey="n"
+                                    icon="fa-plus">
+                                    Add Child Service</button>
+                            </div>
+                            <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
+                                <!-- Workaround: list view click opens a popup of the child service, instead of the form view.
+                                                         To ensure the form view opens for the child service, we use riverflow_one2many -->
+                                <list create="0" delete="0" edit="0">
+                                    <field name="active" column_invisible="True" />
+                                    <field name='indented_name' optional="show" width="260px" />
+                                    <field name="display_name" optional="hide" />
+                                    <field name="root_name" optional="hide" />
+                                    <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
+                                    <field name="state_id" width="140px" optional="show" />
+                                    <field name="timing_json" widget="timing_widget" optional="show" />
+                                    <field name="deadline" optional="hide" />
+                                    <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
+                                    <field name="write_uid" string="Updated By" optional="hide" />
+                                    <field name="write_date" string="Updated On" optional="hide" />
+                                    <field name="company_id" width="100px" optional="show" />
+                                    <field name='internal_notes_summary' width="200px" optional="show" />
+                                    <field name="external_messages_summary" width="200px" optional="show" />
+                                    <field name="unreviewed_message_count" width="40px" optional="show" />
+                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
+                                        readonly="1" optional="show" />
+                                </list>
+                            </field>
+                        </page>
                         <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
                             <group invisible="not has_supply_unit_price">
                                 <field name="supply_unit_price" widget="monetary" />
@@ -107,37 +124,6 @@
                                     </list>
                                 </field>
                             </group>
-                        </page>
-                        <!-- invisible: keep UI simple. The cog menu still allows creating child services -->
-                        <page string="Child Services" name="services" invisible="not descendant_ids">
-                            <div>
-                                <button name="add_child_service" type="object" data-hotkey="n"
-                                    icon="fa-plus">
-                                    Add Child Service</button>
-                            </div>
-                            <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
-                                <!-- Workaround: list view click opens a popup of the child service, instead of the form view.
-                                 To ensure the form view opens for the child service, we use riverflow_one2many -->
-                                <list create="0" delete="0" edit="0">
-                                    <field name="active" column_invisible="True" />
-                                    <field name='indented_name' optional="show" width="260px" />
-                                    <field name="display_name" optional="hide" />
-                                    <field name="root_name" optional="hide" />
-                                    <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
-                                    <field name="state_id" width="140px" optional="show" />
-                                    <field name="timing_json" widget="timing_widget" optional="show" />
-                                    <field name="deadline" optional="hide" />
-                                    <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
-                                    <field name="write_uid" string="Updated By" optional="hide" />
-                                    <field name="write_date" string="Updated On" optional="hide" />
-                                    <field name="company_id" width="100px" optional="show" />
-                                    <field name='internal_notes_summary' width="200px" optional="show" />
-                                    <field name="external_messages_summary" width="200px" optional="show" />
-                                    <field name="unreviewed_message_count" width="40px" optional="show" />
-                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
-                                        readonly="1" optional="show" />
-                                </list>
-                            </field>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
                             <group>
