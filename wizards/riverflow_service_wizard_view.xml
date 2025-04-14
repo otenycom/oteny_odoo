@@ -11,7 +11,8 @@
             <xpath expr="//field[@name='responsible_team_id']" position="after">
                 <field name="use_project_deadline_from_options" invisible="1" on_change="1" />
                 <field name="use_project_deadline_from" widget="filterable_selection"
-                    options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" invisible="use_project_deadline_from_invisible" />
+                    options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1"
+                    invisible="use_project_deadline_from_invisible or use_project_deadline_from == 'self'" />
                 <field name="use_project_deadline_from_invisible" invisible="1" />
                 <field name="project_deadline" invisible="use_project_deadline_from != 'self' or use_project_deadline_from_invisible" />
                 <field name="project_deadline_invisible" invisible="1" />
