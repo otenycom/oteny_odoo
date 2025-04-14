@@ -60,7 +60,7 @@
                                     <field name="active" column_invisible="True" />
                                     <field name="sequence" widget="handle" />
                                     <field name="name" />
-                                    <field name="color_int" widget="color" />
+                                    <field name="color_int" widget="color_picker" />
                                     <field name="description" />
                                 </list>
                             </field>

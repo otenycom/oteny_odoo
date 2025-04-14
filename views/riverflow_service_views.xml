@@ -48,12 +48,13 @@
                             <field name="parent_id" on_change="1" can_create="False"
                                 can_write="True" invisible="1" />
                             <field name="active" invisible="1" />
-                            <field name="company_id" />
+                            <field name="company_id" groups="base.group_no_one" />
 
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
                             <field name="use_project_deadline_from" widget="filterable_selection"
-                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
+                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1"
+                                invisible="use_project_deadline_from == 'self'" />
                             <field name="project_deadline" string="Deadline" invisible="is_days_relative_to_project_applicable" on_change="1" />
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
