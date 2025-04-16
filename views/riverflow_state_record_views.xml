@@ -17,33 +17,15 @@
                         </h1>
                     </div>
                     <group>
-                        <group>
-                            <field name="display_name" />
-                            <field name="company_id" />
-                            <field name="tag_ids" widget="many2many_tags" />
-                            <field name="master_model" />
-                            <field name="master_res_id" />
-                            <field name="master_record_reference" />
-                            <field name="res_model" />
-                            <field name="res_id" />
-                            <field name="res_name" />
-                        </group>
-                        <group>
-                            <field name="root_name" />
-                            <field name="timing_json" widget="timing_widget" />
-                            <field name="responsible_team_id" />
-                            <field name="state_json" widget="json_widget" width="140px" />
-                        </group>
+                        <field name="deadline" readonly="1" />
+                        <field name="master_record_reference" invisible="1" />
+                        <field name="service_id" invisible="not service_id" />
+                        <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
+                        <field name="state_name" invisible="not state_name" string="State" />
+                        <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                        <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+                        <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" />
                     </group>
-                    <notebook>
-                        <page string="Messages" name="messages">
-                            <group>
-                                <field name="internal_notes_summary" />
-                                <field name="external_messages_summary" />
-                                <field name="unreviewed_message_count" />
-                            </group>
-                        </page>
-                    </notebook>
                 </sheet>
             </form>
         </field>
