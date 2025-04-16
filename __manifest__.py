@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.587",
+    "version": "18.0.1.588",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -41,6 +41,7 @@
     "assets": {
         "web.assets_backend": [
             "riverflow/static/src/components/**/*",
+            "riverflow/static/src/riverflow_force_xl.js",
         ],
     },
     "application": True,
