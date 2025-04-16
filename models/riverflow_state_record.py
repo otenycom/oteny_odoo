@@ -455,7 +455,7 @@ class RiverflowStateRecord(models.Model):
     @api.model
     def _compute_end_date_for_record(self, record):
         if record.service_id:
-            return record.service_id.end_date
+            return record.service_id.end_date_for_calendar
         return record.deadline
 
     @api.depends("service_id.root_name")

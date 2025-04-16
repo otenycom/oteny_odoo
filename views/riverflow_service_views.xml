@@ -239,6 +239,7 @@
                 <field name="state_id" width="140px" optional="show" />
                 <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="deadline" optional="hide" />
+                <field name="end_date" optional="hide" />
                 <field name="res_name" optional="show" />
                 <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                 <field name="write_uid" string="Updated By" optional="hide" />
@@ -309,7 +310,7 @@
         <field name="arch" type="xml">
             <calendar string="Services"
                 date_start="project_deadline"
-                date_stop="end_date"
+                date_stop="end_date_for_calendar"
                 color="color_int"
                 create="1" edit="1" delete="0"
                 mode="month"

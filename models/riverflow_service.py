@@ -1,6 +1,6 @@
 from odoo import models, fields, api, _, Command
 from datetime import timedelta, date
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class Service(models.Model):
@@ -166,6 +166,12 @@ class Service(models.Model):
     end_date = fields.Date(
         string="End Date",
     )
+    end_date_for_calendar = fields.Date(
+        string="End Date for Calendar",
+        compute="_compute_end_date_for_calendar",
+        inverse="_inverse_end_date_for_calendar",
+        store=True,
+    )
 
     deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
     timing_json = fields.Json(
@@ -324,6 +330,34 @@ class Service(models.Model):
         recursive=True,
         help="Links back to the 'taxi booking' that generated this leg-info service",
     )
+
+    @api.depends("deadline", "end_date")
+    def _compute_end_date_for_calendar(self):
+        for service in self:
+            if not service.end_date:
+                service.end_date_for_calendar = service.deadline
+            else:
+                service.end_date_for_calendar = service.end_date
+
+    def _inverse_end_date_for_calendar(self):
+        for service in self:
+            if service.end_date_for_calendar == service.deadline:
+                # single day services are the norm, and we don't want the form view to show the end date in that case
+                service.end_date = False
+            else:
+                service.end_date = service.end_date_for_calendar
+
+    @api.constrains("project_deadline", "end_date")
+    def _check_end_date(self):
+        for service in self:
+            if service.end_date and service.project_deadline:
+                if service.end_date < service.project_deadline:
+                    raise ValidationError(
+                        _(
+                            f"The end date cannot be before the start date.\n"
+                            f'Service "{service.name}" ends on {service.end_date} and starts on {service.project_deadline}'
+                        ),
+                    )
 
     @api.depends("res_model", "res_id")
     def _compute_resource_ref(self):
