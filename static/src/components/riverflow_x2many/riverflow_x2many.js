@@ -28,6 +28,9 @@ export class RiverflowOne2many extends X2ManyField {
                 return;
             }
             const { record } = params;
+            if (!record) {
+                throw new Error("Don't use a `riverflow_one2many` widget with no_create=false.");
+            }
             const action = {
                 type: "ir.actions.act_window",
                 target: "current",
