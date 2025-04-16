@@ -90,6 +90,7 @@
         <field name="arch" type="xml">
             <calendar string="State Records"
                 date_start="deadline"
+                date_stop="end_date"
                 color="color_int"
                 create="0" edit="0" delete="0"
                 mode="month"

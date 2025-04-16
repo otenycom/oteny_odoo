@@ -162,6 +162,11 @@ class Service(models.Model):
         index=True,
         recursive=True,
     )
+
+    end_date = fields.Date(
+        string="End Date",
+    )
+
     deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
     timing_json = fields.Json(
         "Timing",

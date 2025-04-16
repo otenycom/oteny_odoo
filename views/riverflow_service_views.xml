@@ -55,7 +55,15 @@
                             <field name="use_project_deadline_from" widget="filterable_selection"
                                 options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1"
                                 invisible="use_project_deadline_from == 'self'" />
-                            <field name="project_deadline" string="Deadline" invisible="is_days_relative_to_project_applicable" on_change="1" />
+                            <field
+                                name="project_deadline"
+                                widget="daterange"
+                                options="{'end_date_field': 'end_date'}"
+                                string="Deadline"
+                                invisible="is_days_relative_to_project_applicable"
+                                on_change="1"
+                            />
+                            <field name="end_date" invisible="1" />
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
                                 on_change="1" />
@@ -301,6 +309,7 @@
         <field name="arch" type="xml">
             <calendar string="Services"
                 date_start="project_deadline"
+                date_stop="end_date"
                 color="color_int"
                 create="1" edit="1" delete="0"
                 mode="month"

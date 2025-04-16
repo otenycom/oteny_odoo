@@ -108,6 +108,11 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_deadline",
         store=True,
     )
+    end_date = fields.Date(
+        "End Date",
+        compute="_compute_end_date",
+        store=True,
+    )
     deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
 
     timing_json = fields.Json(
@@ -441,6 +446,17 @@ class RiverflowStateRecord(models.Model):
         if record.service_id:
             return record.service_id.deadline
         return False
+
+    @api.depends("service_id.end_date", "deadline")
+    def _compute_end_date(self):
+        for record in self:
+            record.end_date = self._compute_end_date_for_record(record)
+
+    @api.model
+    def _compute_end_date_for_record(self, record):
+        if record.service_id:
+            return record.service_id.end_date
+        return record.deadline
 
     @api.depends("service_id.root_name")
     def _compute_root_name(self):
