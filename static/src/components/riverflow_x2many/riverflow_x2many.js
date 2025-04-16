@@ -4,6 +4,7 @@ import { registry } from "@web/core/registry";
 import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
 import { ListRenderer } from "@web/views/list/list_renderer";
 import { useService } from "@web/core/utils/hooks";
+import { utils, SIZES } from "@web/core/ui/ui_service";
 
 const fieldRegistry = registry.category("fields");
 
@@ -12,6 +13,15 @@ export class RiverflowOne2manyRenderer extends ListRenderer {
         super.setup();
     }
 }
+
+// Force chatter to be always at the bottom
+const orgUtilsGetSize = utils.getSize;
+utils.getSize = () => {
+    let size = orgUtilsGetSize();
+    if (size > SIZES.XL) size = SIZES.XL;
+    return size;
+};
+
 
 export class RiverflowOne2many extends X2ManyField {
     /**
