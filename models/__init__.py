@@ -16,3 +16,4 @@ from . import riverflow_auto_add_service
 from . import riverflow_check_results_mixin
 from . import riverflow_import
 from . import models
+from . import mail_mail
