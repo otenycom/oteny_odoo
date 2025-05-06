@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "18.0.1.640",
+    "version": "18.0.1.644",
     "depends": ["base", "mail", "documents"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -37,6 +37,7 @@
         "data/riverflow_to_be_invoiced_workflow.xml",
         "data/riverflow_taxi_leg_workflow.xml",
         "data/riverflow_train_ticket_workflow.xml",
+        "data/ir_config_parameter_data.xml",
     ],
     "assets": {
         "web.assets_backend": [

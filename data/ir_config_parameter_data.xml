@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="ir_config_parameter_riverflow_restrict_email_recipients_to" model="ir.config_parameter">
+        <field name="key">riverflow.restrict_email_recipients_to</field>
+        <field name="value">cuneuscrew.eu,vriend.com,vriend.studio</field>
+    </record>
+</odoo> 
