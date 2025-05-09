@@ -7,15 +7,6 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
-                    <div class="oe_button_box" name="button_box">
-                        <!-- <button name="action_related_contact"
-                            class="oe_stat_button"
-                            icon="fa-address-card-o"
-                            type="object"
-                            help="Related Contact">
-                            <field string="Related Contact" name="partner_id" readonly="1" widget="statinfo" />
-                        </button> -->
-                    </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                         invisible="active" />
                     <div class="oe_title">
