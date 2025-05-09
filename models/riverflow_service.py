@@ -437,10 +437,7 @@ class Service(models.Model):
                 service.root_id = service.id  # Or handle as appropriate
 
     @api.depends(
-        "name",
-        "parent_id.display_name",
-        "supply_leg_id.name",
-        "supply_leg_id.service_id.name",
+        "name", "parent_id.display_name", "supply_leg_id.name", "supply_leg_id.service_id.name", "state_name"
     )
     def _compute_display_name(self):
         for service in self.sudo():
@@ -449,14 +446,16 @@ class Service(models.Model):
                 if not service.parent_id:
                     name = f"{service.supply_leg_id.service_id.name} | {name}"
                 service.name = name
+                continue
 
+            display_name = service.name
             if service.parent_id:
-                service.display_name = "%s | %s" % (
-                    service.parent_id.display_name,
-                    service.name,
-                )
-            else:
-                service.display_name = service.name
+                display_name = f"{service.parent_id.name} | {service.name}"
+
+            if service.state_name:
+                display_name = f"{display_name} | {service.state_name}"
+
+            service.display_name = display_name
 
     @api.depends("child_ids")
     def _compute_descendant_ids(self):

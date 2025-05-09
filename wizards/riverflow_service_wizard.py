@@ -21,6 +21,7 @@ class ServiceWizard(models.TransientModel):
         ],
         string="Deadline From",
         required=False,
+        default="self",
     )
     use_project_deadline_from_invisible = fields.Boolean()
     use_project_deadline_from_options = fields.Json()
