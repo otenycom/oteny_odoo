@@ -82,6 +82,9 @@
                 <field name="service_id" invisible="not service_id" />
                 <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
                 <field name="state_name" invisible="not state_name" string="State" />
+                <field name="tag_ids" widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}" invisible="not tag_ids" />
+                <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
                 <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
                 <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" />

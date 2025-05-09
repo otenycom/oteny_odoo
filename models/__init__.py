@@ -17,3 +17,4 @@ from . import riverflow_check_results_mixin
 from . import riverflow_import
 from . import models
 from . import mail_mail
+from . import res_partner

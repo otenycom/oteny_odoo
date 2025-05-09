@@ -1,20 +1,32 @@
 <?xml version="1.0"?>
-<odoo noupdate="1">
-    <record id="team_logistics" model="riverflow.team">
+<odoo noupdate="0">
+    <record id="partner_team_logistics" model="res.partner">
         <field name="name">Operations NL</field>
-        <field name="company_id" ref="base.main_company" />
         <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
+        <field name="company_id" ref="base.main_company" />
+    </record>
+
+    <record id="team_logistics" model="riverflow.team">
+        <field name="partner_id" ref="partner_team_logistics" />
+    </record>
+
+    <record id="partner_team_operations_de" model="res.partner">
+        <field name="name">Operations DE</field>
+        <field name="phone">+49 177 88 99 111</field>
+        <field name="company_id" ref="base.main_company" />
     </record>
 
     <record id="team_operations_de" model="riverflow.team">
-        <field name="name">Operations DE</field>
-        <field name="company_id" ref="base.main_company" />
-        <field name="phone">+49 177 88 99 111</field>
+        <field name="partner_id" ref="partner_team_operations_de" />
+    </record>
+
+    <record id="partner_team_planning" model="res.partner">
+        <field name="name">Planning Team</field>
+        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
     </record>
 
     <record id="team_planning" model="riverflow.team">
-        <field name="name">Planning Team</field>
-        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
+        <field name="partner_id" ref="partner_team_planning" />
     </record>
 
     <record id="team_finance" model="riverflow.team">

@@ -14,10 +14,16 @@ class TransitionWizard(models.AbstractModel):
 
     # in each derived class, define the records_to_transition_ids field to be of the correct co-model
     records_to_transition_ids = fields.Many2many("riverflow.service")  # to be overridden
+    # responsible_team_id = fields.Many2one(
+    #     "riverflow.team",
+    #     string="Assign to Team",
+    #     help="Team responsible for the next step of the workflow",
+    # )
     responsible_team_id = fields.Many2one(
-        "riverflow.team",
-        string="Assign to Team",
-        help="Team responsible for the next step of the workflow",
+        "res.partner",
+        string="Responsible",
+        help="Team or user who is assigned to this record.",
+        domain="['|', ('is_user', '=', True), ('is_team', '=', True)]",
     )
     responsible_team_id_invisible = fields.Boolean()
     new_note = fields.Text(string="Internal Note")

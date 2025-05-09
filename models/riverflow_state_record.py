@@ -186,7 +186,7 @@ class RiverflowStateRecord(models.Model):
     )
 
     responsible_team_id = fields.Many2one(
-        "riverflow.team",
+        "res.partner",
         string="Responsible Team",
         help="Team executing the workflow. This team is also responsible for reviewing external messages.",
         index=True,
