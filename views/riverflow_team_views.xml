@@ -8,13 +8,13 @@
             <form>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button name="action_related_contact"
+                        <!-- <button name="action_related_contact"
                             class="oe_stat_button"
                             icon="fa-address-card-o"
                             type="object"
                             help="Related Contact">
-                            <field string="Related Contact" name="partner_id" widget="statinfo" />
-                        </button>
+                            <field string="Related Contact" name="partner_id" readonly="1" widget="statinfo" />
+                        </button> -->
                     </div>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                         invisible="active" />
@@ -31,6 +31,10 @@
                             <field name="phone" widget="phone" />
                             <field name="discuss_channel_id" />
                             <field name="company_id" groups="base.group_multi_company" />
+                            <field name="partner_id" groups="base.group_no_one"
+                                readonly="1"
+                                required="0"
+                                invisible="not id" />
                         </group>
                     </group>
                 </sheet>

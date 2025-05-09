@@ -17,6 +17,7 @@ class RiverflowTeam(models.Model):
         string="Related Partner",
         help="Partner record storing the team's contact information",
     )
+    name = fields.Char(related="partner_id.name", inherited=True, readonly=False)
 
     # Team-specific fields
     discuss_channel_id = fields.Many2one(
