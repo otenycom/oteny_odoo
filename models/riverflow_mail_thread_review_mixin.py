@@ -19,7 +19,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         string="Responsible",
         help="Team or user who is assigned to this record. This team/user is also responsible for reviewing external messages.",
         index=True,
-        domain="['|', ('is_user', '=', True), ('is_team', '=', True)]",
+        domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
     )
 
     internal_note_ids = fields.Many2many(
@@ -265,7 +265,8 @@ class MailThreadReviewMixin(models.AbstractModel):
             if message.message_type not in ("email", "comment"):
                 continue
 
-            # Skip messages from internal users
+            # Skip messages from internal users: not sure if hiding these is actually helpful,
+            # the main thing is they should not cause an 'unread' flag on the channel to avoid
             if message.author_id and message.author_id.user_ids.filtered(
                 lambda u: u.has_group("base.group_user")
             ):
@@ -276,8 +277,10 @@ class MailThreadReviewMixin(models.AbstractModel):
                 record = self.browse(message.res_id).exists()
                 if (
                     not record
-                    or not record.responsible_team_id
-                    or not record.responsible_team_id.discuss_channel_id
+                    # Check if record has a responsible team and if that team has a discuss channel
+                    # Using hasattr() to safely check if fields exist before accessing them
+                    or not hasattr(record, "responsible_team_id")
+                    or not record.responsible_team_id.riverflow_team_id
                 ):
                     continue
             except Exception:
@@ -332,7 +335,7 @@ class MailThreadReviewMixin(models.AbstractModel):
 
                 # Post the message to the team's discuss channel using Markup
                 system_user = self.sudo().env.ref("base.user_root")
-                record.sudo().responsible_team_id.discuss_channel_id.with_context(
+                record.sudo().responsible_team_id.riverflow_team_id.discuss_channel_id.with_context(
                     mail_create_nosubscribe=True
                 ).message_post(
                     body=Markup("".join(message_parts)),

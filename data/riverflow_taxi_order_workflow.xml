@@ -65,7 +65,7 @@
         <field name="action_id" ref="riverflow.transition_action_email_sender" />
         <field name="icon">fa-taxi</field>
         <field name="sequence">10</field>
-        <field name="to_responsible_team_id" ref="riverflow.team_logistics" />
+        <field name="to_responsible_team_id" ref="riverflow.partner_team_logistics" />
     </record>
 
     <record id="trans_taxi_skip_send_not_started_to_ordered" model="riverflow.transition">
@@ -75,7 +75,7 @@
         <field name="action_id" ref="riverflow.transition_action_default" />
         <field name="icon">fa-taxi</field>
         <field name="sequence">20</field>
-        <field name="to_responsible_team_id" ref="riverflow.team_logistics" />
+        <field name="to_responsible_team_id" ref="riverflow.partner_team_logistics" />
     </record>
 
     <record id="trans_taxi_skip_send_not_started_to_confirmed" model="riverflow.transition">

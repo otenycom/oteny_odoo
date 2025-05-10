@@ -9,7 +9,10 @@ class Contact(models.Model):
     team_ids: RiverflowTeam = fields.One2many("riverflow.team", "partner_id", string="Teams")
 
     is_user = fields.Boolean(compute="_compute_is_user", store=True)
-    is_team = fields.Boolean(compute="_compute_is_team", store=True)
+    is_riverflow_team = fields.Boolean(compute="_compute_is_riverflow_team", store=True)
+    riverflow_team_id: RiverflowTeam = fields.Many2one(
+        "riverflow.team", string="Team", compute="_compute_riverflow_team_id", store=True
+    )
 
     @api.depends("user_ids")
     def _compute_is_user(self):
@@ -17,6 +20,11 @@ class Contact(models.Model):
             record.is_user = len(record.user_ids) > 0
 
     @api.depends("team_ids")
-    def _compute_is_team(self):
+    def _compute_is_riverflow_team(self):
         for record in self:
-            record.is_team = len(record.team_ids) > 0
+            record.is_riverflow_team = len(record.team_ids) > 0
+
+    @api.depends("team_ids")
+    def _compute_riverflow_team_id(self):
+        for record in self:
+            record.riverflow_team_id = record.team_ids[0] if record.team_ids else False
