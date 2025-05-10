@@ -8,6 +8,7 @@
 
     <record id="team_logistics" model="riverflow.team">
         <field name="partner_id" ref="partner_team_logistics" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
     <record id="partner_team_operations_de" model="res.partner">

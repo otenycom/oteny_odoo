@@ -52,10 +52,11 @@ class RiverflowTransition(models.Model):
     )
 
     to_responsible_team_id = fields.Many2one(
-        "riverflow.team",
+        "res.partner",
         "Assign to Responsible Team",
         help="Team to assign the service to",
         required=False,
+        domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
     )
 
     @api.depends("workflow_id")
