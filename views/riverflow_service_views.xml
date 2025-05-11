@@ -135,7 +135,7 @@
                             </group>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
-                            <group>
+                            <!-- <group>
                                 <group>
                                     <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
                                         string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
@@ -145,18 +145,17 @@
                                     <field name="unreviewed_message_count" string="Unreviewed Messages" />
                                     <field name="last_external_message_review_time" invisible="last_external_message_review_time == False" string="Last Reviewed" />
                                 </group>
-                            </group>
-                            <group>
-                                <field name="message_from_external_sender_ids">
-                                    <list>
-                                        <field name="date" />
-                                        <field name="author_id" />
-                                        <field name="email_from" />
-                                        <field name="subject" />
-                                        <field name="preview" />
-                                    </list>
-                                </field>
-                            </group>
+                            </group> -->
+                            <field name="message_from_external_sender_ids" no_label="1" class="oe_inline">
+                                <list>
+                                    <field name="date" />
+                                    <field name="author_id" />
+                                    <field name="author_guest_id" optional="hide" />
+                                    <field name="email_from" />
+                                    <field name="subject" />
+                                    <field name="preview" />
+                                </list>
+                            </field>
                         </page>
                         <page string="External Messages" name="all_external_messages" invisible="1">
                             <span>Messages visible to third parties (customers, vendors, etc.),
@@ -429,17 +428,6 @@
             action="riverflow.action_riverflow_start_service" sequence="30" />
     </menuitem>
 
-    <record id="action_send_dummy_external_message" model="ir.actions.server">
-        <field name="name">Create Dummy External Message</field>
-        <field name="model_id" ref="model_riverflow_service" />
-        <field name="binding_model_id" ref="model_riverflow_service" />
-        <field name="state">code</field>
-        <field name="code">
-            for record in records:
-            record._send_dummy_external_message()
-        </field>
-        <field name="groups_id" eval="[(4, ref('base.group_no_one'))]" />
-    </record>
 
     <record id="action_add_child_service" model="ir.actions.server">
         <field name="name">Add Child Service</field>
@@ -450,5 +438,16 @@
         <field name="code">action = records.add_child_service()</field>
     </record>
 
+    <record id="action_send_dummy_external_message" model="ir.actions.server">
+        <field name="name">Post Dummy Inbound Message on Chatter</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="code">
+            for record in records:
+            record._send_dummy_external_message()
+        </field>
+        <field name="groups_id" eval="[(4, ref('base.group_no_one'))]" />
+    </record>
 
 </odoo>

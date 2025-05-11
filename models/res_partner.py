@@ -1,5 +1,4 @@
 from odoo import fields, models, api
-
 from .riverflow_team import RiverflowTeam
 
 
@@ -17,7 +16,7 @@ class Contact(models.Model):
     @api.depends("user_ids")
     def _compute_is_user(self):
         for record in self:
-            record.is_user = len(record.user_ids) > 0
+            record.is_user = len(record.user_ids.filtered(lambda u: u.has_group("base.group_user"))) > 0
 
     @api.depends("team_ids")
     def _compute_is_riverflow_team(self):

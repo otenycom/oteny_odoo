@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<odoo noupdate="0">
+<odoo noupdate="1">
     <record id="partner_team_logistics" model="res.partner">
         <field name="name">Operations NL</field>
         <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
@@ -19,6 +19,7 @@
 
     <record id="team_operations_de" model="riverflow.team">
         <field name="partner_id" ref="partner_team_operations_de" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
     <record id="partner_team_planning" model="res.partner">
@@ -28,6 +29,7 @@
 
     <record id="team_planning" model="riverflow.team">
         <field name="partner_id" ref="partner_team_planning" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
     <record id="team_finance" model="riverflow.team">
@@ -35,6 +37,7 @@
         <field name="email">finance@vriend.com</field>
         <field name="phone">+31 6 55 55 55 53</field>
         <field name="company_id" ref="base.main_company" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
     <record id="team_sales" model="riverflow.team">
@@ -42,10 +45,12 @@
         <field name="email">sales@vriend.com</field>
         <field name="phone">+31 6 55 55 55 54</field>
         <field name="company_id" ref="base.main_company" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
     <record id="team_cuneus_yangon" model="riverflow.team">
         <field name="name">Cuneus Yangon</field>
         <field name="company_id" ref="base.main_company" />
+        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 </odoo>

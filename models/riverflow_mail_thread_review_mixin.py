@@ -280,7 +280,7 @@ class MailThreadReviewMixin(models.AbstractModel):
                     # Check if record has a responsible team and if that team has a discuss channel
                     # Using hasattr() to safely check if fields exist before accessing them
                     or not hasattr(record, "responsible_team_id")
-                    or not record.responsible_team_id.riverflow_team_id
+                    or not record.responsible_team_id  # .riverflow_team_id
                 ):
                     continue
             except Exception:
@@ -317,27 +317,31 @@ class MailThreadReviewMixin(models.AbstractModel):
                         )
                     )
 
-                    # Get subject or first line of body
-                    subject = msg.subject
-                    if not subject and msg.body:
-                        body_text = tools.html2plaintext(msg.body)
-                        subject = (
-                            (body_text.split("\n")[0][:100] + "...") if len(body_text) > 100 else body_text
-                        )
-
                     message_parts.append(
                         f'<div style="margin-bottom: 4px;">'
-                        f"<strong>{html_escape(sender)}</strong>: {html_escape(subject)}"
+                        f"<strong>{html_escape(sender)}</strong>: {html_escape(msg.subject)}<br>"
+                        f"{html_escape(msg.preview)}"
                         f"</div>"
                     )
 
                 message_parts.append("</div>")  # Close o_mail_notification div
 
-                # Post the message to the team's discuss channel using Markup
+                responsible_partner_id = record.sudo().responsible_team_id
+
+                channel_id = False
+                if responsible_partner_id.is_riverflow_team:
+                    channel_id = responsible_partner_id.riverflow_team_id.discuss_channel_id
+                elif responsible_partner_id.is_user:
+                    channel_id = self.sudo().env["discuss.channel"].channel_get(responsible_partner_id.ids)
+
+                if not channel_id:
+                    _logger.warning(
+                        "No discuss channel found for responsible partner %s", responsible_partner_id.name
+                    )
+                    continue
+
                 system_user = self.sudo().env.ref("base.user_root")
-                record.sudo().responsible_team_id.riverflow_team_id.discuss_channel_id.with_context(
-                    mail_create_nosubscribe=True
-                ).message_post(
+                channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(
                     body=Markup("".join(message_parts)),
                     message_type="notification",
                     subtype_xmlid="mail.mt_comment",

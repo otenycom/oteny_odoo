@@ -18,8 +18,9 @@ class TransitionWizard(models.AbstractModel):
         "res.partner",
         string="Responsible",
         help="Team or user who is assigned to this record.",
-        domain="['|', ('is_user', '=', True), ('riverflow_team_id', '=', True)]",
+        domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
     )
+
     responsible_team_id_invisible = fields.Boolean()
     new_note = fields.Text(string="Internal Note")
     new_note_invisible = fields.Boolean()
