@@ -68,8 +68,8 @@ class AutoAddService(models.Model):
             "ref": self.env.ref,
         }
 
+    # @log_execution_time
     @api.model
-    @log_execution_time
     def auto_add_services(self, subjects):
         if subjects and isinstance(subjects[0].id, models.NewId):
             """Because of the fake id in form view, we need to return

@@ -58,7 +58,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         state_record_vals = []
         for record in records:
             if self._add_state_record(record):
-                _logger.info(f"Creating riverflow_state_record for {record._name} with id {record.id}")
+                # _logger.info(f"Creating riverflow_state_record for {record._name} with id {record.id}")
                 # The rest of the values are copied from the record by compute methods in the state record model
                 vals = {
                     "master_model": record._name,

@@ -416,8 +416,9 @@ class Service(models.Model):
     def _compute_root_name(self):
         for service in self:
             root_service = service.root_id
+            # use format yyyy-mm-dd as its used for sorting
             sortable_deadline = (
-                root_service.deadline.strftime(self.DATE_FORMAT) if root_service.deadline else "2000-01-01"
+                root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
             service.root_name = f"{sortable_deadline} {root_service.name}"
 

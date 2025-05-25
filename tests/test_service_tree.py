@@ -1,11 +1,12 @@
 from odoo.tests.common import TransactionCase
 from odoo.tests import tagged
 from datetime import date
+from odoo.exceptions import UserError
 
 # Testcases generated with the help of Cursor AI
 
 
-@tagged("post_install", "-at_install", "test_services")
+@tagged("rivermen", "post_install", "-at_install", "riverflow", "test_services")
 class ServiceDeadlineTestCase(TransactionCase):
 
     TEST_PREFIX = "TestRun "
@@ -284,7 +285,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         # Verify the number of services
         self.assertEqual(len(services), len(expected_order), "Incorrect number of services found")
 
-        self.dump_services_to_console(services)
+        # self.dump_services_to_console(services)
 
         # Verify the order of services
         for i, service in enumerate(services):
@@ -360,17 +361,20 @@ class ServiceDeadlineTestCase(TransactionCase):
         # |         Grandchild 3.2.2   | 2024-03-03 |
         # |     Child 3.1              | 2024-02-29 |
 
-        child_3_2.write({"use_project_deadline_from": "self", "project_deadline": False})
+        with self.assertRaisesRegex(UserError, "You must set the Deadline"):
+            child_3_2.write({"use_project_deadline_from": "self", "project_deadline": False})
+
+        # NOTE: Users can't clear the deadline, as asserted above. Checks below are for the odd case where a deadline is set to 'self' and then cleared.
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
 
         services = self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")])
-        self.dump_services_to_console(services)
+        # self.dump_services_to_console(services)
         child_3_2 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Child 3.2")
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
         root_3 = services.filtered(lambda s: s.name == f"{self.TEST_PREFIX}Root Service 3")
 
-        self.dump_services_to_console(root_3.child_ids)
-        self.dump_services_to_console(services)
+        # self.dump_services_to_console(root_3.child_ids)
+        # self.dump_services_to_console(services)
 
         last_child_id = None
         for service in root_3.child_ids.sorted(key=lambda r: r.sequence):
