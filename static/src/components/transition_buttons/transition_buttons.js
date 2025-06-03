@@ -2,11 +2,13 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, onWillRender, useRef } from "@odoo/owl";
+import { Component, onWillRender, useRef, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
+import { DateTimeInput } from "@web/core/datetime/datetime_input";
 
 export class TransitionButtons extends Component {
     static template = "riverflow.TransitionButtons";
+    static components = { DateTimeInput };
     static props = {
         ...standardFieldProps,
         maxButtons: { type: String, optional: true },
@@ -20,6 +22,9 @@ export class TransitionButtons extends Component {
         this.inputRef = useRef("inputElement");
         this.projectDeadlineInput = useRef("projectDeadlineInput");
         this.expandedTemplates = new Set();
+        this.state = useState({
+            projectDeadline: null,
+        });
         onWillRender(() => {
             this.fieldValueState = this.fieldValue(this.props);
         });
@@ -200,6 +205,11 @@ export class TransitionButtons extends Component {
         }
     }
 
+    // Add method to handle deadline changes
+    onDeadlineChanged(date) {
+        this.state.projectDeadline = date;
+    }
+
     async executeSelectedTransitions() {
         // Only consider top-level templates
         const selectedButtons = this.buttonDefs().filter(
@@ -216,8 +226,8 @@ export class TransitionButtons extends Component {
 
         await this.saveRecords();
 
-        // Read the deadline from the input field
-        const projectDeadline = this.projectDeadlineInput.el ? this.projectDeadlineInput.el.value : null;
+        // Read the deadline from the state instead of input field
+        const projectDeadline = this.state.projectDeadline;
 
         // Execute transitions in sequence
         for (const button of selectedButtons) {

@@ -6,7 +6,7 @@
             <form string="New Service">
                 <sheet>
                     <field name="start_transition_ids" invisible="1" />
-                    <field name="transition_buttons_json" widget="transition_buttons" string="" />
+                    <field name="transition_buttons_json" widget="transition_buttons" show_deadline="true" />
                 </sheet>
                 <footer>
                     <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="z" />

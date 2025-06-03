@@ -34,9 +34,18 @@
                         </t>
                     </t>
                     <br />
-                    <div class="mt-2">
-                        <label for="project_deadline_input" class="form-label">Service Deadline</label>
-                        <input type="date" class="form-control" id="project_deadline_input" t-ref="projectDeadlineInput" />
+                    <div>
+                        <div class="row mb-3">
+                            <label class="col-3 col-form-label">Deadline</label>
+                            <div class="col-9">
+                                <DateTimeInput
+                                    type="'date'"
+                                    value="state.projectDeadline"
+                                    onChange.bind="onDeadlineChanged"
+                                    placeholder="'Select deadline date'"
+                                />
+                            </div>
+                        </div>
                         <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
                     </div>
                 </t>

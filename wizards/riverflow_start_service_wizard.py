@@ -1,4 +1,4 @@
-from odoo import models, Command, _
+from odoo import models, Command, _, fields
 from odoo.exceptions import UserError
 
 
@@ -42,6 +42,10 @@ class ServiceNewWizard(models.TransientModel):
         project_deadline = self.env.context.get("default_project_deadline")
         if not project_deadline:
             raise UserError(_("You must set the Deadline"))
+
+        # Convert the date string if needed
+        if isinstance(project_deadline, str):
+            project_deadline = fields.Date.from_string(project_deadline)
 
         new_service = self.env["riverflow.service"]._create_service_from_template(
             template_service_id, project_deadline
