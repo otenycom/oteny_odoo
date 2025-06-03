@@ -113,7 +113,7 @@
         <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="icon">fa-book</field>
         <field name="sequence">20</field>
-        <field name="to_responsible_team_id" ref="riverflow.team_finance" />
+        <field name="to_responsible_team_id" ref="riverflow.partner_team_finance" />
         <field name="action_context">{ }</field>
     </record>
 
@@ -142,7 +142,7 @@
         <field name="to_state_id" ref="riverflow.back_office_state_registered" />
         <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
-        <field name="to_responsible_team_id" ref="riverflow.team_finance" />
+        <field name="to_responsible_team_id" ref="riverflow.partner_team_finance" />
         <field name="action_context">{ "default_supply_quantity_required": False }</field>
     </record>
 

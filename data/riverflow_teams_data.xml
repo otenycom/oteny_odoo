@@ -32,9 +32,13 @@
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
-    <record id="team_finance" model="riverflow.team">
+    <record id="partner_team_finance" model="res.partner">
         <field name="name">Finance Team</field>
         <field name="company_id" ref="base.main_company" />
+    </record>
+
+    <record id="team_finance" model="riverflow.team">
+        <field name="partner_id" ref="partner_team_finance" />
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
