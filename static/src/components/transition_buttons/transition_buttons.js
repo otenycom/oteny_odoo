@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, onWillRender, useRef, useState } from "@odoo/owl";
+import { Component, onMounted, onWillRender, useRef, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { DateTimeInput } from "@web/core/datetime/datetime_input";
 
@@ -25,6 +25,8 @@ export class TransitionButtons extends Component {
         this.state = useState({
             projectDeadline: null,
         });
+
+
         onWillRender(() => {
             this.fieldValueState = this.fieldValue(this.props);
         });
