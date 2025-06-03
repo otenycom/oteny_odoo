@@ -34,17 +34,18 @@
 
     <record id="team_finance" model="riverflow.team">
         <field name="name">Finance Team</field>
-        <field name="email">finance@vriend.com</field>
-        <field name="phone">+31 6 55 55 55 53</field>
         <field name="company_id" ref="base.main_company" />
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
-    <record id="team_sales" model="riverflow.team">
+    <record id="partner_team_sales" model="res.partner">
         <field name="name">Sales Team</field>
-        <field name="email">sales@vriend.com</field>
         <field name="phone">+31 6 55 55 55 54</field>
         <field name="company_id" ref="base.main_company" />
+    </record>
+
+    <record id="team_sales" model="riverflow.team">
+        <field name="partner_id" ref="partner_team_sales" />
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
