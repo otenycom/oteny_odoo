@@ -10,64 +10,73 @@
     <t t-name="riverflow.TransitionButtons">
         <t t-if="this.useFullListLayout()">
             <div class="transition-selection-group full-list-layout">
-                <t t-if="this.buttonDefs().some(button => button.is_template)">
-                    <h3>Select one or more service templates</h3>
+                <div class="row">
+                    <!-- Left column for templates -->
+                    <div t-attf-class="col-#{this.buttonDefs().some(button => !button.is_template) ? '6' : '12'}">
+                        <t t-if="this.buttonDefs().some(button => button.is_template)">
+                            <h3>Select one or more service templates</h3>
 
-                    <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
-                        <t t-if="button.is_template">
-                            <div t-attf-class="template-item indent-#{button.indent_level}"
-                                t-att-style="this.shouldShowButton(button) ? '' : 'display: none;'">
-                                <t t-if="button.indent_level === 0">
-                                    <input type="checkbox"
-                                        t-att-checked="button.checked"
-                                        t-on-click="() => this.toggleCheckbox(button.index)" />
+                            <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                                <t t-if="button.is_template">
+                                    <div t-attf-class="template-item indent-#{button.indent_level}"
+                                        t-att-style="this.shouldShowButton(button) ? '' : 'display: none;'">
+                                        <t t-if="button.indent_level === 0">
+                                            <input type="checkbox"
+                                                t-att-checked="button.checked"
+                                                t-on-click="() => this.toggleCheckbox(button.index)" />
+                                        </t>
+                                        <span>
+                                            <span t-att-class="this.buttonIconClass(button)" />
+                                            <span t-esc="button.caption" t-att-title="button.caption" />
+                                            <t t-if="button.indent_level === 0 and this.hasChildren(button)">
+                                                <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
+                                                    t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
+                                            </t>
+                                        </span>
+                                    </div>
                                 </t>
-                                <span>
-                                    <span t-att-class="this.buttonIconClass(button)" />
-                                    <span t-esc="button.caption" t-att-title="button.caption" />
-                                    <t t-if="button.indent_level === 0 and this.hasChildren(button)">
-                                        <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
-                                            t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
-                                    </t>
-                                </span>
+                            </t>
+                            <br />
+                            <div>
+                                <div class="row mb-3">
+                                    <label class="col-3 col-form-label">Deadline</label>
+                                    <div class="col-9">
+                                        <DateTimeInput
+                                            type="'date'"
+                                            value="state.projectDeadline"
+                                            onChange.bind="onDeadlineChanged"
+                                            placeholder="'Select deadline date'"
+                                        />
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
                             </div>
                         </t>
-                    </t>
-                    <br />
-                    <div>
-                        <div class="row mb-3">
-                            <label class="col-3 col-form-label">Deadline</label>
-                            <div class="col-9">
-                                <DateTimeInput
-                                    type="'date'"
-                                    value="state.projectDeadline"
-                                    onChange.bind="onDeadlineChanged"
-                                    placeholder="'Select deadline date'"
-                                />
-                            </div>
-                        </div>
-                        <button class="btn btn-primary" t-on-click.prevent="() => this.executeSelectedTransitions()" accesskey="s">Create</button>
                     </div>
-                </t>
-                <t t-if="this.buttonDefs().some(button => !button.is_template)">
-                    <t t-if="this.buttonDefs().some(button => button.is_template)">
-                        <h3>Or click an item below to create a blank service</h3>
-                    </t>
-                    <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
-                        <t t-if="!button.is_template">
-                            <div t-attf-class="service-item indent-#{button.indent_level}">
-                                <button
-                                    t-att-name="button.action"
-                                    class="btn btn-link transition_button"
-                                    t-on-click.stop="() => this.executeTransition(button)"
-                                    type="object">
-                                    <span t-att-class="this.buttonIconClass(button)" />
-                                    <span t-esc="button.caption" t-att-title="button.caption" />
-                                </button>
-                            </div>
+
+                    <!-- Right column for non-templates -->
+                    <div t-attf-class="col-#{this.buttonDefs().some(button => button.is_template) ? '6' : '12'}">
+                        <t t-if="this.buttonDefs().some(button => !button.is_template)">
+                            <t t-if="this.buttonDefs().some(button => button.is_template)">
+                                <h3>Or click an item below to create a blank service</h3>
+                            </t>
+                            <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
+                                <t t-if="!button.is_template">
+                                    <div t-attf-class="service-item indent-#{button.indent_level}">
+                                        <button
+                                            t-att-name="button.action"
+                                            class="btn btn-link transition_button"
+                                            t-on-click.stop="() => this.executeTransition(button)"
+                                            type="object">
+                                            <span t-att-class="this.buttonIconClass(button)" />
+                                            <span t-esc="button.caption" t-att-title="button.caption" />
+                                        </button>
+                                    </div>
+                                </t>
+                            </t>
                         </t>
-                    </t>
-                </t>
+                    </div>
+                </div>
             </div>
         </t>
         <t t-elif="this.useFormHeaderLayout()">
