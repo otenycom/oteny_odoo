@@ -370,14 +370,14 @@ class RiverflowStateRecord(models.Model):
                 "is_end_state": record.is_end_state,
             }
 
-    @api.depends("service_id.res_name", "name")
-    def _compute_res_name(self):
-        """Compute res_name based on service_id.res_name or name."""
-        for record in self:
-            if record.service_id:
-                record.res_name = record.service_id.res_name
-            else:
-                record.res_name = record.name
+    # @api.depends("service_id.res_name", "name")
+    # def _compute_res_name(self):
+    #     """Compute res_name based on service_id.res_name or name."""
+    #     for record in self:
+    #         if record.service_id:
+    #             record.res_name = record.service_id.res_name
+    #         else:
+    #             record.res_name = record.name
 
     @api.depends("service_id.workflow_id")
     def _compute_workflow_id(self):
