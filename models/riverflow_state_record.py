@@ -9,7 +9,7 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = "res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
+    _order = "res_date asc,res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
 
     active = fields.Boolean(
         default=True,
@@ -73,6 +73,7 @@ class RiverflowStateRecord(models.Model):
     res_model = fields.Char(
         string="Subject of Service Model Name",
         compute="_compute_res_model",
+        index=True,
         store=True,
     )
     res_name = fields.Char(
@@ -80,6 +81,13 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_res_name",
         store=True,
         index="trigram",
+    )
+    res_date = fields.Date(
+        string="Subject Date",
+        compute="_compute_res_date",
+        store=True,
+        index=True,
+        help="Deadline date of the subject record, used for sorting. All records in a tree share the same res_date.",
     )
 
     root_id = fields.Integer(
@@ -247,16 +255,6 @@ class RiverflowStateRecord(models.Model):
                 record.master_model = False
                 record.master_res_id = False
 
-    def init(self):
-        # Create a unique index on (master_model, master_res_id) to ensure no duplicates
-        self._cr.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS riverflow_global_state_unique_record
-            ON %s (master_model, master_res_id)
-        """
-            % self._table
-        )
-
     @api.depends("service_id.indented_name", "name")
     def _compute_indented_name(self):
         for slave in self:
@@ -370,14 +368,42 @@ class RiverflowStateRecord(models.Model):
                 "is_end_state": record.is_end_state,
             }
 
-    # @api.depends("service_id.res_name", "name")
-    # def _compute_res_name(self):
-    #     """Compute res_name based on service_id.res_name or name."""
-    #     for record in self:
-    #         if record.service_id:
-    #             record.res_name = record.service_id.res_name
-    #         else:
-    #             record.res_name = record.name
+    @api.depends("deadline", "is_subject")
+    def _compute_res_date(self):
+        """Compute res_date to be the deadline of the subject record.
+        For subjects: use their own deadline
+        For services: use the deadline of their subject (via res_id lookup)
+        """
+        for record in self:
+            if record.is_subject:
+                # Subject records use their own deadline
+                record.res_date = record.deadline
+            elif record.service_id:
+                # For service records, try to get the deadline from the subject
+                # First check if we can access it through service relationships
+                # (this will be overridden in inheriting modules for better performance)
+                subject_deadline = self._get_subject_deadline_for_service(record)
+                record.res_date = subject_deadline if subject_deadline else record.deadline
+            else:
+                record.res_date = record.deadline
+
+    def _get_subject_deadline_for_service(self, record):
+        """Get the deadline of the subject for a service record.
+        This method can be overridden in inheriting modules for better performance.
+        """
+        if record.res_model and record.res_id:
+            # Find the subject record (where master_model/master_res_id matches this service's res_model/res_id)
+            subject_record = self.search(
+                [
+                    ("master_model", "=", record.res_model),
+                    ("master_res_id", "=", record.res_id),
+                    ("is_subject", "=", True),
+                ],
+                limit=1,
+            )
+            if subject_record:
+                return subject_record.deadline
+        return False
 
     @api.depends("service_id.workflow_id")
     def _compute_workflow_id(self):
