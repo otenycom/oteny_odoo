@@ -129,6 +129,7 @@
                 <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Issues" name="has_issues" domain="[('check_result_ids.severity', '!=', False)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"
                     domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
                 <filter string="Has External Messages" name="has_external_messages"
