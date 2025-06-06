@@ -508,14 +508,6 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.sequence = 1
 
-    @api.depends("service_id.tag_ids")
-    def _compute_tag_ids(self):
-        for record in self:
-            if record.service_id:
-                record.tag_ids = record.service_id.tag_ids
-            else:
-                record.tag_ids = False
-
     @api.depends("service_id.res_id")
     def _compute_res_id(self):
         for record in self:
