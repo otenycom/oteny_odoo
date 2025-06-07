@@ -92,6 +92,8 @@
                                     <field name='indented_name' optional="show" width="260px" />
                                     <field name="display_name" optional="hide" />
                                     <field name="root_name" optional="hide" />
+                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
+                                        readonly="1" optional="show" />
                                     <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
                                     <field name="state_id" width="140px" optional="show" />
                                     <field name="timing_json" widget="timing_widget" optional="show" />
@@ -103,8 +105,7 @@
                                     <field name='internal_notes_summary' width="200px" optional="show" />
                                     <field name="external_messages_summary" width="200px" optional="show" />
                                     <field name="unreviewed_message_count" width="40px" optional="show" />
-                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
-                                        readonly="1" optional="show" />
+
                                 </list>
                             </field>
                         </page>
@@ -234,6 +235,7 @@
                 <field name='indented_name' optional="show" width="260px" />
                 <field name="display_name" optional="hide" />
                 <field name="root_name" optional="hide" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
                 <field name="state_id" width="140px" optional="show" />
                 <field name="timing_json" widget="timing_widget" optional="show" />
@@ -246,11 +248,10 @@
                 <field name="front_office_workflow_id" optional="hide" />
                 <field name="supply_unit_price" optional="hide" />
                 <field name="supply_unit_price_currency_id" column_invisible="1" />
-                <field name="company_id" width="100px" optional="show" />
+                <field name="company_id" width="100px" optional="hide" />
                 <field name='internal_notes_summary' width="200px" optional="show" />
                 <field name="external_messages_summary" width="200px" optional="show" />
                 <field name="unreviewed_message_count" width="40px" optional="show" />
-                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
             </list>
         </field>
     </record>
