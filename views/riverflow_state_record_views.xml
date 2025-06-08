@@ -71,6 +71,7 @@
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
             <calendar string="State Records"
+                js_class="readonly_calendar"
                 date_start="deadline"
                 date_stop="end_date"
                 color="color_int"
@@ -104,6 +105,7 @@
                 <field name="res_model" />
                 <field name="res_name" />
                 <field name="root_name" />
+                <field name="workflow_id" />
                 <field name="state_id" />
                 <field name="tag_ids" />
                 <field name="deadline" />
