@@ -47,6 +47,7 @@
                 <field name="display_name" optional="hide" />
                 <field name="indented_name" optional="show" />
                 <field name="company_id" optional="hide" width="120px" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="master_model" optional="hide" />
                 <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="res_model" optional="hide" />
@@ -60,7 +61,6 @@
                 <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name='internal_notes_summary' width="180px" optional="show" />
                 <field name="external_messages_summary" width="180px" optional="show" />
-                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
                 <field name="unreviewed_message_count" optional="show" />
             </list>
         </field>
@@ -71,6 +71,7 @@
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
             <calendar string="State Records"
+                js_class="readonly_calendar"
                 date_start="deadline"
                 date_stop="end_date"
                 color="color_int"
@@ -104,6 +105,7 @@
                 <field name="res_model" />
                 <field name="res_name" />
                 <field name="root_name" />
+                <field name="workflow_id" />
                 <field name="state_id" />
                 <field name="tag_ids" />
                 <field name="deadline" />
@@ -129,6 +131,7 @@
                 <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Issues" name="has_issues" domain="[('check_result_ids.severity', '!=', False)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"
                     domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
                 <filter string="Has External Messages" name="has_external_messages"

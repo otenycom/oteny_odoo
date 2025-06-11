@@ -9,23 +9,10 @@ class CheckResultsMixin(models.AbstractModel):
     def create(self, vals_list):
         records = super().create(vals_list)
         self._refresh_check_results_on_create(records)
-        # important: flush the database to ensure that _write is triggered before web_save in models.py
-        # captures the current record state
-        # self.env.flush_all()
         return records
 
     def _refresh_check_results_on_create(self, records):
         pass
-
-    def write(self, vals):
-        result = super().write(vals)
-        # important: flush the database to ensure that _write is triggered before web_save in models.py
-        # captures the current record state
-        # see addons/event_crm/models/event_registration.py _write()
-
-        # self.env.flush_all()
-
-        return result
 
     def write(self, vals):
         before__write_result = self._refresh_check_results_on_before__write(vals)

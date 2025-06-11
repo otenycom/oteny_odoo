@@ -17,44 +17,32 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
     _name = "riverflow.state.record.tracker.mixin"
     _description = "Syncs the model with the central Radar table (RiverflowStateRecord)."
 
-    def _get_state_record(self):
-        self.ensure_one()
-        state_record = self._get_state_records(ids=[self.id])
-        return state_record
+    state_record_id = fields.Many2one(
+        "riverflow.state.record",
+        string="State Record",
+        compute="_compute_state_record_id",
+        store=True,
+        readonly=True,
+        ondelete="set null",
+    )
 
-    def _get_state_records(self, ids):
-        """
-        Retrieve state records for the current model, including archived ones.
+    @api.depends("create_date")
+    def _compute_state_record_id(self):
+        if any(isinstance(record.id, models.NewId) for record in self):
+            return
 
-        :param ids: Optional list of record IDs to filter by
-        :return: Recordset of riverflow.state.record
-        """
-        domain = [("master_model", "=", self._name)]
-        domain.append(("master_res_id", "in", ids))
-        return self.env["riverflow.state.record"].sudo().with_context(active_test=False).search(domain)
+        needing_state_record = self.filtered(lambda r: not r.state_record_id)
+        if not needing_state_record:
+            return
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        records = super().create(vals_list)
-        self._create_state_record(records)
-        return records
+        state_records = self._create_state_records(needing_state_record)
+        for record in self:
+            state_record = state_records.filtered(
+                lambda r: r.master_res_id == record.id and r.master_model == record._name
+            )
+            record.state_record_id = state_record.id
 
-    def _unlink_state_record(self):
-        state_records = self._get_state_records(ids=self.ids)
-        if state_records:
-            existing_records = state_records.exists()
-            if existing_records:
-                existing_records.sudo().unlink()
-
-    def unlink(self):
-        # we first unlink the master record, as during its unlink, it will flush writes to the state record
-        # for computed values. These flushes fail if we remove the state record from under the feet of the master record
-        result = super().unlink()
-        self._unlink_state_record()
-        return result
-
-    @api.model
-    def _create_state_record(self, records):
+    def _create_state_records(self, records):
         state_record_vals = []
         for record in records:
             if self._add_state_record(record):
@@ -66,8 +54,17 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 }
                 state_record_vals.append(vals)
         if len(state_record_vals) > 0:
-            self.env["riverflow.state.record"].create(state_record_vals)
+            return self.env["riverflow.state.record"].create(state_record_vals)
+        return self.env["riverflow.state.record"]
 
     @api.model
     def _add_state_record(self, record):
         return True
+
+    def unlink(self):
+        # we first unlink the master record, as during its unlink, it will flush writes to the state record
+        # for computed values. These flushes fail if we remove the state record from under the feet of the master record
+        state_records = self.mapped("state_record_id")
+        result = super().unlink()
+        state_records.sudo().unlink()
+        return result
