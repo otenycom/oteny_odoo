@@ -78,7 +78,13 @@ class Service(models.Model):
         index=True,
         recursive=True,
     )
-    name = fields.Char("Service Name", index="trigram", required=True, tracking=True)
+    name = fields.Char(
+        "Service Name",
+        index="trigram",
+        required=True,
+        tracking=True,
+    )
+
     indented_name = fields.Char("Service", compute="_compute_indented_name", store=False, recursive=True)
     display_name = fields.Char(
         "Display Name",
@@ -441,12 +447,13 @@ class Service(models.Model):
         "name", "parent_id.display_name", "supply_leg_id.name", "supply_leg_id.service_id.name", "state_name"
     )
     def _compute_display_name(self):
-        for service in self.sudo():
+        for service in self:
             if service.supply_leg_id:
                 name = service.supply_leg_id.name
                 if not service.parent_id:
                     name = f"{service.supply_leg_id.service_id.name} | {name}"
-                service.name = name
+                service.name = name  # used in lists/radar
+                service.display_name = name  # used in calendar
                 continue
 
             display_name = service.name

@@ -78,6 +78,32 @@
                     </group>
                     <notebook>
                         <!-- invisible by default: keep UI simple. The cog menu still allows creating child services -->
+                        <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
+                            <group invisible="not has_supply_unit_price">
+                                <field name="supply_unit_price" widget="monetary" />
+                                <field name="supply_unit_price_currency_id" invisible="1" />
+                            </group>
+                            <group invisible="not has_supplier">
+                                <group>
+                                    <field name="supplier_partner_id" />
+                                </group>
+                                <group>
+                                    <field name="supply_order_instructions" />
+                                </group>
+                            </group>
+                            <group invisible="not has_legs">
+                                <field name="leg_ids" nolabel="1">
+                                    <list>
+                                        <field name="sequence" widget="handle" />
+                                        <field name="supply_from" />
+                                        <field name="supply_to" />
+                                        <field name="supply_instructions" />
+                                        <field name="supply_cost_currency_id" column_invisible="1" />
+                                        <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
+                                    </list>
+                                </field>
+                            </group>
+                        </page>
                         <page string="Child Services" name="services" invisible="not descendant_ids">
                             <div>
                                 <button name="add_child_service" type="object" data-hotkey="n"
@@ -108,32 +134,6 @@
 
                                 </list>
                             </field>
-                        </page>
-                        <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
-                            <group invisible="not has_supply_unit_price">
-                                <field name="supply_unit_price" widget="monetary" />
-                                <field name="supply_unit_price_currency_id" invisible="1" />
-                            </group>
-                            <group invisible="not has_supplier">
-                                <group>
-                                    <field name="supplier_partner_id" />
-                                </group>
-                                <group>
-                                    <field name="supply_order_instructions" />
-                                </group>
-                            </group>
-                            <group invisible="not has_legs">
-                                <field name="leg_ids" nolabel="1">
-                                    <list>
-                                        <field name="sequence" widget="handle" />
-                                        <field name="supply_from" />
-                                        <field name="supply_to" />
-                                        <field name="supply_instructions" />
-                                        <field name="supply_cost_currency_id" column_invisible="1" />
-                                        <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
-                                    </list>
-                                </field>
-                            </group>
                         </page>
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
                             <!-- <group>
