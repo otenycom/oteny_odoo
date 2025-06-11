@@ -208,6 +208,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         "responsible_team_id",
         "supplier_partner_id",
         "is_supply_order",
+        "supply_order_instructions",
     )
     def onchange_supply_fields(self):
         self.render()
