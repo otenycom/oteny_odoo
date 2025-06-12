@@ -113,7 +113,8 @@
                             <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
                                 <!-- Workaround: list view click opens a popup of the child service, instead of the form view.
                                                          To ensure the form view opens for the child service, we use riverflow_one2many -->
-                                <list create="0" delete="0" edit="0">
+                                <list create="0" delete="0" edit="0" default_order="sub_sequence,root_name,root_id,sequence">
+                                    <field name="sub_sequence" widget="handle" />
                                     <field name="active" column_invisible="True" />
                                     <field name='indented_name' optional="show" width="260px" />
                                     <field name="display_name" optional="hide" />

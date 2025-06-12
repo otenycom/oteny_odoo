@@ -194,8 +194,9 @@ class Service(models.Model):
         store=True,
         recursive=True,
     )
+
     sub_sequence = fields.Integer(
-        default=100,
+        default=10,
         help="Orders services that have the same parent",
         required=True,
     )
@@ -1090,30 +1091,45 @@ class Service(models.Model):
         """
         Called by the riverflow_x2many widget to handle reordering of records based on drag-and-drop.
         'self' is the record that was moved (the source).
+        This method resequences all sibling services to ensure a consistent order.
         """
         self.ensure_one()
 
-        if target_id is False or target_id is None:
-            # Dropped at the beginning of the list. Move it before the current first record.
-            first_record = self.search(
-                [
-                    ("res_model", "=", self.res_model),
-                    ("res_id", "=", self.res_id),
-                    ("parent_id", "=", self.parent_id.id),
-                    ("id", "!=", self.id),  # Exclude self
-                ],
-                order="sub_sequence asc",
-                limit=1,
-            )
+        # Define the domain to find all siblings.
+        # We filter by parent_id. For root services (parent_id is NULL), we use res_model and res_id.
+        domain = [("parent_id", "=", self.parent_id.id)]
+        if not self.parent_id:
+            domain.extend([("res_model", "=", self.res_model), ("res_id", "=", self.res_id)])
 
-            if first_record:
-                self.sub_sequence = first_record.sub_sequence - 1
-            else:
-                self.sub_sequence = 0  # It's the only record
+        # Get all siblings, ordered by their current sub_sequence
+        all_siblings = self.search(domain, order="sub_sequence asc")
+
+        sibling_ids = all_siblings.ids
+
+        # Remove the moved record from its original position.
+        if self.id in sibling_ids:
+            sibling_ids.remove(self.id)
+
+        if target_id is False or target_id is None:
+            # Dropped at the beginning of the list.
+            new_ordered_ids = [self.id] + sibling_ids
         else:
             # Dropped after a target record.
-            target_record = self.browse(target_id)
-            self.sub_sequence = target_record.sub_sequence + 1
+            if target_id in sibling_ids:
+                target_index = sibling_ids.index(target_id)
+                sibling_ids.insert(target_index + 1, self.id)
+                new_ordered_ids = sibling_ids
+            else:
+                # Fallback: add at the end. This may happen if target_id is not a sibling.
+                new_ordered_ids = sibling_ids + [self.id]
+
+        # Re-sequence all siblings with a gap of 10 between them.
+        # This is more robust than just incrementing, as it avoids collisions and handles reordering gracefully.
+        sub_seq = 10
+        for service_id in new_ordered_ids:
+            # We browse and write one by one. This will trigger the recompute of dependent fields, which is intended.
+            self.browse(service_id).write({"sub_sequence": sub_seq})
+            sub_seq += 10
 
         return True
 
