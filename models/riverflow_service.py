@@ -76,7 +76,7 @@ class Service(models.Model):
         help="Name of the top-level service, for sorting the list of services",
         store=True,
         index=True,
-        # recursive=True,
+        recursive=True,
     )
     name = fields.Char(
         "Service Name",
@@ -423,7 +423,7 @@ class Service(models.Model):
             name = record.display_name
             service.res_name = name if name else f"{service.res_model}/{service.res_id}"
 
-    @api.depends("root_id", "root_id.name", "name", "deadline", "sub_sequence")
+    @api.depends("root_id", "root_id.root_name", "name", "deadline", "sub_sequence")
     def _compute_root_name(self):
         for service in self:
             root_service = service.root_id
@@ -1088,12 +1088,11 @@ class Service(models.Model):
 
     def set_sub_sequence(self, target_id=None):
         """
-        Custom method to handle reordering of records based on drag-and-drop.
+        Called by the riverflow_x2many widget to handle reordering of records based on drag-and-drop.
         'self' is the record that was moved (the source).
         """
         self.ensure_one()
 
-        # Your existing logic to set the sub_sequence
         if target_id is False or target_id is None:
             # Dropped at the beginning of the list. Move it before the current first record.
             first_record = self.search(
@@ -1116,9 +1115,7 @@ class Service(models.Model):
             target_record = self.browse(target_id)
             self.sub_sequence = target_record.sub_sequence + 1
 
-        # This is the crucial part. After performing the logic, return an
-        # action that tells the client to reload the view.
-        return {"type": "ir.actions.act_window_close"}
+        return True
 
 
 class ServiceLeg(models.Model):

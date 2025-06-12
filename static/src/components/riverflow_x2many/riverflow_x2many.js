@@ -46,7 +46,6 @@ export class RiverflowOne2manyRenderer extends ListRenderer {
                 { target_id: targetRecordId }
             );
 
-            //this.props.list.model.bus.trigger("RELOAD_RIVERFLOW_LIST");
             await sourceRecord.model.root.load();
 
         } catch (e) {
@@ -83,14 +82,6 @@ export class RiverflowOne2many extends X2ManyField {
             await this.actionService.doAction(action);
         };
         this.canOpenRecord = true;
-
-        // Listen for the custom event from the renderer.
-        useBus(this.list.model.bus, "RELOAD_RIVERFLOW_LIST", async () => {
-            // THE FIX: Call .load() on 'this.list', which is the RelationalRecordList
-            // representing the one2many relation. This will re-fetch its records
-            // from the server, respecting the new server-side order.
-            await this.props.record.model.root.load();
-        });
     }
 }
 
