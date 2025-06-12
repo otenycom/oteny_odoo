@@ -189,6 +189,7 @@
                             <group>
                                 <field name="workflow_id" on_change="1" options="{'no_create': True}" />
                                 <field name="state_id" on_change="1" options="{'no_create': True}" />
+                                <field name="sub_sequence" />
                             </group>
                         </page>
                     </notebook>

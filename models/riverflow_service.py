@@ -76,7 +76,7 @@ class Service(models.Model):
         help="Name of the top-level service, for sorting the list of services",
         store=True,
         index=True,
-        recursive=True,
+        # recursive=True,
     )
     name = fields.Char(
         "Service Name",
@@ -193,6 +193,11 @@ class Service(models.Model):
         required=True,
         store=True,
         recursive=True,
+    )
+    sub_sequence = fields.Integer(
+        default=100,
+        help="Orders services that have the same parent",
+        required=True,
     )
 
     tag_ids = fields.Many2many(
@@ -418,7 +423,7 @@ class Service(models.Model):
             name = record.display_name
             service.res_name = name if name else f"{service.res_model}/{service.res_id}"
 
-    @api.depends("root_id", "root_id.name", "name", "deadline")
+    @api.depends("root_id", "root_id.name", "name", "deadline", "sub_sequence")
     def _compute_root_name(self):
         for service in self:
             root_service = service.root_id
@@ -426,7 +431,7 @@ class Service(models.Model):
             sortable_deadline = (
                 root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
-            service.root_name = f"{sortable_deadline} {root_service.name}"
+            service.root_name = f"{root_service.sub_sequence:05d} {sortable_deadline} {root_service.name}"
 
     @api.depends("parent_path")
     def _compute_root_id(self):
@@ -598,6 +603,7 @@ class Service(models.Model):
         "parent_id",
         "root_name",
         "deadline",
+        "sub_sequence",
     )
     def _compute_sequence(self):
         # if self.env.context.get("computing_sequence"):
@@ -683,6 +689,7 @@ class Service(models.Model):
                     sorted_children_ids = sorted(
                         children_ids,
                         key=lambda child_id: (
+                            service_dict[child_id].sub_sequence,
                             service_dict[child_id].deadline or date.max,
                             service_dict[child_id].name,
                             service_dict[child_id].id,
@@ -695,10 +702,13 @@ class Service(models.Model):
             if None in service_tree:
                 visited = set()
 
+                root_ids = service_tree[None]
+
                 # Sort the root services by `name`, then `id`
                 root_ids = sorted(
                     service_tree[None],
                     key=lambda root_id: (
+                        service_dict[root_id].sub_sequence,
                         service_dict[root_id].name,
                         service_dict[root_id].id,
                     ),
@@ -1075,6 +1085,40 @@ class Service(models.Model):
                 and not record.project_deadline
             ):
                 raise UserError(_("You must set the Deadline"))
+
+    def set_sub_sequence(self, target_id=None):
+        """
+        Custom method to handle reordering of records based on drag-and-drop.
+        'self' is the record that was moved (the source).
+        """
+        self.ensure_one()
+
+        # Your existing logic to set the sub_sequence
+        if target_id is False or target_id is None:
+            # Dropped at the beginning of the list. Move it before the current first record.
+            first_record = self.search(
+                [
+                    ("res_model", "=", self.res_model),
+                    ("res_id", "=", self.res_id),
+                    ("parent_id", "=", self.parent_id.id),
+                    ("id", "!=", self.id),  # Exclude self
+                ],
+                order="sub_sequence asc",
+                limit=1,
+            )
+
+            if first_record:
+                self.sub_sequence = first_record.sub_sequence - 1
+            else:
+                self.sub_sequence = 0  # It's the only record
+        else:
+            # Dropped after a target record.
+            target_record = self.browse(target_id)
+            self.sub_sequence = target_record.sub_sequence + 1
+
+        # This is the crucial part. After performing the logic, return an
+        # action that tells the client to reload the view.
+        return {"type": "ir.actions.act_window_close"}
 
 
 class ServiceLeg(models.Model):
