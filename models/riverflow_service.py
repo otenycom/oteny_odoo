@@ -451,7 +451,7 @@ class Service(models.Model):
             if service.supply_leg_id:
                 name = service.supply_leg_id.name
                 if not service.parent_id:
-                    name = f"{service.supply_leg_id.service_id.name} | {name}"
+                    name = f"{name} ({service.supply_leg_id.service_id.name})"
                 service.name = name  # used in lists/radar
                 service.display_name = name  # used in calendar
                 continue
