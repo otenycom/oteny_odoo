@@ -81,6 +81,7 @@
                 scales="day,week,month,quarter,year"
                 hide_time="true"
                 event_limit="35">
+                <field name="res_sortable_name" />
                 <field name="service_id" invisible="not service_id" />
                 <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
                 <field name="state_name" invisible="not state_name" string="State" />
