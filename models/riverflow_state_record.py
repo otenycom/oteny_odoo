@@ -9,7 +9,9 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = "res_date asc,res_model,res_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
+    _order = (
+        "res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
+    )
 
     active = fields.Boolean(
         default=True,
@@ -38,6 +40,11 @@ class RiverflowStateRecord(models.Model):
         string="Name",
         index=True,
         compute="_compute_name",
+        store=True,
+    )
+    sortable_name = fields.Char(
+        string="Sortable Name",
+        compute="_compute_sortable_name",
         store=True,
     )
     display_name = fields.Char(
@@ -79,6 +86,12 @@ class RiverflowStateRecord(models.Model):
     res_name = fields.Char(
         string="Subject of Service",
         compute="_compute_res_name",
+        store=True,
+        index="trigram",
+    )
+    res_sortable_name = fields.Char(
+        string="Subject of Service Sortable Name",
+        compute="_compute_res_sortable_name",
         store=True,
         index="trigram",
     )
@@ -532,6 +545,14 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.res_name = record.name
 
+    @api.depends("service_id.sortable_name", "sortable_name")
+    def _compute_res_sortable_name(self):
+        for record in self:
+            if record.service_id:
+                record.res_sortable_name = record.service_id.sortable_name
+            else:
+                record.res_sortable_name = record.sortable_name
+
     @api.depends("service_id.responsible_team_id")
     def _compute_responsible_team_id(self):
         for record in self:
@@ -559,10 +580,21 @@ class RiverflowStateRecord(models.Model):
         for record in self:
             record.name = self._compute_name_for_record(record)
 
+    @api.depends("service_id.sortable_name")
+    def _compute_sortable_name(self):
+        for record in self:
+            record.sortable_name = self._compute_sortable_name_for_record(record)
+
     @api.model
     def _compute_name_for_record(self, record):
         if record.service_id:
             return record.service_id.name
+        return False
+
+    @api.model
+    def _compute_sortable_name_for_record(self, record):
+        if record.service_id:
+            return record.service_id.sortable_name
         return False
 
     @api.depends("service_id.indent_level")
