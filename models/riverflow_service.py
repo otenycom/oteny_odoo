@@ -84,6 +84,11 @@ class Service(models.Model):
         required=True,
         tracking=True,
     )
+    sortable_name = fields.Char(
+        "Sortable Name",
+        compute="_compute_sortable_name",
+        store=True,
+    )
 
     indented_name = fields.Char("Service", compute="_compute_indented_name", store=False, recursive=True)
     display_name = fields.Char(
@@ -470,6 +475,11 @@ class Service(models.Model):
                 display_name = f"{display_name} | {service.state_name}"
 
             service.display_name = display_name
+
+    @api.depends("display_name")
+    def _compute_sortable_name(self):
+        for service in self:
+            service.sortable_name = service.display_name
 
     @api.depends("child_ids")
     def _compute_descendant_ids(self):

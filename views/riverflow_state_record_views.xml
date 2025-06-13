@@ -52,6 +52,7 @@
                 <field name="timing_json" widget="timing_widget" optional="show" />
                 <field name="res_model" optional="hide" />
                 <field name="res_name" optional="hide" />
+                <field name="res_sortable_name" optional="hide" />
                 <field name="deadline" optional="hide" />
                 <field name="state_json" widget="transition_buttons" optional="show" width="140px" />
                 <field name="state_id" optional="hide" />
