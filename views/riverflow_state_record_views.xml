@@ -81,7 +81,18 @@
                 scales="day,week,month,quarter,year"
                 hide_time="true"
                 event_limit="35">
-                <field name="res_sortable_name" />
+                <!-- Fields needed for sorting: res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,sequence,deadline -->
+                <field name="res_date" invisible="1" />
+                <field name="res_model" invisible="1" />
+                <field name="res_sortable_name" invisible="1" />
+                <field name="res_id" invisible="1" />
+                <field name="is_subject" invisible="1" />
+                <field name="root_name" invisible="1" />
+                <field name="root_id" invisible="1" />
+                <field name="sequence" invisible="1" />
+                <field name="deadline" invisible="1" />
+
+                <!-- normal fields for the popup window -->
                 <field name="service_id" invisible="not service_id" />
                 <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
                 <field name="state_name" invisible="not state_name" string="State" />

@@ -29,12 +29,6 @@ class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
      */
     get options() {
         const defaultOptions = super.options;
-        const sortFieldName = "res_sortable_name";
-        // Only apply custom sorting for month view when the field is available.
-        // this.props.model.scale !== "month" ||
-        if (!this.props.model.meta.fieldNames.includes(sortFieldName)) {
-            return defaultOptions;
-        }
 
         return {
             ...defaultOptions,
@@ -47,20 +41,54 @@ class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
                     return eventA.title.localeCompare(eventB.title);
                 }
 
-                const orderA = recordA.rawRecord[sortFieldName];
-                const orderB = recordB.rawRecord[sortFieldName];
-                const hasOrderA = orderA !== undefined && orderA !== null;
-                const hasOrderB = orderB !== undefined && orderB !== null;
+                const rawA = recordA.rawRecord;
+                const rawB = recordB.rawRecord;
 
-                // If both records have a sort key, compare them.
-                if (hasOrderA && hasOrderB) {
-                    if (orderA < orderB) return -1;
-                    if (orderA > orderB) return 1;
+                const compareField = (fieldName, order = "asc") => {
+                    const valA = rawA[fieldName];
+                    const valB = rawB[fieldName];
+                    const hasValA = valA !== undefined && valA !== null;
+                    const hasValB = valB !== undefined && valB !== null;
+
+                    // Records with a value come before records without a value.
+                    if (hasValA && !hasValB) return -1;
+                    if (!hasValA && hasValB) return 1;
+                    if (!hasValA && !hasValB) return 0;
+
+                    let result = 0;
+                    if (typeof valA === "string" && typeof valB === "string") {
+                        result = valA.localeCompare(valB);
+                    } else if (valA < valB) {
+                        result = -1;
+                    } else if (valA > valB) {
+                        result = 1;
+                    }
+
+                    if (order === "desc") {
+                        result *= -1;
+                    }
+
+                    return result;
+                };
+
+                const sortCriteria = [
+                    { name: "res_date" },
+                    { name: "res_model" },
+                    { name: "res_sortable_name" },
+                    { name: "res_id" },
+                    { name: "is_subject", order: "desc" },
+                    { name: "root_name" },
+                    { name: "root_id" },
+                    { name: "sequence" },
+                    { name: "deadline" },
+                ];
+
+                for (const criteria of sortCriteria) {
+                    const result = compareField(criteria.name, criteria.order);
+                    if (result !== 0) {
+                        return result;
+                    }
                 }
-
-                // If only one record has a sort key, it comes first.
-                if (hasOrderA) return -1;
-                if (hasOrderB) return 1;
 
                 // If records have equal or no sort key, fall back to title comparison.
                 return eventA.title.localeCompare(eventB.title);
