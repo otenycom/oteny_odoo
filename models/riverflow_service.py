@@ -252,6 +252,11 @@ class Service(models.Model):
         store=True,
         index="trigram",
     )
+    res_sortable_name = fields.Char(
+        "Subject's Sortable Name",
+        compute="_compute_res_name",
+        store=True,
+    )
 
     # related entity (similar to the one in the mail_message.py in odoo)
     # content fields such as display_name of the related document can be looked
@@ -417,17 +422,26 @@ class Service(models.Model):
         for service in self:
             if not service.res_id or not service.res_model:
                 service.res_name = False
+                service.res_sortable_name = False
                 continue
             if service.res_model not in self.env:
                 # Skip if the container model is not yet loaded in the environment
                 #  (during upgrades of the module, when the container is a module dependent on riverflow)
                 continue
-            record = self.env[service.res_model].sudo().browse(service.res_id)
-            if not record.exists():
+            subject = self.env[service.res_model].sudo().browse(service.res_id)
+            if not subject.exists():
                 service.res_name = False
+                service.res_sortable_name = False
                 continue
-            name = record.display_name
+            name = subject.display_name
             service.res_name = name if name else f"{service.res_model}/{service.res_id}"
+
+            # Odoo has no .get() method, so we use hasattr() to check if the subject has a sortable_name field
+            if hasattr(subject, "sortable_name") and subject.sortable_name:
+                res_sortable_name = subject.sortable_name
+            else:
+                res_sortable_name = service.res_name
+            service.res_sortable_name = res_sortable_name
 
     @api.depends("root_id", "root_id.root_name", "name", "deadline", "sub_sequence")
     def _compute_root_name(self):

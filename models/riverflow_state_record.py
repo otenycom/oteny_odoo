@@ -549,7 +549,7 @@ class RiverflowStateRecord(models.Model):
     def _compute_res_sortable_name(self):
         for record in self:
             if record.service_id:
-                record.res_sortable_name = record.service_id.sortable_name
+                record.res_sortable_name = record.service_id.res_sortable_name
             else:
                 record.res_sortable_name = record.sortable_name
 
