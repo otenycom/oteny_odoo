@@ -52,8 +52,12 @@
 
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
+                            <!-- 
+                            This was previously in the use_project_deadline_from field, but it was giving errors on the client and since in 99% of cases it was invisible, we disabled it.
+                            options="{'whitelist_fname': 'use_project_deadline_from_options'}"  
+                            -->
                             <field name="use_project_deadline_from" widget="filterable_selection"
-                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1"
+                                required="1" on_change="1"
                                 invisible="use_project_deadline_from == 'self'" />
                             <field
                                 name="project_deadline"
