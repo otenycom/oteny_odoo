@@ -451,7 +451,7 @@ class Service(models.Model):
             sortable_deadline = (
                 root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
-            service.root_name = f"{root_service.sub_sequence:05d} {sortable_deadline} {root_service.name}"
+            service.root_name = f"{sortable_deadline} {root_service.sub_sequence:05d} {root_service.name}"
 
     @api.depends("parent_path")
     def _compute_root_id(self):
@@ -714,8 +714,8 @@ class Service(models.Model):
                     sorted_children_ids = sorted(
                         children_ids,
                         key=lambda child_id: (
-                            service_dict[child_id].sub_sequence,
                             service_dict[child_id].deadline or date.max,
+                            service_dict[child_id].sub_sequence,
                             service_dict[child_id].name,
                             service_dict[child_id].id,
                         ),
@@ -729,10 +729,11 @@ class Service(models.Model):
 
                 root_ids = service_tree[None]
 
-                # Sort the root services by `name`, then `id`
+                # Sort the root services
                 root_ids = sorted(
                     service_tree[None],
                     key=lambda root_id: (
+                        service_dict[root_id].deadline or date.max,
                         service_dict[root_id].sub_sequence,
                         service_dict[root_id].name,
                         service_dict[root_id].id,
@@ -1111,41 +1112,63 @@ class Service(models.Model):
             ):
                 raise UserError(_("You must set the Deadline"))
 
-    def set_sub_sequence(self, target_id=None):
+    def handle_drop_event(self, target_id=None):
         """
         Called by the riverflow_x2many widget to handle reordering of records based on drag-and-drop.
         'self' is the record that was moved (the source).
         This method resequences all sibling services to ensure a consistent order.
+        If a service is dropped onto a target with a different deadline, it is moved to the end of its own deadline group.
         """
         self.ensure_one()
 
+        if target_id and target_id == self.id:
+            # Dropping on self doesn't change anything.
+            return True
+
         # Define the domain to find all siblings.
         # We filter by parent_id. For root services (parent_id is NULL), we use res_model and res_id.
-        domain = [("parent_id", "=", self.parent_id.id)]
-        if not self.parent_id:
-            domain.extend([("res_model", "=", self.res_model), ("res_id", "=", self.res_id)])
+        if self.parent_id:
+            siblings_domain = [("parent_id", "=", self.parent_id.id)]
+        else:
+            siblings_domain = [
+                ("parent_id", "=", False),
+                ("res_model", "=", self.res_model),
+                ("res_id", "=", self.res_id),
+            ]
 
-        # Get all siblings, ordered by their current sub_sequence
-        all_siblings = self.search(domain, order="sub_sequence asc")
+        all_siblings = self.search(siblings_domain, order="sub_sequence")
 
-        sibling_ids = all_siblings.ids
+        target = self.browse(target_id) if target_id else self.env[self._name]
+
+        effective_target = target
+        while effective_target and effective_target not in all_siblings and effective_target.parent_id:
+            effective_target = effective_target.parent_id
+
+        # We only re-order siblings with the same deadline as the source record.
+        siblings_to_reorder = all_siblings.filtered(lambda s: s.deadline == self.deadline)
+        sibling_ids_to_reorder = siblings_to_reorder.ids
 
         # Remove the moved record from its original position.
-        if self.id in sibling_ids:
-            sibling_ids.remove(self.id)
+        if self.id in sibling_ids_to_reorder:
+            sibling_ids_to_reorder.remove(self.id)
 
-        if target_id is False or target_id is None:
-            # Dropped at the beginning of the list.
-            new_ordered_ids = [self.id] + sibling_ids
+        is_dropped_on_parent = self.parent_id and target_id == self.parent_id.id
+
+        if not target_id or is_dropped_on_parent:
+            # Dropped at the beginning of the list or on parent.
+            new_ordered_ids = [self.id] + sibling_ids_to_reorder
+        elif (
+            not effective_target
+            or effective_target.id not in all_siblings.ids
+            or effective_target.deadline != self.deadline
+        ):
+            # Target is invalid or has a different deadline, move to the end.
+            new_ordered_ids = sibling_ids_to_reorder + [self.id]
         else:
-            # Dropped after a target record.
-            if target_id in sibling_ids:
-                target_index = sibling_ids.index(target_id)
-                sibling_ids.insert(target_index + 1, self.id)
-                new_ordered_ids = sibling_ids
-            else:
-                # Fallback: add at the end. This may happen if target_id is not a sibling.
-                new_ordered_ids = sibling_ids + [self.id]
+            # Dropped after a valid target record with the same deadline.
+            target_index = sibling_ids_to_reorder.index(effective_target.id)
+            sibling_ids_to_reorder.insert(target_index + 1, self.id)
+            new_ordered_ids = sibling_ids_to_reorder
 
         # Re-sequence all siblings with a gap of 10 between them.
         # This is more robust than just incrementing, as it avoids collisions and handles reordering gracefully.

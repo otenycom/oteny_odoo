@@ -43,19 +43,23 @@
                 <field name="root_id" column_invisible="True" />
                 <field name="root_name" column_invisible="True" />
                 <field name="is_subject" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
                 <field name="name" optional="hide" />
                 <field name="display_name" optional="hide" />
                 <field name="indented_name" optional="show" />
                 <field name="company_id" optional="hide" width="120px" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="master_model" optional="hide" />
-                <field name="timing_json" widget="timing_widget" optional="show" />
+                <field name="timing_json" widget="timing_widget" optional="hide" />
+                <field name="deadline" optional="show"
+                    decoration-danger="(deadline &lt; context_today().strftime('%Y-%m-%d')) and not is_end_state"
+                    decoration-warning="(deadline == context_today().strftime('%Y-%m-%d')) and not is_end_state"
+                    decoration-muted="is_end_state" />
                 <field name="res_model" optional="hide" />
                 <field name="res_name" optional="hide" />
                 <field name="res_sortable_name" optional="hide" />
-                <field name="deadline" optional="hide" />
                 <field name="state_json" widget="transition_buttons" optional="show" width="140px" />
-                <field name="state_id" optional="hide" />
+                <field name="state_id" optional="hide" decoration-success="is_end_state" />
                 <field name="responsible_team_id" optional="show" string="Responsible" />
                 <field name="write_uid" string="Updated By" optional="hide" />
                 <field name="write_date" string="Updated On" optional="hide" />

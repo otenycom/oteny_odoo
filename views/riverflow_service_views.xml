@@ -113,22 +113,30 @@
                             <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
                                 <!-- Workaround: list view click opens a popup of the child service, instead of the form view.
                                                          To ensure the form view opens for the child service, we use riverflow_one2many -->
-                                <list create="0" delete="0" edit="0" default_order="sub_sequence,root_name,root_id,sequence">
+                                <list create="0" delete="0" edit="0" default_order="root_name,root_id,sequence">
                                     <field name="sub_sequence" widget="handle" />
                                     <field name="active" column_invisible="True" />
+                                    <field name="is_end_state" column_invisible="1" />
                                     <field name='indented_name' optional="show" width="260px" />
                                     <field name="display_name" optional="hide" />
                                     <field name="root_name" optional="hide" />
-                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"
-                                        readonly="1" optional="show" />
                                     <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
-                                    <field name="state_id" width="140px" optional="show" />
-                                    <field name="timing_json" widget="timing_widget" optional="show" />
-                                    <field name="deadline" optional="hide" />
+                                    <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
+                                    <field name="timing_json" widget="timing_widget" optional="hide" column_invisible="1" />
+                                    <field name="deadline" optional="show"
+                                        decoration-muted="is_end_state"
+                                        decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                        decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                    />
+                                    <field name="end_date" optional="hide" />
+                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                                     <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                                     <field name="write_uid" string="Updated By" optional="hide" />
                                     <field name="write_date" string="Updated On" optional="hide" />
-                                    <field name="company_id" width="100px" optional="show" />
+                                    <field name="front_office_workflow_id" optional="hide" />
+                                    <field name="supply_unit_price" optional="hide" />
+                                    <field name="supply_unit_price_currency_id" column_invisible="1" />
+                                    <field name="company_id" width="100px" optional="hide" />
                                     <field name='internal_notes_summary' width="200px" optional="show" />
                                     <field name="external_messages_summary" width="200px" optional="show" />
                                     <field name="unreviewed_message_count" width="40px" optional="show" />
@@ -234,16 +242,20 @@
         <field name='arch' type='xml'>
             <list create="false">
                 <field name="active" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
+                <field name="res_name" optional="show" />
                 <field name='indented_name' optional="show" width="260px" />
                 <field name="display_name" optional="hide" />
                 <field name="root_name" optional="hide" />
-                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
-                <field name="state_id" width="140px" optional="show" />
-                <field name="timing_json" widget="timing_widget" optional="show" />
-                <field name="deadline" optional="hide" />
+                <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
+                <field name="timing_json" widget="timing_widget" optional="hide" column_invisible="1" />
+                <field name="deadline" optional="show"
+                    decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                    decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                    decoration-muted="is_end_state" />
                 <field name="end_date" optional="hide" />
-                <field name="res_name" optional="show" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                 <field name="write_uid" string="Updated By" optional="hide" />
                 <field name="write_date" string="Updated On" optional="hide" />

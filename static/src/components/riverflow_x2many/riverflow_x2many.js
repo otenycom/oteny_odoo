@@ -41,7 +41,7 @@ export class RiverflowOne2manyRenderer extends ListRenderer {
         try {
             await this.orm.call(
                 this.props.list.resModel,
-                "set_sub_sequence",
+                "handle_drop_event",
                 [sourceRecordId],
                 { target_id: targetRecordId }
             );
