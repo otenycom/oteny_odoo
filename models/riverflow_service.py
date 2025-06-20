@@ -1117,7 +1117,7 @@ class Service(models.Model):
         Called by the riverflow_x2many widget to handle reordering of records based on drag-and-drop.
         'self' is the record that was moved (the source).
         This method resequences all sibling services to ensure a consistent order.
-        If a service is dropped onto a target with a different deadline, it is moved to the end of its own deadline group.
+        If a service is dropped onto a target with a different deadline, its position is adjusted.
         """
         self.ensure_one()
 
@@ -1157,13 +1157,17 @@ class Service(models.Model):
         if not target_id or is_dropped_on_parent:
             # Dropped at the beginning of the list or on parent.
             new_ordered_ids = [self.id] + sibling_ids_to_reorder
-        elif (
-            not effective_target
-            or effective_target.id not in all_siblings.ids
-            or effective_target.deadline != self.deadline
-        ):
-            # Target is invalid or has a different deadline, move to the end.
+        elif not effective_target or effective_target.id not in all_siblings.ids:
+            # Target is not a sibling, move to the end.
             new_ordered_ids = sibling_ids_to_reorder + [self.id]
+        elif effective_target.deadline != self.deadline:
+            # Dropped on a sibling with a different deadline.
+            # If the source's deadline is later than the target's, move to the top of its group.
+            if self.deadline and effective_target.deadline and self.deadline > effective_target.deadline:
+                new_ordered_ids = [self.id] + sibling_ids_to_reorder
+            else:
+                # Otherwise, move to the end of its group.
+                new_ordered_ids = sibling_ids_to_reorder + [self.id]
         else:
             # Dropped after a valid target record with the same deadline.
             target_index = sibling_ids_to_reorder.index(effective_target.id)
