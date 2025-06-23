@@ -144,7 +144,7 @@ class RiverflowImport(models.AbstractModel):
                         imd_prep_data["res_id"] = new_record.id
                         imd_create_vals.append(imd_prep_data)
                         result["created"] += 1
-                        _logger.info(f"Prepared ir.model.data for created record {xml_id}")
+                        # _logger.info(f"Prepared ir.model.data for created record {xml_id}")
                     else:
                         # This case should ideally not happen if len(created_records) == len(create_vals_list)
                         _logger.error(f"Mismatch in created records and prepared IMD data for {model_name}")
