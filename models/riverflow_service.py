@@ -1112,6 +1112,14 @@ class Service(models.Model):
             ):
                 raise UserError(_("You must set the Deadline"))
 
+    def _message_compute_subject(self):
+        """
+        Overrides the default subject of the message (display_name) to use only the service name.
+        This prevents that the workflow state is appended to the subject.
+        """
+        self.ensure_one()
+        return self.name
+
     def handle_drop_event(self, target_id=None):
         """
         Called by the riverflow_x2many widget to handle reordering of records based on drag-and-drop.

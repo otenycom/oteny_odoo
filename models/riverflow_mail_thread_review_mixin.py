@@ -19,7 +19,9 @@ class MailThreadReviewMixin(models.AbstractModel):
         string="Responsible",
         help="Team or user who is assigned to this record. This team/user is also responsible for reviewing external messages.",
         index=True,
-        domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
+        tracking=True,
+        # domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
+        domain="[('is_riverflow_team', '=', True)]",
     )
 
     internal_note_ids = fields.Many2many(

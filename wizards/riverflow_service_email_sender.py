@@ -111,6 +111,23 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         default_values["responsible_team_id_invisible"] = False
         return default_values
 
+    def default_get_using_records(self, defaultValues, records_to_transition):
+        super().default_get_using_records(defaultValues, records_to_transition)
+
+        # Get default recipients from the first service record
+        if records_to_transition:
+            service = records_to_transition[0]
+
+            defaultValues["subject_updatable"] = service.name
+
+            default_recipients = service._get_default_recipients()
+            if default_recipients:
+                recipients = [Command.link(partner_id) for partner_id in default_recipients.ids]
+                if "recipient_partner_ids" in defaultValues:
+                    defaultValues["recipient_partner_ids"].extend(recipients)
+                else:
+                    defaultValues["recipient_partner_ids"] = recipients
+
     @api.depends("subject_rendered", "body_rendered", "subject", "body")
     def _compute_updatable_content(self):
         for wizard in self:
@@ -179,22 +196,10 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             )[service.id]
 
             # Update editable fields when template changes
-            wizard.subject_updatable = wizard.subject_rendered
-            wizard.body_updatable = wizard.body_rendered
-
-    def default_get_using_records(self, defaultValues, records_to_transition):
-        super().default_get_using_records(defaultValues, records_to_transition)
-
-        # Get default recipients from the first service record
-        if records_to_transition:
-            service = records_to_transition[0]
-            default_recipients = service._get_default_recipients()
-            if default_recipients:
-                recipients = [Command.link(partner_id) for partner_id in default_recipients.ids]
-                if "recipient_partner_ids" in defaultValues:
-                    defaultValues["recipient_partner_ids"].extend(recipients)
-                else:
-                    defaultValues["recipient_partner_ids"] = recipients
+            if wizard.subject_rendered:
+                wizard.subject_updatable = wizard.subject_rendered
+            if wizard.body_rendered:
+                wizard.body_updatable = wizard.body_rendered
 
     @api.onchange("email_template_id")
     def onchange_email_template_id(self):
@@ -241,11 +246,9 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(service, vals)
-        # new services are automatically assigned a name equal to the email subject
-        isNewService = isinstance(service.id, models.NewId)
-        if isNewService and not vals.get("name"):
-            subject = self.subject_updatable
-            vals["name"] = subject
+
+        subject = self.subject_updatable
+        vals["name"] = subject
 
         if self.is_supply_order:
             # Write supplier reference to service
@@ -292,7 +295,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             if invalid_recipients:
                 # TODO: change the recipient to the email of the current user
-                raise ValueError(
+                raise UserError(
                     _(
                         "Email sending is restricted to specific domains (%s). "
                         "The following recipients have invalid email domains: %s"
@@ -309,10 +312,14 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if not self.body_updatable:
             raise ValueError(_("Body is required"))
 
+        # services = self.records_to_transition_ids
+        # # Setting the name equal to the subject allows the user to also send a later message via Chatter
+        # services.write({"name": self.subject_updatable})
+
         # Post the message, add followers to the chatter, and don't subscribe them to the chatter
         service.with_context(mail_post_autofollow=True, mail_create_nosubscribe=True).message_post(
             message_type="email",
-            subject=self.subject_updatable,
+            # subject=self.subject_updatable,
             partner_ids=recipient_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,

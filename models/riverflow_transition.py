@@ -56,7 +56,8 @@ class RiverflowTransition(models.Model):
         "Assign to Responsible Team",
         help="Team to assign the service to",
         required=False,
-        domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
+        # domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
+        domain="[('is_riverflow_team', '=', True)]",
     )
 
     @api.depends("workflow_id")
