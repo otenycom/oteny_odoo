@@ -147,9 +147,15 @@ class MailThreadReviewMixin(models.AbstractModel):
 
             # Use original sender info for external messages, system user for notifications
             if email_from and message_type == "email":
-                post_values["email_from"] = email_from
-                if author_name:
-                    post_values["email_from"] = f"{author_name} <{email_from}>"
+                # Parse the email_from to extract just the email address
+                if "<" in email_from and ">" in email_from:
+                    post_values["email_from"] = email_from
+                else:
+                    # email_from is just an email address
+                    if author_name:
+                        post_values["email_from"] = f"{author_name} <{email_from}>"
+                    else:
+                        post_values["email_from"] = email_from
             else:
                 system_user = self.sudo().env.ref("base.user_root")
                 post_values["author_id"] = system_user.partner_id.id
