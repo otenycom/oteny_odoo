@@ -22,7 +22,6 @@ class MailThreadReviewMixin(models.AbstractModel):
         "res.partner",
         string="Responsible",
         help="Team or user who is assigned to this record. This team/user is also responsible for reviewing external messages.",
-        inverse="_inverse_notify_team_change",
         index=True,
         tracking=True,
         # domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
@@ -174,18 +173,32 @@ class MailThreadReviewMixin(models.AbstractModel):
             return False
 
     # -------------------------------------------------------------------------
-    # INVERSE METHODS
+    # OVERRIDES
     # -------------------------------------------------------------------------
 
-    def _inverse_notify_team_change(self):
-        self.ensure_one()
-        """Send notification to new team's discuss channel when responsibility is transferred"""
-        if not self.responsible_team_id:
-            return
+    def write(self, vals):
+        """Override write to send notification when responsible team changes"""
+        # Store original values before the write for comparison
+        old_teams = {record.id: record.responsible_team_id for record in self}
 
-        """Hack: workaround for form view onchange in New record mode"""
-        if any(isinstance(record.id, models.NewId) for record in self):
-            return
+        # Perform the actual write
+        result = super().write(vals)
+
+        # Check if responsible_team_id was changed and send notifications
+        if "responsible_team_id" in vals:
+            for record in self:
+                old_team = old_teams.get(record.id)
+                new_team = record.responsible_team_id
+
+                # Only notify if team actually changed and there's a new team
+                if old_team != new_team and new_team:
+                    record._send_team_change_notification()
+
+        return result
+
+    def _send_team_change_notification(self):
+        """Send notification to new team's discuss channel when responsibility is transferred"""
+        self.ensure_one()
 
         # Construct the record URL and display text
         base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
@@ -196,7 +209,6 @@ class MailThreadReviewMixin(models.AbstractModel):
             display_text = f"{display_text} | {html_escape(self.res_name)}"
 
         # Create the transfer notification message with standardized format
-        model_name = self._description or self._name
         team_name = self.responsible_team_id.name
         message_body = (
             f'<div class="o_mail_notification">'
@@ -210,6 +222,10 @@ class MailThreadReviewMixin(models.AbstractModel):
 
         # Send the notification
         self._send_notification_to_team_channel(self.responsible_team_id, message_body)
+
+    # -------------------------------------------------------------------------
+    # INVERSE METHODS
+    # -------------------------------------------------------------------------
 
     def _inverse_internal_notes_summary(self):
         for record in self:
