@@ -114,12 +114,16 @@ class MailThreadReviewMixin(models.AbstractModel):
     # HELPER METHODS
     # -------------------------------------------------------------------------
 
-    def _send_notification_to_team_channel(self, team, message_body, message_type="notification"):
+    def _send_notification_to_team_channel(
+        self, team, message_body, message_type="notification", email_from=None, author_name=None
+    ):
         """Send a notification to a team's discuss channel.
 
         :param team: res.partner record representing the team
         :param message_body: HTML string with the notification content
         :param message_type: Type of message to send ("notification" or "email")
+        :param email_from: Original sender's email address
+        :param author_name: Original sender's name
         :return: True if successful, False otherwise
         """
         try:
@@ -134,14 +138,24 @@ class MailThreadReviewMixin(models.AbstractModel):
                 _logger.warning("No discuss channel found for team %s", team.name)
                 return False
 
-            # Send the notification to the team's discuss channel
-            system_user = self.sudo().env.ref("base.user_root")
-            channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(
-                body=Markup(message_body),
-                message_type=message_type,
-                subtype_xmlid="mail.mt_comment",
-                author_id=system_user.partner_id.id,
-            )
+            # Prepare message posting parameters
+            post_values = {
+                "body": Markup(message_body),
+                "message_type": message_type,
+                "subtype_xmlid": "mail.mt_comment",
+            }
+
+            # Use original sender info for external messages, system user for notifications
+            if email_from and message_type == "email":
+                post_values["email_from"] = email_from
+                if author_name:
+                    post_values["email_from"] = f"{author_name} <{email_from}>"
+            else:
+                system_user = self.sudo().env.ref("base.user_root")
+                post_values["author_id"] = system_user.partner_id.id
+
+            # Send the message to the team's discuss channel
+            channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(**post_values)
             return True
 
         except Exception:
@@ -389,18 +403,35 @@ class MailThreadReviewMixin(models.AbstractModel):
 
                 # Post each original message to the team discuss channel
                 for msg in new_messages:
+                    # Get original sender information
+                    sender_email = msg.email_from
+                    sender_name = msg.author_id.name if msg.author_id else None
+
+                    # If no name from author_id, try to extract from email_from
+                    if not sender_name and sender_email:
+                        # Parse "Name <email@domain.com>" format
+                        parsed_email = email_split_and_format(sender_email)
+                        if parsed_email:
+                            sender_name = parsed_email[0].split(" <")[0] if " <" in parsed_email[0] else None
+
                     # Create a simple header with link to the record
                     header = (
                         f'<div style="margin-bottom: 8px; padding: 8px; background-color: #f8f9fa; border-left: 3px solid #007bff;">'
-                        f'<strong>Message from:</strong> <a href="{record_url}">{display_text}</a>'
+                        f'<a href="{record_url}">{display_text}</a>'
                         f"</div>"
                     )
 
                     # Combine header with original message body
                     full_message = f"{header}{msg.body or msg.preview or 'No content'}"
 
-                    # Post the original message to the team discuss channel
-                    record._send_notification_to_team_channel(responsible_partner_id, full_message, "email")
+                    # Post the original message to the team discuss channel with original sender info
+                    record._send_notification_to_team_channel(
+                        responsible_partner_id,
+                        full_message,
+                        "email",
+                        email_from=sender_email,
+                        author_name=sender_name,
+                    )
 
             except Exception:
                 _logger.exception(
