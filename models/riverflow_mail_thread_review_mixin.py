@@ -14,10 +14,15 @@ class MailThreadReviewMixin(models.AbstractModel):
     _description = "Mail Thread Review Mixin"
     _inherit = ["mail.thread"]
 
+    # -------------------------------------------------------------------------
+    # FIELDS
+    # -------------------------------------------------------------------------
+
     responsible_team_id = fields.Many2one(
         "res.partner",
         string="Responsible",
         help="Team or user who is assigned to this record. This team/user is also responsible for reviewing external messages.",
+        inverse="_inverse_notify_team_change",
         index=True,
         tracking=True,
         # domain="['|', ('is_user', '=', True), ('is_riverflow_team', '=', True)]",
@@ -41,6 +46,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_external_message_ids",
         store=False,
     )
+
     unreviewed_message_ids = fields.Many2many(
         comodel_name="mail.message",
         column1="res_id",
@@ -49,6 +55,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_unreviewed_message_ids",
         store=False,
     )
+
     # field to store messages specifically from external senders, which
     # will trigger a needs review flag
     message_from_external_sender_ids = fields.Many2many(
@@ -71,31 +78,24 @@ class MailThreadReviewMixin(models.AbstractModel):
         index="trigram",
     )
 
-    def _inverse_internal_notes_summary(self):
-        for record in self:
-            if record.internal_notes_summary:
-                plain_text = record.internal_notes_summary
-                record.message_post(
-                    body=plain_text,
-                    message_type="comment",
-                    subtype_xmlid="mail.mt_note",
-                )
-
     last_external_message_review_time = fields.Datetime(
         string="External Messages Reviewed",
         tracking=True,
     )
+
     external_message_count = fields.Integer(
         string="External Message Count",
         compute="_compute_external_message_count",
         store=True,
     )
+
     unreviewed_message_count = fields.Integer(
         string="Review",
         help="Count of inbound messages that have not yet been reviewed",
         compute="_compute_unreviewed_message_count",
         store=True,
     )
+
     external_messages_summary = fields.Html(
         string="Top 3 External Messages",
         help="Send external messages via the 'Send message' button in the Chatter",
@@ -110,13 +110,96 @@ class MailThreadReviewMixin(models.AbstractModel):
         compute="_compute_most_recent_attachment_id",
     )
 
-    def _compute_most_recent_attachment_id(self):
+    # -------------------------------------------------------------------------
+    # HELPER METHODS
+    # -------------------------------------------------------------------------
+
+    def _send_notification_to_team_channel(self, team, message_body, message_type="notification"):
+        """Send a notification to a team's discuss channel.
+
+        :param team: res.partner record representing the team
+        :param message_body: HTML string with the notification content
+        :param message_type: Type of message to send ("notification" or "email")
+        :return: True if successful, False otherwise
+        """
+        try:
+            # Find the discuss channel for the team
+            channel_id = False
+            if team.is_riverflow_team:
+                channel_id = team.riverflow_team_id.discuss_channel_id
+            elif team.is_user:
+                channel_id = self.sudo().env["discuss.channel"].channel_get(team.ids)
+
+            if not channel_id:
+                _logger.warning("No discuss channel found for team %s", team.name)
+                return False
+
+            # Send the notification to the team's discuss channel
+            system_user = self.sudo().env.ref("base.user_root")
+            channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(
+                body=Markup(message_body),
+                message_type=message_type,
+                subtype_xmlid="mail.mt_comment",
+                author_id=system_user.partner_id.id,
+            )
+            return True
+
+        except Exception:
+            _logger.exception(
+                "Failed to send notification to team %s for %s:%s",
+                team.name if team else "Unknown",
+                self._name,
+                self.id,
+            )
+            return False
+
+    # -------------------------------------------------------------------------
+    # INVERSE METHODS
+    # -------------------------------------------------------------------------
+
+    def _inverse_notify_team_change(self):
+        self.ensure_one()
+        """Send notification to new team's discuss channel when responsibility is transferred"""
+        if not self.responsible_team_id:
+            return
+
+        """Hack: workaround for form view onchange in New record mode"""
+        if any(isinstance(record.id, models.NewId) for record in self):
+            return
+
+        # Construct the record URL and display text
+        base_url = self.env["ir.config_parameter"].sudo().get_param("web.base.url")
+        record_url = f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
+
+        display_text = html_escape(self.display_name)
+        if hasattr(self, "res_name") and self.res_name:
+            display_text = f"{display_text} | {html_escape(self.res_name)}"
+
+        # Create the transfer notification message with standardized format
+        model_name = self._description or self._name
+        team_name = self.responsible_team_id.name
+        message_body = (
+            f'<div class="o_mail_notification">'
+            f'<div style="margin-bottom: 8px;">🔄 '
+            f'<a href="{record_url}">{display_text}</a></div>'
+            f'<div style="color: #666; font-size: 0.9em;">'
+            f"Assigned to: <strong>{html_escape(team_name)}</strong>"
+            f"</div>"
+            f"</div>"
+        )
+
+        # Send the notification
+        self._send_notification_to_team_channel(self.responsible_team_id, message_body)
+
+    def _inverse_internal_notes_summary(self):
         for record in self:
-            attachments = record.message_ids.attachment_ids.sorted(key=lambda a: a.create_date, reverse=True)
-            if len(attachments) > 0:
-                record.most_recent_attachment_id = attachments[0]
-            else:
-                record.most_recent_attachment_id = False
+            if record.internal_notes_summary:
+                plain_text = record.internal_notes_summary
+                record.message_post(
+                    body=plain_text,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
 
     def _get_filtered_messages(self, select_internal):
         """
@@ -302,53 +385,22 @@ class MailThreadReviewMixin(models.AbstractModel):
                 if hasattr(record, "res_name") and record.res_name:
                     display_text = f"{display_text} | {html_escape(record.res_name)})"
 
-                # Format the notification message using HTML
-                message_parts = [
-                    f'<div class="o_mail_notification">'
-                    f'<div style="margin-bottom: 8px;">💬 <a href="{record_url}">{display_text}</a></div>'
-                ]
+                responsible_partner_id = record.sudo().responsible_team_id
 
+                # Post each original message to the team discuss channel
                 for msg in new_messages:
-                    sender = (
-                        msg.author_id.name
-                        if msg.author_id
-                        else (
-                            email_split_and_format(msg.email_from)[0]
-                            if msg.email_from and email_split_and_format(msg.email_from)
-                            else msg.email_from or _("Unknown")
-                        )
-                    )
-
-                    message_parts.append(
-                        f'<div style="margin-bottom: 4px;">'
-                        f"<strong>{html_escape(sender)}</strong>: {html_escape(msg.subject)}<br>"
-                        f"{html_escape(msg.preview)}"
+                    # Create a simple header with link to the record
+                    header = (
+                        f'<div style="margin-bottom: 8px; padding: 8px; background-color: #f8f9fa; border-left: 3px solid #007bff;">'
+                        f'<strong>Message from:</strong> <a href="{record_url}">{display_text}</a>'
                         f"</div>"
                     )
 
-                message_parts.append("</div>")  # Close o_mail_notification div
+                    # Combine header with original message body
+                    full_message = f"{header}{msg.body or msg.preview or 'No content'}"
 
-                responsible_partner_id = record.sudo().responsible_team_id
-
-                channel_id = False
-                if responsible_partner_id.is_riverflow_team:
-                    channel_id = responsible_partner_id.riverflow_team_id.discuss_channel_id
-                elif responsible_partner_id.is_user:
-                    channel_id = self.sudo().env["discuss.channel"].channel_get(responsible_partner_id.ids)
-
-                if not channel_id:
-                    _logger.warning(
-                        "No discuss channel found for responsible partner %s", responsible_partner_id.name
-                    )
-                    continue
-
-                system_user = self.sudo().env.ref("base.user_root")
-                channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(
-                    body=Markup("".join(message_parts)),
-                    message_type="notification",
-                    subtype_xmlid="mail.mt_comment",
-                    author_id=system_user.partner_id.id,
-                )
+                    # Post the original message to the team discuss channel
+                    record._send_notification_to_team_channel(responsible_partner_id, full_message, "email")
 
             except Exception:
                 _logger.exception(

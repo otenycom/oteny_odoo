@@ -45,7 +45,11 @@ class ServiceWizard(models.TransientModel):
     tag_ids_invisible = fields.Boolean()
 
     def default_get_using_records(self, defaultValues, records_to_transition):
+        if not "project_deadline" in defaultValues:
+            defaultValues["project_deadline"] = fields.Date.today()
+
         super().default_get_using_records(defaultValues, records_to_transition)
+
         if len(records_to_transition) == 0:
             ctx = self.env.context
             parent_id = self.env["riverflow.service"].browse(ctx.get("default_parent_id", 0))
