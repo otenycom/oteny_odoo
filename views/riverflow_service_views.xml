@@ -251,8 +251,8 @@
                 <field name='indented_name' optional="show" width="260px" />
                 <field name="display_name" optional="hide" />
                 <field name="root_name" optional="hide" />
-                <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
-                <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
+                <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
+                <field name="state_id" width="140px" optional="hide" decoration-success="is_end_state" />
                 <field name="timing_json" widget="timing_widget" optional="hide" column_invisible="1" />
                 <field name="deadline" optional="show"
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
