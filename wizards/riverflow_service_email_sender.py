@@ -312,18 +312,17 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         if not self.body_updatable:
             raise ValueError(_("Body is required"))
 
-        # services = self.records_to_transition_ids
-        # # Setting the name equal to the subject allows the user to also send a later message via Chatter
-        # services.write({"name": self.subject_updatable})
-
-        # Post the message, add followers to the chatter, and don't subscribe them to the chatter
-        service.with_context(mail_post_autofollow=True, mail_create_nosubscribe=True).message_post(
+        # Post the message, add recipients as followers to the chatter, and subscribe current user to the chatter
+        service.with_context(
+            mail_post_autofollow=True,
+            mail_create_nosubscribe=False,
+            email_notification_allow_footer=False,  # No 'Sent by Odoo' footer
+        ).message_post(
             message_type="email",
-            # subject=self.subject_updatable,
             partner_ids=recipient_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
-            email_add_signature=False,
+            email_add_signature=True,  # Makes it the same as the Chatter Send Message, uses the User's signature for a personal footer text
             email_layout_xmlid=self.email_template_id.email_layout_xmlid,
             attachment_ids=self.attachment_ids.ids,
         )

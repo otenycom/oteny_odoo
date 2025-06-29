@@ -478,15 +478,16 @@ class Service(models.Model):
                 if not service.parent_id:
                     name = f"{name} ({service.supply_leg_id.service_id.name})"
                 service.name = name  # used in lists/radar
-                service.display_name = name  # used in calendar
+                service.display_name = name  # used in calendar / chatter messages / emails
                 continue
 
             display_name = service.name
             if service.parent_id:
                 display_name = f"{service.parent_id.name} | {service.name}"
 
-            if service.state_name:
-                display_name = f"{display_name} | {service.state_name}"
+            # Removed, its not nice when the service display_name is used as the subject of chatter email messages
+            # if service.state_name:
+            #     display_name = f"{display_name} | {service.state_name}"
 
             service.display_name = display_name
 
