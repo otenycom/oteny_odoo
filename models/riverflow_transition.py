@@ -35,7 +35,9 @@ class RiverflowTransition(models.Model):
         copy=True,
         index=True,
         required=True,
-        domain="[('workflow_id', '=', workflow_id)]",
+        # Todo: refine this domain, so that it is possible to create a transition between workflows
+        # For now disabled since i couldn't make it to back office via ui
+        # domain="[('workflow_id', '=', workflow_id)]",
     )
     workflow_id = fields.Many2one(
         "riverflow.workflow",
