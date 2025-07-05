@@ -156,8 +156,8 @@ class MailThreadReviewMixin(models.AbstractModel):
                     else:
                         post_values["email_from"] = email_from
             else:
-                system_user = self.sudo().env.ref("base.user_root")
-                post_values["author_id"] = system_user.partner_id.id
+                # Use current user as author instead of system user
+                post_values["author_id"] = self.env.user.partner_id.id
 
             # Send the message to the team's discuss channel
             channel_id.sudo().with_context(mail_create_nosubscribe=True).message_post(**post_values)
@@ -212,11 +212,12 @@ class MailThreadReviewMixin(models.AbstractModel):
         team_name = self.responsible_team_id.name
         message_body = (
             f'<div class="o_mail_notification">'
-            f'<div style="margin-bottom: 8px;">🔄 '
+            f'<div style="margin-bottom: 8px;">'
             f'<a href="{record_url}">{display_text}</a></div>'
-            f'<div style="color: #666; font-size: 0.9em;">'
+            f'<div style="font-size: 0.9em;">'
             f"Assigned to: <strong>{html_escape(team_name)}</strong>"
             f"</div>"
+            f'<div style="border-top: 1px solid #a0a0a088; margin-top: 8px; padding-top: 8px;"></div>'
             f"</div>"
         )
 
