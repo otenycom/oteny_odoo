@@ -206,7 +206,8 @@ class MailThreadReviewMixin(models.AbstractModel):
 
         display_text = html_escape(self.display_name)
         if hasattr(self, "res_name") and self.res_name:
-            display_text = f"{display_text} | {html_escape(self.res_name)}"
+            # show parent record (entry) and the service below it
+            display_text = f"{html_escape(self.res_name)}<br/>⤷ {display_text}"
 
         # Create the transfer notification message with standardized format
         team_name = self.responsible_team_id.name
