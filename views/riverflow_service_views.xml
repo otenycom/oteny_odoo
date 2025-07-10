@@ -57,8 +57,7 @@
                             options="{'whitelist_fname': 'use_project_deadline_from_options'}"  
                             -->
                             <field name="use_project_deadline_from" widget="filterable_selection"
-                                required="1" on_change="1"
-                                invisible="use_project_deadline_from == 'self'" />
+                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
                             <field
                                 name="project_deadline"
                                 widget="daterange"
@@ -71,7 +70,11 @@
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
                                 on_change="1" />
-                            <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable" />
+                            <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable"
+                                decoration-muted="is_end_state"
+                                decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                            />
 
                             <field name="unreviewed_message_count" string="Unreviewed Messages" invisible="not unreviewed_message_count" />
                             <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
@@ -126,7 +129,7 @@
                                     <field name="root_name" optional="hide" />
                                     <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
                                     <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
-                                    <field name="timing_json" widget="timing_widget" optional="hide" column_invisible="1" />
+                                    <field name="timing_json" widget="timing_widget" optional="hide" />
                                     <field name="deadline" optional="show"
                                         decoration-muted="is_end_state"
                                         decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
@@ -148,6 +151,23 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template">
+                            <group>
+                                <group string="Email Settings">
+                                    <field name="email_template_id" />
+                                    <field name="add_operator_as_recipient" />
+                                </group>
+                                <group string="Supply Order Settings">
+                                    <field name="is_supply_order" />
+                                </group>
+                                <group string="Template Settings" groups="base.group_no_one">
+                                    <field name="is_root_a_template" />
+                                    <field name="is_this_a_template" />
+                                    <field name="only_add_children" />
+                                </group>
+                            </group>
+                        </page>
+
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
                             <!-- <group>
                                 <group>
@@ -182,21 +202,6 @@
                         </page>
                         <page string="Internal Notes" name="internal_notes" invisible="1">
                             <field name="internal_note_ids" />
-                        </page>
-                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template">
-                            <group>
-                                <group string="Email Settings">
-                                    <field name="email_template_id" />
-                                    <field name="add_operator_as_recipient" />
-                                </group>
-                                <group string="Supply Order Settings">
-                                    <field name="is_supply_order" />
-                                </group>
-                                <group string="Template Settings" groups="base.group_no_one">
-                                    <field name="is_root_a_template" />
-                                    <field name="is_this_a_template" />
-                                </group>
-                            </group>
                         </page>
                         <page string="Workflow Override" name="workflow" groups="base.group_no_one">
                             <group>
@@ -253,7 +258,7 @@
                 <field name="root_name" optional="hide" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
                 <field name="state_id" width="140px" optional="hide" decoration-success="is_end_state" />
-                <field name="timing_json" widget="timing_widget" optional="hide" column_invisible="1" />
+                <field name="timing_json" widget="timing_widget" optional="hide" />
                 <field name="deadline" optional="show"
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
@@ -298,11 +303,12 @@
                 <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
                 <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
                 <separator />
-                <filter string="Deadline" name="deadline" date="project_deadline" />
+                <filter string="Deadline" name="deadline" date="deadline" />
                 <separator />
-                <filter string="Overdue" name="overdue" domain="[('project_deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
-                <filter string="Today" name="today" domain="[('project_deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
-                <filter string="Upcoming" name="upcoming" domain="[('project_deadline', '&gt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
+                <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"

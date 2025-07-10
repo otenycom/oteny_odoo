@@ -35,6 +35,7 @@
     <record id="partner_team_finance" model="res.partner">
         <field name="name">Finance Team</field>
         <field name="company_id" ref="base.main_company" />
+        <field name="email">financeDE@cuneuscrew.eu</field>
     </record>
 
     <record id="team_finance" model="riverflow.team">

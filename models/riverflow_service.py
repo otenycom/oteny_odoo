@@ -54,6 +54,12 @@ class Service(models.Model):
         store=True,
         help="Technical so we always treat the full tree of a service as a template, even if the children are not flagged astemplates themselves",
     )
+    only_add_children = fields.Boolean(
+        string="Only Add Children",
+        default=False,
+        help="If checked, only the children of this template will be added when creating a new service from this template",
+        recursive=True,
+    )
     email_template_id = fields.Many2one(
         "mail.template",
         string="Email Template",
@@ -890,7 +896,7 @@ class Service(models.Model):
             )
 
     @api.model
-    def _create_service_member_from_template(self, template_service, parent_id=False, project_deadline=False):
+    def _create_service_member_from_template(self, template_service, parent_id=False, deadline=False):
         """Create a new service based on a template service.
 
         Args:
@@ -906,11 +912,6 @@ class Service(models.Model):
             "state_id": template_service.state_id.id,
             "responsible_team_id": template_service.responsible_team_id.id,
             "company_id": template_service.company_id.id,
-            "use_project_deadline_from": (
-                "self" if project_deadline else template_service.use_project_deadline_from
-            ),
-            "project_deadline": project_deadline,
-            "days_relative_to_project": 0 if project_deadline else template_service.days_relative_to_project,
             "is_this_a_template": self.env.context.get("default_is_this_a_template", False),
             "email_template_id": template_service.email_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
@@ -919,6 +920,14 @@ class Service(models.Model):
             "supply_order_instructions": template_service.supply_order_instructions,
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
         }
+
+        if deadline:
+            vals["use_project_deadline_from"] = "self"
+            vals["days_relative_to_project"] = 0
+        else:
+            vals["use_project_deadline_from"] = template_service.use_project_deadline_from
+            vals["days_relative_to_project"] = template_service.days_relative_to_project
+
         if parent_id:
             vals["parent_id"] = parent_id
 
@@ -1000,23 +1009,18 @@ class Service(models.Model):
         return new_service
 
     @api.model
-    def _create_service_from_template(self, template_service_id, project_deadline=False):
+    def _create_services_from_template(self, template_service_id, project_deadline=False):
         """Create a new service from a template, including all child services recursively.
 
         Args:
             template_service_id: ID of the template service to clone
 
         Returns:
-            The newly created root service record
+            The newly created root service record(s)
         """
         template_service = self.env["riverflow.service"].browse(template_service_id)
         if not template_service:
             raise UserError(_("No template service selected."))
-
-        # Create main service from template
-        new_service = self._create_service_member_from_template(
-            template_service, project_deadline=project_deadline
-        )
 
         # Clone children recursively
         def clone_children(template, parent):
@@ -1024,9 +1028,23 @@ class Service(models.Model):
                 new_child = self._create_service_member_from_template(child, parent.id)
                 clone_children(child, new_child)
 
-        clone_children(template_service, new_service)
+        newly_created_services = self.env["riverflow.service"]
+        if template_service.only_add_children:
+            for child_template in template_service.child_ids:
+                new_service = self._create_service_member_from_template(
+                    child_template, deadline=project_deadline
+                )
+                clone_children(child_template, new_service)
+                newly_created_services += new_service
+        else:
+            # Create main service from template
+            new_service = self._create_service_member_from_template(
+                template_service, deadline=project_deadline
+            )
+            clone_children(template_service, new_service)
+            newly_created_services += new_service
 
-        return new_service
+        return newly_created_services
 
     @api.model
     def _add_state_record(self, record):
@@ -1111,7 +1129,8 @@ class Service(models.Model):
                 and record.use_project_deadline_from == "self"
                 and not record.project_deadline
             ):
-                raise UserError(_("You must set the Deadline"))
+                pass
+                # raise UserError(_("You must set the Deadline"))
 
     def _message_compute_subject(self):
         """

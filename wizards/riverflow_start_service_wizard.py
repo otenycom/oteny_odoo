@@ -40,21 +40,21 @@ class ServiceNewWizard(models.TransientModel):
 
         # Read the deadline from the client-side input field
         project_deadline = self.env.context.get("default_project_deadline")
-        if not project_deadline:
-            raise UserError(_("You must set the Deadline"))
+        # if not project_deadline:
+        #     raise UserError(_("You must set the Deadline"))
 
         # Convert the date string if needed
         if isinstance(project_deadline, str):
             project_deadline = fields.Date.from_string(project_deadline)
 
-        new_service = self.env["riverflow.service"]._create_service_from_template(
+        new_services = self.env["riverflow.service"]._create_services_from_template(
             template_service_id, project_deadline
         )
 
         return {
             "type": "ir.actions.act_window",
             "res_model": "riverflow.service",
-            "res_id": new_service.id,
+            "res_id": new_services.ids[0],
             "view_mode": "form",
             "target": "current",
         }

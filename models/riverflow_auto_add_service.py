@@ -166,7 +166,6 @@ class AutoAddService(models.Model):
             to_deactivate.write({"active": False})
 
         if to_create:
-            created_services = []
             for service_vals in to_create:
                 service_context = self.env["riverflow.service"].with_context(
                     {
@@ -177,5 +176,4 @@ class AutoAddService(models.Model):
                         ],
                     }
                 )
-                created_service = service_context._create_service_from_template(service_vals["template_id"])
-                created_services.append(created_service)
+                service_context._create_services_from_template(service_vals["template_id"])

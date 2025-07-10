@@ -37,6 +37,8 @@
         <field name="arch" type="xml">
             <list action="row_click" type="object"
                 create="0" edit="0" delete="0"
+                decoration-info="is_subject and not is_end_state"
+                decoration-success="is_subject and is_end_state"
                 decoration-bf="is_subject">
                 <field name="active" column_invisible="True" />
                 <field name="sequence" column_invisible="True" />
@@ -145,7 +147,8 @@
                 <separator />
                 <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
-                <filter string="Upcoming" name="upcoming" domain="[('deadline', '&gt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
+                <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Issues" name="has_issues" domain="[('check_result_ids.severity', '!=', False)]" />
