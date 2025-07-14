@@ -25,7 +25,7 @@
                         <group string="Email">
                             <field name="responsible_team_id" string="Sender Team" required="1" invisible="responsible_team_id_invisible" />
                             <field name="responsible_team_id_invisible" invisible="1" />
-                            <field name="email_template_id" options="{'no_create': False, 'no_open': False}" />
+                            <field name="mail_template_id" options="{'no_create': False, 'no_open': False}" />
                             <field name="res_id" invisible="1"></field>
                             <field name="res_model" invisible="1"></field>
                             <field name="is_supply_order" invisible="1" />

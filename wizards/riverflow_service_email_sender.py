@@ -27,7 +27,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         render_engine="qweb",
         render_options={"post_process": True},
     )
-    email_template_id = fields.Many2one(
+    mail_template_id = fields.Many2one(
         "mail.template",
         string="Template",
         domain="[('model_id', '=', 'riverflow.service')]",
@@ -150,11 +150,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         for wizard in self:
             wizard.supplier_email_formatted = wizard.supplier_partner_id.email_formatted
 
-    @api.depends("email_template_id")
+    @api.depends("mail_template_id")
     def _compute_attachment_ids(self):
         for wizard in self:
-            if wizard.email_template_id.attachment_ids:
-                wizard.attachment_ids = wizard.email_template_id.attachment_ids
+            if wizard.mail_template_id.attachment_ids:
+                wizard.attachment_ids = wizard.mail_template_id.attachment_ids
             else:
                 wizard.attachment_ids = False
 
@@ -178,7 +178,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             # Render subject
             wizard.subject_rendered = wizard._render_template(
-                wizard.subject or self.email_template_id.subject,
+                wizard.subject or self.mail_template_id.subject,
                 "riverflow.service",
                 [service.id],
                 engine="inline_template",
@@ -187,7 +187,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             # Render body
             wizard.body_rendered = wizard._render_template(
-                wizard.body or self.email_template_id.body_html,
+                wizard.body or self.mail_template_id.body_html,
                 "riverflow.service",
                 [service.id],
                 engine="qweb",
@@ -201,11 +201,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             if wizard.body_rendered:
                 wizard.body_updatable = wizard.body_rendered
 
-    @api.onchange("email_template_id")
+    @api.onchange("mail_template_id")
     def onchange_email_template_id(self):
-        if self.email_template_id:
-            self.subject = self.email_template_id.subject
-            self.body = self.email_template_id.body_html
+        if self.mail_template_id:
+            self.subject = self.mail_template_id.subject
+            self.body = self.mail_template_id.body_html
             self.render()
 
     @api.onchange(
@@ -330,6 +330,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
             email_add_signature=True,  # Makes it the same as the Chatter Send Message, uses the User's signature for a personal footer text
-            email_layout_xmlid=self.email_template_id.email_layout_xmlid,
+            email_layout_xmlid=self.mail_template_id.email_layout_xmlid,
             attachment_ids=self.attachment_ids.ids,
         )

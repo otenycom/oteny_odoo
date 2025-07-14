@@ -60,7 +60,7 @@ class Service(models.Model):
         help="If checked, only the children of this template will be added when creating a new service from this template",
         recursive=True,
     )
-    email_template_id = fields.Many2one(
+    mail_template_id = fields.Many2one(
         "mail.template",
         string="Email Template",
         domain="[('model_id', '=', 'riverflow.service')]",
@@ -913,7 +913,7 @@ class Service(models.Model):
             "responsible_team_id": template_service.responsible_team_id.id,
             "company_id": template_service.company_id.id,
             "is_this_a_template": self.env.context.get("default_is_this_a_template", False),
-            "email_template_id": template_service.email_template_id.id,
+            "mail_template_id": template_service.mail_template_id.id,
             "add_operator_as_recipient": template_service.add_operator_as_recipient,
             "is_supply_order": template_service.is_supply_order,
             "supplier_partner_id": template_service.supplier_partner_id.id,
