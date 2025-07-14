@@ -15,23 +15,30 @@
         <field name="sequence">10</field>
         <field name="color_int">5</field>
     </record>
-    <record id="state_service_se_sent" model="riverflow.state">
+    <record id="state_service_se_awaiting_reply" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_send_email" />
-        <field name="name">Sent</field>
+        <field name="name">Awaiting Reply</field>
         <field name="sequence">20</field>
+        <field name="color_int">5</field>
+    </record>
+    <record id="state_service_se_done" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_send_email" />
+        <field name="name">Done</field>
+        <field name="sequence">30</field>
         <field name="is_end_state">True</field>
         <field name="color_int">5</field>
     </record>
     <record id="state_service_se_not_needed" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_send_email" />
         <field name="name">Not Needed</field>
-        <field name="sequence">30</field>
+        <field name="sequence">40</field>
         <field name="is_end_state">True</field>
         <field name="hide_in_statusbar">True</field>
         <field name="color_int">5</field>
     </record>
 
-    <!-- Send Email Transitions -->
+    <!-- Transitions -->
+    <!-- Transitions from no state -->
     <record id="trans_se_1" model="riverflow.transition">
         <field name="name">Later</field>
         <field name="from_state_id" ref="" />
@@ -40,34 +47,59 @@
         <field name="sequence">10</field>
     </record>
 
+    <!-- Transitions from state Not Started -->
     <record id="trans_se_3" model="riverflow.transition">
         <field name="name">Send Email</field>
         <field name="from_state_id" ref="state_service_se_not_started" />
-        <field name="to_state_id" ref="state_service_se_sent" />
+        <field name="to_state_id" ref="state_service_se_awaiting_reply" />
         <field name="action_id" ref="riverflow.transition_action_email_sender" />
         <field name="sequence">10</field>
     </record>
-
-    <record id="trans_se_4" model="riverflow.transition">
-        <field name="name">Resend</field>
-        <field name="from_state_id" ref="state_service_se_sent" />
-        <field name="to_state_id" ref="state_service_se_sent" />
-        <field name="action_id" ref="riverflow.transition_action_email_sender" />
-        <field name="sequence">10</field>
+    <record id="trans_se_sent_already" model="riverflow.transition">
+        <field name="name">Sent already</field>
+        <field name="from_state_id" ref="state_service_se_not_started" />
+        <field name="to_state_id" ref="state_service_se_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
     </record>
-
     <record id="trans_se_5" model="riverflow.transition">
         <field name="name">Not Needed</field>
         <field name="from_state_id" ref="state_service_se_not_started" />
         <field name="to_state_id" ref="state_service_se_not_needed" />
         <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- Transitions from state Awaiting Reply -->
+    <record id="trans_se_awaiting_reply_to_done" model="riverflow.transition">
+        <field name="name">Mark as Done</field>
+        <field name="from_state_id" ref="state_service_se_awaiting_reply" />
+        <field name="to_state_id" ref="state_service_se_done" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_se_awaiting_reply_resend" model="riverflow.transition">
+        <field name="name">Resend</field>
+        <field name="from_state_id" ref="state_service_se_awaiting_reply" />
+        <field name="to_state_id" ref="state_service_se_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
         <field name="sequence">20</field>
     </record>
 
+    <!-- Transitions from state Done -->
+    <record id="trans_se_4" model="riverflow.transition">
+        <field name="name">Resend</field>
+        <field name="from_state_id" ref="state_service_se_done" />
+        <field name="to_state_id" ref="state_service_se_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- Transitions from state Not Needed -->
     <record id="trans_se_6" model="riverflow.transition">
         <field name="name">Send email after all</field>
         <field name="from_state_id" ref="state_service_se_not_needed" />
-        <field name="to_state_id" ref="state_service_se_sent" />
+        <field name="to_state_id" ref="state_service_se_awaiting_reply" />
         <field name="action_id" ref="riverflow.transition_action_email_sender" />
         <field name="sequence">10</field>
     </record>

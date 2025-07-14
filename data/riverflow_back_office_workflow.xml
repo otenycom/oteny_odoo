@@ -4,7 +4,7 @@
     <record id="workflow_service_back_office" model="riverflow.workflow">
         <field name="model_id" ref="riverflow.model_riverflow_service" />
         <field name="name">Back-office</field>
-        <field name="description">Workflow for financial processing of services</field>
+        <field name="description">The service is reviewed, billed or paid as salary by the billing- and salary wizard</field>
         <field name="icon">fa-book</field>
     </record>
 
@@ -14,53 +14,8 @@
         <field name="name">Registered</field>
         <field name="sequence">10</field>
         <field name="is_back_office_state">True</field>
-        <field name="color_int">2</field>
-    </record>
-
-    <record id="back_office_state_approved" model="riverflow.state">
-        <field name="workflow_id" ref="workflow_service_back_office" />
-        <field name="name">Approved</field>
-        <field name="sequence">20</field>
-        <field name="is_back_office_state">True</field>
-        <field name="color_int">2</field>
-    </record>
-
-    <record id="back_office_state_booked" model="riverflow.state">
-        <field name="workflow_id" ref="workflow_service_back_office" />
-        <field name="name">Booked</field>
-        <field name="sequence">30</field>
         <field name="is_end_state">True</field>
-        <field name="is_back_office_state">True</field>
         <field name="color_int">2</field>
-    </record>
-
-    <!-- Transitions from Registered -->
-    <record id="back_office_registered_to_approved" model="riverflow.transition">
-        <field name="name">Approve</field>
-        <field name="description">Approve the service for accounting</field>
-        <field name="from_state_id" ref="back_office_state_registered" />
-        <field name="to_state_id" ref="back_office_state_approved" />
-        <field name="action_id" ref="riverflow.transition_action_register_service" />
-        <field name="sequence">10</field>
-    </record>
-
-    <!-- Transitions from Approved -->
-    <record id="back_office_approved_to_booked" model="riverflow.transition">
-        <field name="name">Book</field>
-        <field name="description">Book the service, e.g. add it to a sales invoice</field>
-        <field name="from_state_id" ref="back_office_state_approved" />
-        <field name="to_state_id" ref="back_office_state_booked" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
-        <field name="sequence">10</field>
-    </record>
-
-    <record id="back_office_approved_to_registered" model="riverflow.transition">
-        <field name="name">Un-approve</field>
-        <field name="description">Remove approval and return to registered state</field>
-        <field name="from_state_id" ref="back_office_state_approved" />
-        <field name="to_state_id" ref="back_office_state_registered" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
-        <field name="sequence">20</field>
     </record>
 
 </odoo>

@@ -1,7 +1,7 @@
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import UserError
 from odoo.fields import Command
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     )
     email_template_id = fields.Many2one(
         "mail.template",
-        string="Email Template",
+        string="Template",
         domain="[('model_id', '=', 'riverflow.service')]",
         required=False,
     )
@@ -257,6 +257,13 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
             vals["use_project_deadline_from"] = "self"
             vals["project_deadline"] = self.deadline
+        else:
+            vals["use_project_deadline_from"] = "self"
+            # default deadline for the reply to a normal email is tomorrow
+            vals["project_deadline"] = date.today() + timedelta(days=1)
+
+        # TODO: add ship contact names to the service
+        # vals["ship_contact_names"] = service.log_entry.ship_contact_names
 
         # for leg in service.leg_ids:
         #     # HACK: if we access leg.service_id, we get the old data without the UI updates, this line would workaround it.

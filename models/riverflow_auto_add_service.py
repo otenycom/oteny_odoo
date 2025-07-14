@@ -149,7 +149,10 @@ class AutoAddService(models.Model):
 
         # Services to deactivate (not in new_services_set and currently active)
         to_deactivate = current_services.filtered(
-            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) not in new_services_set and s.active
+            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) not in new_services_set
+            and s.active
+            # only de-active an auto-added service if it unmodified since it was auto-added.
+            and s.create_date == s.write_date
         )
 
         # Services to create (in new_services_set but not in current_services_dict)
