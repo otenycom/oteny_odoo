@@ -31,7 +31,7 @@ class AutoAddService(models.Model):
         store=True,
         index=True,
     )
-    condition_domain = fields.Text(
+    domain = fields.Text(
         string="Condition",
         required=True,
         default="[]",
@@ -85,7 +85,7 @@ class AutoAddService(models.Model):
 
         """
         TODO: also make this a log_entry.applicable_auto_add_service_ids field, so that log entry services_ids can take 
-        a  dependency on applicable_auto_add_service_ids.condition_domain to make this more responsive
+        a  dependency on applicable_auto_add_service_ids.domain to make this more responsive
         """
         auto_add_rules = self.search(
             [
@@ -102,7 +102,7 @@ class AutoAddService(models.Model):
         rule_domains = {}
         for auto_add_rule in auto_add_rules:
             try:
-                domain = safe_eval(auto_add_rule.condition_domain, eval_context)
+                domain = safe_eval(auto_add_rule.domain, eval_context)
                 rule_domains[auto_add_rule] = expression.normalize_domain(domain)
             except Exception as e:
                 raise ValidationError(f"Error evaluating domain for rule {auto_add_rule.name}: {e}")

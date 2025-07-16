@@ -908,6 +908,9 @@ class Service(models.Model):
         """
         vals = {
             "name": template_service.name,
+            "res_id": self.env.context.get("default_res_id"),
+            "res_model": self.env.context.get("default_res_model"),
+            "created_by_auto_add_service_id": self.env.context.get("default_created_by_auto_add_service_id"),
             "workflow_id": template_service.workflow_id.id,
             "state_id": template_service.state_id.id,
             "responsible_team_id": template_service.responsible_team_id.id,
@@ -919,6 +922,7 @@ class Service(models.Model):
             "supplier_partner_id": template_service.supplier_partner_id.id,
             "supply_order_instructions": template_service.supply_order_instructions,
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
+            "sub_sequence": template_service.sub_sequence,
         }
 
         if deadline:

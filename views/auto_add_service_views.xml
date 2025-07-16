@@ -18,7 +18,7 @@
                         <field name="description" placeholder="Description of the auto-add rule's purpose and behavior." />
                         <field name="applies_to_model_id" />
                         <field name="applies_to_model" readonly="1" invisible="1" />
-                        <field name="condition_domain" widget="domain" options="{'model': 'applies_to_model'}" />
+                        <field name="domain" widget="domain" options="{'model': 'applies_to_model'}" />
                     </group>
                 </sheet>
             </form>
@@ -33,7 +33,7 @@
                 <field name="active" column_invisible="1" />
                 <field name="name" optional="show" />
                 <field name="applies_to_model_id" optional="show" />
-                <field name="condition_domain" optional="show" />
+                <field name="domain" optional="show" />
                 <field name="description" optional="hide" />
                 <field name="service_template_id" optional="show" />
             </list>

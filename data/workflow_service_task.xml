@@ -56,13 +56,6 @@
         <field name="icon">fa-play</field>
         <field name="sequence">10</field>
     </record>
-    <record id="trans_task_not_started_to_not_started" model="riverflow.transition">
-        <field name="name">Edit</field>
-        <field name="from_state_id" ref="state_task_not_started" />
-        <field name="to_state_id" ref="state_task_not_started" />
-        <field name="action_id" ref="riverflow.transition_action_default" />
-        <field name="sequence">15</field>
-    </record>
     <record id="trans_task_not_started_to_done" model="riverflow.transition">
         <field name="name">Done</field>
         <field name="from_state_id" ref="state_task_not_started" />
