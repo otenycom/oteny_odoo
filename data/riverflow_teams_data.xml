@@ -11,14 +11,14 @@
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 
-    <record id="partner_team_operations_de" model="res.partner">
-        <field name="name">Operations DE</field>
+    <record id="partner_team_hr" model="res.partner">
+        <field name="name">Human Resources</field>
         <field name="phone">+49 177 88 99 111</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
-    <record id="team_operations_de" model="riverflow.team">
-        <field name="partner_id" ref="partner_team_operations_de" />
+    <record id="team_hr" model="riverflow.team">
+        <field name="partner_id" ref="partner_team_hr" />
         <field name="discuss_channel_id" ref="mail.channel_all_employees" />
     </record>
 

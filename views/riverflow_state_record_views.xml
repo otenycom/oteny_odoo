@@ -39,7 +39,10 @@
                 create="0" edit="0" delete="0"
                 decoration-info="is_subject and not is_end_state"
                 decoration-success="is_subject and is_end_state"
-                decoration-bf="is_subject">
+                decoration-bf="is_subject"
+                decoration-bg-info="highlight_row"
+            >
+                <field name="highlight_row" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="sequence" column_invisible="True" />
                 <field name="root_id" column_invisible="True" />
@@ -55,8 +58,8 @@
                 <field name="indented_name" optional="show" />
                 <field name="company_id" optional="hide" width="120px" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
-                <field name="timing_json" widget="timing_widget" optional="hide" />
-                <field name="deadline" optional="show"
+                <field name="timing_json" widget="timing_widget" optional="show" />
+                <field name="deadline" optional="hide"
                     decoration-danger="(deadline &lt; context_today().strftime('%Y-%m-%d')) and not is_end_state"
                     decoration-warning="(deadline == context_today().strftime('%Y-%m-%d')) and not is_end_state"
                     decoration-muted="is_end_state" />

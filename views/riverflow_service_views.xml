@@ -129,8 +129,8 @@
                                     <field name="root_name" optional="hide" />
                                     <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
                                     <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
-                                    <field name="timing_json" widget="timing_widget" optional="hide" />
-                                    <field name="deadline" optional="show"
+                                    <field name="timing_json" widget="timing_widget" optional="show" />
+                                    <field name="deadline" optional="hide"
                                         decoration-muted="is_end_state"
                                         decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                         decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
@@ -249,7 +249,10 @@
         <field name='name'>riverflow.service.list</field>
         <field name='model'>riverflow.service</field>
         <field name='arch' type='xml'>
-            <list create="false">
+            <list create="false"
+                decoration-bg-info="highlight_row"
+            >
+                <field name="highlight_row" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
                 <field name="res_name" optional="show" />
@@ -258,8 +261,8 @@
                 <field name="root_name" optional="hide" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
                 <field name="state_id" width="140px" optional="hide" decoration-success="is_end_state" />
-                <field name="timing_json" widget="timing_widget" optional="hide" />
-                <field name="deadline" optional="show"
+                <field name="timing_json" widget="timing_widget" optional="show" />
+                <field name="deadline" optional="hide"
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-muted="is_end_state" />

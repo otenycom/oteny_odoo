@@ -1,5 +1,6 @@
 from . import riverflow_mail_thread_review_mixin
 from . import riverflow_state_record_tracker_mixin
+from . import riverflow_highlight_row_mixin
 from . import riverflow_state_record
 from . import riverflow_workflow
 from . import riverflow_state

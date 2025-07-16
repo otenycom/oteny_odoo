@@ -7,10 +7,10 @@
             <form string="Enter Airline Flight Ticket">
                 <sheet>
                     <group>
-                        <field name="date" />
+                        <field name="date" string="Booking Date" />
+                        <field name="new_note" required="0" invisible="new_note_invisible" widget="html" string="Departure and arrival details" />
+                        <field name="new_note_invisible" invisible="1" />
                         <field name="supply_unit_price" />
-                        <field name="notes" placeholder="Enter flight details, booking reference, etc." />
-
                         <field name="attachment_ids" widget="many2many_binary" invisible="use_existing_attachment" />
                         <field name="use_existing_attachment" />
                     </group>

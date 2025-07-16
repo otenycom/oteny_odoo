@@ -12,6 +12,9 @@ class RiverflowStateRecord(models.Model):
     _order = (
         "res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
     )
+    _inherit = [
+        "riverflow.highlight.row.mixin",
+    ]
 
     active = fields.Boolean(
         default=True,

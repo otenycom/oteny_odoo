@@ -9,7 +9,6 @@ class RiverflowEnterAirlineTicketWizard(models.TransientModel):
 
     date = fields.Date(string="Date", required=True)
     supply_unit_price = fields.Float(string="Cost", required=True)
-    notes = fields.Text(string="Notes")  # Flight details will be entered here
     attachment_ids = fields.Many2many(
         "ir.attachment",
         "riverflow_airline_ticket_wizard_attachments_rel",  # Renamed relation table
@@ -35,7 +34,7 @@ class RiverflowEnterAirlineTicketWizard(models.TransientModel):
         if service.most_recent_attachment_id:
             defaultValues["use_existing_attachment"] = True
 
-        defaultValues["date"] = service.deadline
+        defaultValues["date"] = fields.Date.today()
         if service.supply_unit_price:
             defaultValues["supply_unit_price"] = service.supply_unit_price
 

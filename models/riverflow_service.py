@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _, Command
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime
 from odoo.exceptions import UserError, ValidationError
 
 
@@ -11,6 +11,7 @@ class Service(models.Model):
         "riverflow.mail.thread.review.mixin",
         "riverflow.state.mixin",
         "riverflow.state.record.tracker.mixin",
+        "riverflow.highlight.row.mixin",
     ]
     _description = "Service"
     _parent_name = "parent_id"
@@ -582,7 +583,7 @@ class Service(models.Model):
         for service in self:
             relative_days = ""
             if service.is_days_relative_to_project_applicable:
-                relative_days = f"{self.relative_to_project_days_prefix()} {'+' if service.days_relative_to_project >= 0 else '-'} {abs(service.days_relative_to_project)}d"
+                relative_days = f"{self.relative_to_project_days_prefix()}{'+' if service.days_relative_to_project >= 0 else '-'}{abs(service.days_relative_to_project)}d"
 
             if not service.deadline:
                 date_str = ""

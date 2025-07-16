@@ -43,6 +43,7 @@
         "web.assets_backend": [
             "riverflow/static/src/components/**/*",
             "riverflow/static/src/riverflow_force_xl.js",
+            "riverflow/static/src/scss/bg-decorations.scss",
         ],
     },
     "application": True,
