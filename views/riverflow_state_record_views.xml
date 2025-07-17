@@ -40,9 +40,9 @@
                 decoration-info="is_subject and not is_end_state"
                 decoration-success="is_subject and is_end_state"
                 decoration-bf="is_subject"
-                decoration-bg-info="highlight_row"
             >
                 <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="sequence" column_invisible="True" />
                 <field name="root_id" column_invisible="True" />

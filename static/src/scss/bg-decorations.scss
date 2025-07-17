@@ -1,40 +1,39 @@
-.text-bg-danger {
+.row-bg-danger {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--danger-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
     --table-bg: rgba(var(--danger-rgb), var(--bs-bg-opacity)) !important;
 }
 
-.text-bg-warning {
+.row-bg-warning {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--warning-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
     --table-bg: rgba(var(--warning-rgb), var(--bs-bg-opacity)) !important;
 }
 
-.text-bg-success {
+.row-bg-success {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--success-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
     --table-bg: rgba(var(--success-rgb), var(--bs-bg-opacity)) !important;
 }
 
-// Used in list decoration-bg-info="highlight_row"
-.text-bg-info {
+.row-bg-info {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--info-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
     --table-bg: rgba(var(--info-rgb), var(--bs-bg-opacity)) !important;
 }
 
-.text-bg-primary {
+.row-bg-primary {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--primary-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
     --table-bg: rgba(var(--primary-rgb), var(--bs-bg-opacity)) !important;
 }
 
-.text-bg-muted {
+.row-bg-muted {
     --bs-bg-opacity: .1;
     background-color: rgba(var(--secondary-rgb), var(--bs-bg-opacity)) !important;
     color: var(--black) !important;
