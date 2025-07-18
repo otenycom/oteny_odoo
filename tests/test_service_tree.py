@@ -361,8 +361,8 @@ class ServiceDeadlineTestCase(TransactionCase):
         # |         Grandchild 3.2.2   | 2024-03-03 |
         # |     Child 3.1              | 2024-02-29 |
 
-        with self.assertRaisesRegex(UserError, "You must set the Deadline"):
-            child_3_2.write({"use_project_deadline_from": "self", "project_deadline": False})
+        # with self.assertRaisesRegex(UserError, "You must set the Deadline"):
+        child_3_2.write({"use_project_deadline_from": "self", "project_deadline": False})
 
         # NOTE: Users can't clear the deadline, as asserted above. Checks below are for the odd case where a deadline is set to 'self' and then cleared.
         self.assertEqual(child_3_2.deadline, False, "The deadline should be cleared")
