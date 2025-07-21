@@ -342,7 +342,8 @@
                 mode="month"
                 scales="day,week,month,quarter,year"
                 hide_time="true"
-                event_limit="25">
+                event_limit="25"
+            >
 
                 <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
                 <field name="state_name" invisible="not state_name" string="State" />

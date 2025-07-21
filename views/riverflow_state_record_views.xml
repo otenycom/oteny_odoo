@@ -49,6 +49,7 @@
                 <field name="root_name" column_invisible="True" />
                 <field name="is_subject" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
+                <field name="show_on_calendar" column_invisible="1" />
                 <field name="res_model" optional="hide" />
                 <field name="res_name" optional="hide" />
                 <field name="res_sortable_name" optional="hide" />
@@ -100,6 +101,7 @@
                 <field name="root_id" invisible="1" />
                 <field name="sequence" invisible="1" />
                 <field name="deadline" invisible="1" />
+                <field name="show_on_calendar" invisible="1" />
 
                 <!-- normal fields for the popup window -->
                 <field name="service_id" invisible="not service_id" />
