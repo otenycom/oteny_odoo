@@ -5,6 +5,7 @@ from markupsafe import Markup
 from odoo.tools.mail import email_split_and_format
 from odoo.addons.riverflow.util import is_neutralized_or_development  # type: ignore
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
 
@@ -309,19 +310,44 @@ class MailThreadReviewMixin(models.AbstractModel):
 
                 record.message_from_external_sender_ids = messages_from_external_senders
 
-    def _format_message_body(self, body, max_length=100):
-        # Convert body to string, remove Markup wrapper if present, and convert to plain text
-        body_str = html2plaintext(str(body))
-        body_str = " ".join(body_str.split())
-        if len(body_str) > max_length:
-            body_str = body_str[:max_length] + "..."
-        return f'<p style="margin-bottom: 0rem;">{body_str}</p>'
+    def _format_message_body(self, body, remove_links=False, remove_star=False, remove_margin_bottom=False):
+        body = str(body)
+
+        if remove_links:
+            # Remove opening <a ...> tags
+            body = re.sub(r"<a\b[^>]*>", "", body)
+            # Remove closing </a> tags
+            body = re.sub(r"</a>", "", body)
+
+        if remove_star:
+            # Remove the first asterisk and any following whitespace
+            body = re.sub(r"<p>\*\s*", "<p>", body, count=1)
+
+        def add_margin_bottom(match):
+            tag = match.group(0)
+            if "style=" in tag:
+                # Append to existing style
+                return re.sub(
+                    r'style="([^"]*)"',
+                    lambda m: f'style="{m.group(1).rstrip(";")}; margin-bottom: 0px;"',
+                    tag,
+                )
+            else:
+                # Add new style attribute
+                return tag[:-1] + ' style="margin-bottom: 0px;">'
+
+        if remove_margin_bottom:
+            # Apply to opening <p> tags only
+            body = re.sub(r"<p\b[^>]*?>", add_margin_bottom, body)
+
+        return body
 
     @api.depends("message_ids.body")
     def _compute_latest_internal_notes(self):
         for record in self:
             formatted_notes = [
-                self._format_message_body(message.body) for message in record.internal_note_ids[:3]
+                self._format_message_body(message.body, True, False, True)
+                for message in record.internal_note_ids[:3]
             ]
             if len(formatted_notes) > 0:
                 record.internal_notes_summary = "".join(formatted_notes)
@@ -335,7 +361,7 @@ class MailThreadReviewMixin(models.AbstractModel):
                 :3
             ]
             formatted_messages = [
-                self._format_message_body(message.body or message.subject or "")
+                self._format_message_body(message.body or message.subject or "", True, False, True)
                 for message in sorted_messages
             ]
             if len(formatted_messages) > 0:
