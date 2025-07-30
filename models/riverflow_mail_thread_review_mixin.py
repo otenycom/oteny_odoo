@@ -29,6 +29,12 @@ class MailThreadReviewMixin(models.AbstractModel):
         domain="[('is_riverflow_team', '=', True)]",
     )
 
+    current_user_signature = fields.Html(
+        string="Current User Signature",
+        compute="_compute_current_user_signature",
+        store=False,
+    )
+
     internal_note_ids = fields.Many2many(
         comodel_name="mail.message",
         column1="res_id",
@@ -247,6 +253,10 @@ class MailThreadReviewMixin(models.AbstractModel):
                 record.most_recent_attachment_id = attachments[0]
             else:
                 record.most_recent_attachment_id = False
+
+    def _compute_current_user_signature(self):
+        for record in self:
+            record.current_user_signature = record.env.user.signature
 
     def _get_filtered_messages(self, select_internal):
         """

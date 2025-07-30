@@ -198,6 +198,12 @@ class Service(models.Model):
         store=False,
         recursive=True,
     )
+    relative_timing_formatted = fields.Char(
+        "Relative Timing",
+        compute="_compute_relative_timing_formatted",
+        store=True,
+        help="User-friendly representation of the service's relative timing, e.g. 'Top-level service +5d'.",
+    )
     sequence = fields.Integer(
         default=1,
         compute="_compute_sequence",
@@ -607,6 +613,19 @@ class Service(models.Model):
                 "is_end_state": service.is_end_state,
             }
 
+    @api.depends(
+        "use_project_deadline_from", "days_relative_to_project", "is_days_relative_to_project_applicable"
+    )
+    def _compute_relative_timing_formatted(self):
+        for service in self:
+            if not service.is_days_relative_to_project_applicable:
+                service.relative_timing_formatted = "On deadline date"
+            else:
+                prefix = service.relative_to_project_days_prefix()
+                days = service.days_relative_to_project
+                sign = "+" if days >= 0 else ""
+                service.relative_timing_formatted = f"{prefix} {sign}{days:02d}d".strip()
+
     def relative_to_project_days_prefix(self):
         if self.use_project_deadline_from == "self":
             return ""
@@ -996,16 +1015,17 @@ class Service(models.Model):
                 {
                     "subject": note.subject,
                     "body": note.body,
-                    "message_type": note.message_type,
+                    # We convert template-notes to auto-comments, because we don't want to see them in the top-3 internal notes
+                    # they are just for documentation purposes
+                    "message_type": "auto_comment" if note.message_type == "comment" else note.message_type,
+                    "subtype_id": note.subtype_id.id,
                     "model": "riverflow.service",
                     "res_id": new_service.id,
-                    "subtype_id": note.subtype_id.id,
                     "author_id": note.author_id.id,
                     "email_from": note.email_from,
                     "create_uid": note.create_uid.id,
                     "parent_id": note.parent_id.id,
                     "date": note.date,
-                    "starred": note.starred,
                     "starred_partner_ids": [(6, 0, note.starred_partner_ids.ids)],
                     "attachment_ids": [(6, 0, new_attachment_ids)],
                 }

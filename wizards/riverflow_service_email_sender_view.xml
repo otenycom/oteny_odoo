@@ -6,14 +6,25 @@
         <field name="arch" type="xml">
             <form string="Send Email">
                 <sheet>
-                    <group string="Supply Order" invisible="not is_supply_order" colspan="2">
-                        <field name="supplier_partner_id" />
-                        <field name="deadline" string="Supply Date" />
-                        <field name="supply_order_instructions" />
-                    </group>
-
                     <group>
-                        <group string="Recipients">
+                        <group string="Supply Order" invisible="not is_supply_order">
+                            <field name="supplier_partner_id" />
+                            <field name="deadline" string="Supply Date" />
+                            <field name="supply_order_instructions" />
+                        </group>
+                        <group string="Email">
+                            <field name="mail_template_id" options="{'no_create': True, 'no_open': False}" />
+                            <field name="responsible_team_id" string="Responsible Team" required="1" invisible="responsible_team_id_invisible" />
+                            <field name="responsible_team_id_invisible" invisible="1" />
+                            <field name="res_id" invisible="1"></field>
+                            <field name="res_model" invisible="1"></field>
+                            <field name="is_supply_order" invisible="1" />
+                            <field name="records_to_transition_ids" invisible="1" />
+                            <field name="transition_id" invisible="1" />
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Recipients" colspan="2">
                             <field name="supplier_email_formatted" invisible="not is_supply_order" />
                             <field name="recipient_partner_ids" nolabel="1">
                                 <list>
@@ -21,16 +32,6 @@
                                     <field name="email" />
                                 </list>
                             </field>
-                        </group>
-                        <group string="Email">
-                            <field name="responsible_team_id" string="Sender Team" required="1" invisible="responsible_team_id_invisible" />
-                            <field name="responsible_team_id_invisible" invisible="1" />
-                            <field name="mail_template_id" options="{'no_create': False, 'no_open': False}" />
-                            <field name="res_id" invisible="1"></field>
-                            <field name="res_model" invisible="1"></field>
-                            <field name="is_supply_order" invisible="1" />
-                            <field name="records_to_transition_ids" invisible="1" />
-                            <field name="transition_id" invisible="1" />
                         </group>
                         <!-- <group string="Sender">
                         </group> -->

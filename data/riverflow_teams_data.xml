@@ -2,7 +2,7 @@
 <odoo noupdate="1">
     <record id="partner_team_logistics" model="res.partner">
         <field name="name">Operations NL</field>
-        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
+        <field name="phone">+31 181 712 314</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
@@ -13,7 +13,7 @@
 
     <record id="partner_team_hr" model="res.partner">
         <field name="name">Human Resources</field>
-        <field name="phone">+49 177 88 99 111</field>
+        <field name="phone">+49 203 443310</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 
@@ -24,7 +24,7 @@
 
     <record id="partner_team_planning" model="res.partner">
         <field name="name">Planning Team</field>
-        <field name="phone">+31 181 71 23 14 | +31 6 1000 99 78</field>
+        <field name="phone">+31 181 712 314</field>
     </record>
 
     <record id="team_planning" model="riverflow.team">
@@ -36,6 +36,7 @@
         <field name="name">Finance Team</field>
         <field name="company_id" ref="base.main_company" />
         <field name="email">financeDE@cuneuscrew.eu</field>
+        <field name="phone">+49 203 443310</field>
     </record>
 
     <record id="team_finance" model="riverflow.team">
@@ -45,7 +46,7 @@
 
     <record id="partner_team_sales" model="res.partner">
         <field name="name">Sales Team</field>
-        <field name="phone">+31 6 55 55 55 54</field>
+        <field name="phone">+31 181 712 314</field>
         <field name="company_id" ref="base.main_company" />
     </record>
 

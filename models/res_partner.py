@@ -1,15 +1,14 @@
 from odoo import fields, models, api
-from .riverflow_team import RiverflowTeam
 
 
 class Contact(models.Model):
     _inherit = "res.partner"
 
-    team_ids: RiverflowTeam = fields.One2many("riverflow.team", "partner_id", string="Teams")
+    team_ids = fields.One2many("riverflow.team", "partner_id", string="Teams")
 
     is_user = fields.Boolean(compute="_compute_is_user", store=True)
     is_riverflow_team = fields.Boolean(compute="_compute_is_riverflow_team", store=True)
-    riverflow_team_id: RiverflowTeam = fields.Many2one(
+    riverflow_team_id = fields.Many2one(
         "riverflow.team", string="Team", compute="_compute_riverflow_team_id", store=True
     )
 

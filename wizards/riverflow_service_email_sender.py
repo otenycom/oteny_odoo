@@ -20,6 +20,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         string="Recipients",
         help="The default recipients for the email can be set by adding followers to the chatter",
     )
+
     subject = fields.Char(string="Subject")
     body = fields.Html(
         string="Body",
@@ -45,6 +46,12 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         compute="_compute_rendered_content",
         store=False,
         sanitize=False,
+    )
+    recipients_from_template = fields.Many2many(
+        "res.partner",
+        string="Recipients from Template",
+        help="The recipients specified in the e-mail template",
+        compute="_compute_rendered_content",
     )
 
     # New editable fields that mirror the rendered content
@@ -111,31 +118,16 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         default_values["responsible_team_id_invisible"] = False
         return default_values
 
+    @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
         super().default_get_using_records(defaultValues, records_to_transition)
 
         # Get default recipients from the first service record
         if records_to_transition:
             service = records_to_transition[0]
-
-            defaultValues["subject_updatable"] = service.name
-
             default_recipients = service._get_default_recipients()
-            if default_recipients:
-                recipients = [Command.link(partner_id) for partner_id in default_recipients.ids]
-                if "recipient_partner_ids" in defaultValues:
-                    defaultValues["recipient_partner_ids"].extend(recipients)
-                else:
-                    defaultValues["recipient_partner_ids"] = recipients
-
-    @api.depends("subject_rendered", "body_rendered", "subject", "body")
-    def _compute_updatable_content(self):
-        for wizard in self:
-            # Update if empty or if template fields changed
-            if not wizard.subject_updatable or wizard.subject != wizard._origin.subject:
-                wizard.subject_updatable = wizard.subject_rendered
-            if not wizard.body_updatable or wizard.body != wizard._origin.body:
-                wizard.body_updatable = wizard.body_rendered
+            defaultValues["recipient_partner_ids"] = [Command.set(default_recipients.ids)]
+            defaultValues["subject_updatable"] = service.name
 
     def _inverse_subject_updatable(self):
         # This method allows manual updates to subject_updatable to persist
@@ -162,7 +154,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         self._compute_rendered_content()
         self._compute_updatable_content()
 
-    @api.depends("subject", "body", "records_to_transition_ids")
+    @api.depends("subject", "body", "records_to_transition_ids", "mail_template_id")
     def _compute_rendered_content(self):
         for wizard in self:
             if not wizard.records_to_transition_ids:
@@ -195,15 +187,43 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                 options={"post_process": True},
             )[service.id]
 
+            wizard.recipients_from_template = self._render_recipients_from_template(service)
+
             # Update editable fields when template changes
             if wizard.subject_rendered:
                 wizard.subject_updatable = wizard.subject_rendered
             if wizard.body_rendered:
                 wizard.body_updatable = wizard.body_rendered
 
+    @api.depends("subject_rendered", "body_rendered", "subject", "body")
+    def _compute_updatable_content(self):
+        for wizard in self:
+            # Update if empty or if template fields changed
+            if not wizard.subject_updatable or wizard.subject != wizard._origin.subject:
+                wizard.subject_updatable = wizard.subject_rendered
+            if not wizard.body_updatable or wizard.body != wizard._origin.body:
+                wizard.body_updatable = wizard.body_rendered
+
+    def _render_recipients_from_template(self, service):
+        if not self.mail_template_id:
+            return self.env["res.partner"]
+        partner_ids_map = self.mail_template_id._generate_template_recipients(
+            res_ids=[service.id],
+            render_fields=["partner_to", "email_cc", "email_to"],
+            find_or_create_partners=True,
+        )
+        partner_ids = partner_ids_map.get(service.id, {}).get("partner_ids", [])
+        return self.env["res.partner"].browse(partner_ids)
+
     @api.onchange("mail_template_id")
     def onchange_email_template_id(self):
         if self.mail_template_id:
+            service = self.records_to_transition_ids[0] if self.records_to_transition_ids else None
+            if service:
+                default_recipients = service._get_default_recipients()
+                template_recipients = self._render_recipients_from_template(service)
+                self.recipient_partner_ids = default_recipients | template_recipients
+
             self.subject = self.mail_template_id.subject
             self.body = self.mail_template_id.body_html
             self.render()
@@ -226,29 +246,26 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         else:
             log_entry_id = None
 
-        if self.is_supply_order:
-            write_vals = {}
-            self.update_write_values(service, write_vals)
+        write_vals = {}
+        self.update_write_values(service, write_vals)
+        if write_vals:
+            # HACK: writing to the record to make sure the template has the latest data
             service.write(write_vals)
 
-        if self.is_supply_order:
-            return {
-                "service": service,
-                "log_entry": log_entry_id,
-                "company": service.company_id,
-            }
-        else:
-            return {
-                "service": service,
-                "log_entry": log_entry_id,
-                "company": service.company_id,
-            }
+        return {
+            "service": service,
+            "log_entry": log_entry_id,
+            "company": service.company_id,
+        }
 
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(service, vals)
 
         subject = self.subject_updatable
         vals["name"] = subject
+
+        if self.responsible_team_id:
+            vals["responsible_team_id"] = self.responsible_team_id.id
 
         if self.is_supply_order:
             # Write supplier reference to service
@@ -329,7 +346,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             partner_ids=recipient_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,
-            email_add_signature=True,  # Makes it the same as the Chatter Send Message, uses the User's signature for a personal footer text
+            email_add_signature=False,  # Makes it the same as the Chatter Send Message, does not add the User's signature for templates
             email_layout_xmlid=self.mail_template_id.email_layout_xmlid,
             attachment_ids=self.attachment_ids.ids,
         )

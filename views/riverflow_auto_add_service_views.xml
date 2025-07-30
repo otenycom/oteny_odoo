@@ -15,10 +15,7 @@
                     <group>
                         <field name="active" invisible="1" />
                         <field name="service_template_id" />
-                        <field name="description" placeholder="Description of the auto-add rule's purpose and behavior." />
-                        <field name="applies_to_model_id" />
-                        <field name="applies_to_model" readonly="1" invisible="1" />
-                        <field name="domain" widget="domain" options="{'model': 'applies_to_model'}" />
+                        <field name="domain_id" />
                     </group>
                 </sheet>
             </form>
@@ -29,24 +26,23 @@
         <field name="name">riverflow.auto.add.service.list</field>
         <field name="model">riverflow.auto.add.service</field>
         <field name="arch" type="xml">
-            <list>
+            <list editable="bottom">
                 <field name="active" column_invisible="1" />
-                <field name="name" optional="show" />
-                <field name="applies_to_model_id" optional="show" />
-                <field name="domain" optional="show" />
-                <field name="description" optional="hide" />
+                <field name="domain_id" optional="show" />
+                <field name="applies_to_model_id" optional="hide" />
                 <field name="service_template_id" optional="show" />
+                <field name="template_relative_timing" optional="show" />
             </list>
         </field>
     </record>
+
 
     <record id="view_auto_add_service_search" model="ir.ui.view">
         <field name="name">riverflow.auto.add.service.search</field>
         <field name="model">riverflow.auto.add.service</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name" />
-                <field name="applies_to_model_id" />
+                <field name="domain_id" />
                 <field name="service_template_id" />
                 <separator />
                 <filter string="Archived" name="inactive" domain="[('active','=',False)]" />

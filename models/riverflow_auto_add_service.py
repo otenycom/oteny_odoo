@@ -12,34 +12,32 @@ _logger = logging.getLogger(__name__)
 class AutoAddService(models.Model):
     _name = "riverflow.auto.add.service"
     _description = "Auto Add Service"
+    _order = "applies_to_model, template_relative_timing desc, template_sub_sequence"
 
     name = fields.Char(string="Name", compute="_compute_name", store=True, index=True)
     active = fields.Boolean(
         default=True,
         help="If unchecked, the auto-add rule will be disabled without removing it.",
     )
-    applies_to_model_id = fields.Many2one(
-        "ir.model",
-        string="Add Service To",
+    domain_id = fields.Many2one(
+        "riverflow.auto.add.domain",
+        string="Domain Condition",
         required=True,
-        ondelete="cascade",
-        help="The model to which services will be added.",
+        ondelete="restrict",
+    )
+    applies_to_model_id = fields.Many2one(
+        related="domain_id.applies_to_model_id",
+        store=True,
+        readonly=True,
     )
     applies_to_model = fields.Char(
-        string="Applies to Model",
-        related="applies_to_model_id.model",
+        related="domain_id.applies_to_model",
         store=True,
         index=True,
     )
     domain = fields.Text(
-        string="Condition",
-        required=True,
-        default="[]",
-        help="Specifies when the service should be added.",
-    )
-    description = fields.Text(
-        string="Description",
-        help="Internal notes about the rule's purpose or behavior.",
+        related="domain_id.domain",
+        readonly=True,
     )
     service_template_id = fields.Many2one(
         "riverflow.service",
@@ -47,6 +45,18 @@ class AutoAddService(models.Model):
         required=True,
         domain=[("is_this_a_template", "=", True)],
         help="Template that will be copied to create the auto-added service",
+    )
+    template_relative_timing = fields.Char(
+        related="service_template_id.relative_timing_formatted",
+        string="Template Timing",
+        store=True,
+        readonly=True,
+    )
+    template_sub_sequence = fields.Integer(
+        related="service_template_id.sub_sequence",
+        string="Template Sub Sequence",
+        store=True,
+        readonly=True,
     )
 
     @api.depends("service_template_id.name")
@@ -89,7 +99,7 @@ class AutoAddService(models.Model):
         """
         auto_add_rules = self.search(
             [
-                ("applies_to_model_id.model", "=", model),
+                ("applies_to_model", "=", model),
             ]
         )
 
