@@ -29,7 +29,6 @@
                             <field name="has_supply_unit_price" />
                             <field name="has_supplier" />
                             <field name="has_legs" />
-                            <field name="show_on_calendar" />
                         </group>
                     </group>
                     <notebook>

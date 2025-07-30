@@ -360,12 +360,6 @@ class Service(models.Model):
         help="Links back to the 'taxi booking' that generated this leg-info service",
     )
 
-    show_on_calendar = fields.Boolean(
-        "Show on Calendar",
-        related="front_office_workflow_id.show_on_calendar",
-        store=True,
-    )
-
     @api.depends("deadline", "end_date")
     def _compute_end_date_for_calendar(self):
         for service in self:

@@ -186,11 +186,7 @@ class RiverflowStateRecord(models.Model):
         store=True,
         index=True,
     )
-    show_on_calendar = fields.Boolean(
-        "Show on Calendar",
-        compute="_compute_show_on_calendar",
-        store=True,
-    )
+
     # fields from MailThreadReviewMixin
     color_int = fields.Integer(
         related="state_id.color_int",
@@ -459,17 +455,6 @@ class RiverflowStateRecord(models.Model):
     def _compute_is_end_state_for_record(self, record):
         if record.service_id:
             return record.service_id.is_end_state
-        return False
-
-    @api.depends("service_id.show_on_calendar")
-    def _compute_show_on_calendar(self):
-        for record in self:
-            record.show_on_calendar = self._compute_show_on_calendar_for_record(record)
-
-    @api.model
-    def _compute_show_on_calendar_for_record(self, record):
-        if record.service_id:
-            return record.service_id.show_on_calendar
         return False
 
     @api.depends("service_id.display_name", "name")

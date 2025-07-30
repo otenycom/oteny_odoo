@@ -68,13 +68,6 @@ class RiverflowWorkflow(models.Model):
         default=False,
     )
 
-    show_on_calendar = fields.Boolean(
-        "Show on Calendar",
-        help="If checked, this workflow will be shown on the calendar.",
-        tracking=True,
-        default=True,
-    )
-
     _sql_constraints = [("name_uniq", "unique (name)", "Workflow name already exists!")]
 
     @api.depends("icon", "name")
