@@ -467,6 +467,8 @@ class Service(models.Model):
             sortable_deadline = (
                 root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
+            # TODO: it does not make sense to include sub_sequence, as root services are not ordered by sub_sequence but only by name and by deadline
+            # Only decendents of root services are ordered by sub_sequence (actually by deadline and then by sub_sequence)
             service.root_name = f"{sortable_deadline} {root_service.sub_sequence:05d} {root_service.name}"
 
     @api.depends("parent_path")
@@ -682,13 +684,22 @@ class Service(models.Model):
 
             # we use direct sql to avoid recalculation of root_id, which means 'search' would decide
             # to recursively recalculate all records in the table, this overflows the stack
-            self.env.cr.execute(
-                """
+            if record.res_model and record.res_id:
+                self.env.cr.execute(
+                    """
+                    SELECT id FROM riverflow_service
+                    WHERE res_model = %s AND res_id = %s AND id != %s
+                    """,
+                    (record.res_model, record.res_id, record.id),
+                )
+            else:
+                self.env.cr.execute(
+                    """
                     SELECT id FROM riverflow_service
                     WHERE root_id = %s AND id != %s
                     """,
-                (record.root_id.id, record.id),
-            )
+                    (record.root_id.id, record.id),
+                )
             service_ids = [row[0] for row in self.env.cr.fetchall()]
             services = set(Service.browse(service_ids))
             # current record is not included in the search as it can lead to recursive stack overflow
@@ -1182,15 +1193,21 @@ class Service(models.Model):
             return True
 
         # Define the domain to find all siblings.
-        # We filter by parent_id. For root services (parent_id is NULL), we use res_model and res_id.
+        # We filter by parent_id. For root services (parent_id is NULL), we use res_model and res_id for attached, or root_id for standalone.
         if self.parent_id:
             siblings_domain = [("parent_id", "=", self.parent_id.id)]
         else:
-            siblings_domain = [
-                ("parent_id", "=", False),
-                ("res_model", "=", self.res_model),
-                ("res_id", "=", self.res_id),
-            ]
+            if self.res_model and self.res_id:
+                siblings_domain = [
+                    ("parent_id", "=", False),
+                    ("res_model", "=", self.res_model),
+                    ("res_id", "=", self.res_id),
+                ]
+            else:
+                siblings_domain = [
+                    ("parent_id", "=", False),
+                    ("root_id", "=", self.root_id.id),
+                ]
 
         all_siblings = self.search(siblings_domain)  # , order="sub_sequence")
 
