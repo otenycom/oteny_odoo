@@ -3,15 +3,18 @@
 import { registry } from "@web/core/registry";
 import { X2ManyField, x2ManyField } from "@web/views/fields/x2many/x2many_field";
 import { ListRenderer } from "@web/views/list/list_renderer";
-import { useService, useBus } from "@web/core/utils/hooks";
+import { useService } from "@web/core/utils/hooks";
+import { listView } from "@web/views/list/list_view";
 
 const fieldRegistry = registry.category("fields");
+const viewRegistry = registry.category("views");
 
-// No changes needed in the renderer. It correctly triggers the event.
-export class RiverflowOne2manyRenderer extends ListRenderer {
+
+export class RiverflowListRenderer extends ListRenderer {
     setup() {
         super.setup();
         this.orm = useService("orm");
+        this.notificationService = useService("notification");
     }
 
     get canResequenceRows() {
@@ -23,8 +26,8 @@ export class RiverflowOne2manyRenderer extends ListRenderer {
     /**
      * @override
      */
-    async sortDrop(dataRowId, { previous }) {
-        const sourceRecord = this.props.list.records.find((rec) => rec.id === dataRowId);
+    async sortDrop(id, { previous }) {
+        const sourceRecord = this.props.list.records.find((rec) => rec.id === id);
         const sourceRecordId = sourceRecord ? sourceRecord.resId : null;
 
         if (!sourceRecordId) {
@@ -46,7 +49,14 @@ export class RiverflowOne2manyRenderer extends ListRenderer {
                 { target_id: targetRecordId }
             );
 
-            await sourceRecord.model.root.load();
+            // When used in an x2many, the list has a 'root' which is the form's model.
+            // Reloading the root reloads the whole form view, including the x2many.
+            // When used as a standalone list view, we just need to reload the list itself.
+            if (this.props.list.root) {
+                await this.props.list.root.load();
+            } else {
+                await this.props.list.load();
+            }
 
         } catch (e) {
             console.error("Could not reorder records:", e);
@@ -94,5 +104,12 @@ fieldRegistry.add("riverflow_one2many", riverflowOne2many);
 
 RiverflowOne2many.components = {
     ...X2ManyField.components,
-    ListRenderer: RiverflowOne2manyRenderer,
+    ListRenderer: RiverflowListRenderer,
 };
+
+export const riverflowServiceListView = {
+    ...listView,
+    Renderer: RiverflowListRenderer,
+};
+
+viewRegistry.add("riverflow_service_list", riverflowServiceListView);

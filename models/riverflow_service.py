@@ -21,7 +21,7 @@ class Service(models.Model):
     # list view, we assign a sequence numer for all child services. For performance, we don't
     # set the sequence field to all services on any service update, so the root services are not sorted
     # by sequence, but by name.
-    _order = "root_name,root_id,sequence"
+    _order = "res_sortable_name,res_model,res_id,root_name,root_id,sequence"
 
     DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
 
@@ -251,7 +251,9 @@ class Service(models.Model):
     res_model = fields.Char(
         string="Subject of Service Model Name",
     )
-    res_id = fields.Integer(string="Subject of Service ID", required=False)
+    res_id = fields.Integer(
+        string="Subject of Service ID", required=True, default=0
+    )  # prevent null vs 0 sorting differences
     res_id_computed = fields.Integer(
         "Computed Service Subject ID",
         compute="_compute_res_id_computed",
