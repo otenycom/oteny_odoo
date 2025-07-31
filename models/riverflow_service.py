@@ -18,10 +18,10 @@ class Service(models.Model):
     _parent_store = True
     _rec_name = "display_name"  # ensure default search is on display_name.
     # Services are a recursive tree, and in order to show the tree correctly in the flat
-    # list view, we assign a sequence numer for all child services. For performance, we don't
-    # set the sequence field to all services on any service update, so the root services are not sorted
-    # by sequence, but by name.
-    _order = "res_sortable_name,res_model,res_id,root_name,root_id,sequence"
+    # list view, we assign a display_order numer for all child services. For performance, we don't
+    # set the display_order field to all services on any service update, so the root services are not sorted
+    # by display_order, but by name.
+    _order = "res_sortable_name,res_model,res_id,root_name,root_id,display_order"
 
     DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
 
@@ -204,9 +204,10 @@ class Service(models.Model):
         store=True,
         help="User-friendly representation of the service's relative timing, e.g. 'Top-level service +5d'.",
     )
-    sequence = fields.Integer(
+    display_order = fields.Integer(
+        "Display Order",
         default=1,
-        compute="_compute_sequence",
+        compute="_compute_display_order",
         index=True,
         required=True,
         store=True,
@@ -519,7 +520,7 @@ class Service(models.Model):
                     ("parent_path", "=like", f"{service.parent_path}%"),
                     ("id", "!=", service.id),
                 ],
-                order="root_name,root_id,sequence",
+                order="root_name,root_id,display_order",
             )
             service.descendant_ids = descendants
 
@@ -659,7 +660,7 @@ class Service(models.Model):
         "deadline",
         "sub_sequence",
     )
-    def _compute_sequence(self):
+    def _compute_display_order(self):
         # if self.env.context.get("computing_sequence"):
         #     return
 
@@ -676,8 +677,8 @@ class Service(models.Model):
             # try:
 
             # Retrieve all service records with the same root_id as the current record
-            # we only set the sequence field of child nodes, the root nodes are sorted
-            # by name; as it would become very slow to sequence the entire list of services
+            # we only set the display_order field of child nodes, the root nodes are sorted
+            # by name; as it would become very slow to display_order the entire list of services
 
             # we use direct sql to avoid recalculation of root_id, which means 'search' would decide
             # to recursively recalculate all records in the table, this overflows the stack
@@ -691,7 +692,7 @@ class Service(models.Model):
             service_ids = [row[0] for row in self.env.cr.fetchall()]
             services = set(Service.browse(service_ids))
             # current record is not included in the search as it can lead to recursive stack overflow
-            # as search also recalculates the sequence field
+            # as search also recalculates the display_order field
             services.add(record)
             # finally:
             #     self = self.with_context(computing_sequence=False)
@@ -713,11 +714,11 @@ class Service(models.Model):
                 # Add the current service to its parent's list of children
                 service_tree[parent_id].append(service.id)
 
-            # Initialize the sequence counter
-            sequence = 0
+            # Initialize the display_order counter
+            display_order = 0
 
             def assign_sequence(service_id, visited):
-                nonlocal sequence  # Use the nonlocal keyword to modify the outer scope 'sequence' variable
+                nonlocal display_order  # Use the nonlocal keyword to modify the outer scope 'display_order' variable
 
                 # Check for circular references in the hierarchy
                 if service_id in visited:
@@ -731,11 +732,11 @@ class Service(models.Model):
                 # Retrieve the service object using its ID
                 service = service_dict[service_id]
 
-                # Assign the current sequence number to the service
-                service.sequence = sequence
+                # Assign the current display_order number to the service
+                service.display_order = display_order
 
-                # Increment the sequence number for the next service
-                sequence += 1
+                # Increment the display_order number for the next service
+                display_order += 1
 
                 if service_id in service_tree:
                     children_ids = service_tree[service_id]
@@ -752,7 +753,7 @@ class Service(models.Model):
                     for child_id in sorted_children_ids:
                         assign_sequence(child_id, visited)
 
-            # Assign sequence numbers to root services (those without parents) and their children
+            # Assign display_order numbers to root services (those without parents) and their children
             if None in service_tree:
                 visited = set()
 
@@ -1191,7 +1192,7 @@ class Service(models.Model):
                 ("res_id", "=", self.res_id),
             ]
 
-        all_siblings = self.search(siblings_domain, order="sub_sequence")
+        all_siblings = self.search(siblings_domain)  # , order="sub_sequence")
 
         target = self.browse(target_id) if target_id else self.env[self._name]
 

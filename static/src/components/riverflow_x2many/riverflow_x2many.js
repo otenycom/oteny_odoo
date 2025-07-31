@@ -49,14 +49,8 @@ export class RiverflowListRenderer extends ListRenderer {
                 { target_id: targetRecordId }
             );
 
-            // When used in an x2many, the list has a 'root' which is the form's model.
-            // Reloading the root reloads the whole form view, including the x2many.
-            // When used as a standalone list view, we just need to reload the list itself.
-            if (this.props.list.root) {
-                await this.props.list.root.load();
-            } else {
-                await this.props.list.load();
-            }
+
+            await sourceRecord.model.root.load();
 
         } catch (e) {
             console.error("Could not reorder records:", e);

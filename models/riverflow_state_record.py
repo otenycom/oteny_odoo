@@ -9,9 +9,7 @@ DATE_FORMAT = "%d/%m/%Y"
 class RiverflowStateRecord(models.Model):
     _name = "riverflow.state.record"
     _description = "Global View of Riverflow State"
-    _order = (
-        "res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,sequence,deadline"
-    )
+    _order = "res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,display_order,deadline"
     _inherit = [
         "riverflow.highlight.row.mixin",
     ]
@@ -144,11 +142,12 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_timing_json",
         store=False,
     )
-    sequence = fields.Integer(
+    display_order = fields.Integer(
+        "Display Order",
         default=1,
         index=True,
         required=True,
-        compute="_compute_sequence",
+        compute="_compute_display_order",
         store=True,
     )
 
@@ -517,13 +516,13 @@ class RiverflowStateRecord(models.Model):
             else:
                 record.root_id = False
 
-    @api.depends("service_id.sequence")
-    def _compute_sequence(self):
+    @api.depends("service_id.display_order")
+    def _compute_display_order(self):
         for record in self:
             if record.service_id:
-                record.sequence = record.service_id.sequence
+                record.display_order = record.service_id.display_order
             else:
-                record.sequence = 1
+                record.display_order = 1
 
     @api.depends("service_id.res_id")
     def _compute_res_id(self):

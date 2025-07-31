@@ -377,7 +377,7 @@ class ServiceDeadlineTestCase(TransactionCase):
         # self.dump_services_to_console(services)
 
         last_child_id = None
-        for service in root_3.child_ids.sorted(key=lambda r: r.sequence):
+        for service in root_3.child_ids.sorted(key=lambda r: r.display_order):
             last_child_id = service.id
         self.assertEqual(
             last_child_id,

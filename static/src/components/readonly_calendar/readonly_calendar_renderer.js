@@ -79,7 +79,7 @@ class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
                     { name: "is_subject", order: "desc" },
                     { name: "root_name" },
                     { name: "root_id" },
-                    { name: "sequence" },
+                    { name: "display_order" },
                     { name: "deadline" },
                 ];
 

@@ -44,7 +44,7 @@
                 <field name="highlight_row" column_invisible="1" />
                 <field name="highlight_row_type" column_invisible="1" />
                 <field name="active" column_invisible="True" />
-                <field name="sequence" column_invisible="True" />
+                <field name="display_order" column_invisible="True" />
                 <field name="root_id" column_invisible="True" />
                 <field name="root_name" column_invisible="True" />
                 <field name="is_subject" column_invisible="True" />
@@ -90,7 +90,7 @@
                 scales="day,week,month,quarter,year"
                 hide_time="true"
                 event_limit="35">
-                <!-- Fields needed for sorting: res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,sequence,deadline -->
+                <!-- Fields needed for sorting: res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,display_order,deadline -->
                 <field name="res_date" invisible="1" />
                 <field name="res_model" invisible="1" />
                 <field name="res_sortable_name" invisible="1" />
@@ -98,7 +98,7 @@
                 <field name="is_subject" invisible="1" />
                 <field name="root_name" invisible="1" />
                 <field name="root_id" invisible="1" />
-                <field name="sequence" invisible="1" />
+                <field name="display_order" invisible="1" />
                 <field name="deadline" invisible="1" />
 
                 <!-- normal fields for the popup window -->
