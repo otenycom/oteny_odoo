@@ -1,4 +1,5 @@
 import random
+from lxml import etree, html
 from odoo import api, fields, models, tools, _
 from odoo.tools import html2plaintext, html_escape
 from markupsafe import Markup
@@ -323,7 +324,9 @@ class MailThreadReviewMixin(models.AbstractModel):
     def _format_message_body(
         self, body, remove_links=False, remove_star=False, remove_margin_bottom=False, max_length=100
     ):
-        body = str(body)
+        body = str(body or "")
+        if not body:
+            return body
 
         if remove_links:
             # Remove opening <a ...> tags
@@ -352,7 +355,59 @@ class MailThreadReviewMixin(models.AbstractModel):
             # Apply to opening <p> tags only
             body = re.sub(r"<p\b[^>]*?>", add_margin_bottom, body)
 
+        if max_length:
+            body = self._html_truncate(body, max_length)
+
         return body
+
+    def _html_truncate(self, html_string, max_length):
+        if not html_string or not isinstance(html_string, str):
+            return ""
+
+        try:
+            # a wrapping div is safer for fragments
+            doc = html.fromstring(f"<div>{html_string}</div>")
+        except (etree.ParserError, etree.XMLSyntaxError):
+            # Fallback for invalid HTML
+            return (html_string or "")[:max_length]
+
+        length = 0
+        nodes_to_remove = []
+        truncated = False
+
+        for element in doc.iter():
+            if truncated:
+                nodes_to_remove.append(element)
+                continue
+
+            # Process text of the element
+            text = element.text or ""
+            if length + len(text) >= max_length:
+                element.text = text[: max_length - length]
+                element.tail = None
+                for child in element:
+                    nodes_to_remove.append(child)
+                truncated = True
+            else:
+                length += len(text)
+
+            if truncated:
+                continue
+
+            # Process tail of the element
+            tail = element.tail or ""
+            if length + len(tail) >= max_length:
+                element.tail = tail[: max_length - length]
+                truncated = True
+            else:
+                length += len(tail)
+
+        for node in nodes_to_remove:
+            if node.getparent() is not None:
+                node.getparent().remove(node)
+
+        # Return inner html of the wrapper div
+        return (doc.text or "") + "".join(etree.tostring(child, encoding="unicode") for child in doc)
 
     @api.depends("message_ids.body")
     def _compute_latest_internal_notes(self):
