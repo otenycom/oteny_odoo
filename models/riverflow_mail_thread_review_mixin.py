@@ -321,106 +321,20 @@ class MailThreadReviewMixin(models.AbstractModel):
 
                 record.message_from_external_sender_ids = messages_from_external_senders
 
-    def _format_message_body(
-        self, body, remove_links=False, remove_star=False, remove_margin_bottom=False, max_length=100
-    ):
-        body = str(body or "")
-        if not body:
-            return body
-
-        if remove_links:
-            # Remove opening <a ...> tags
-            body = re.sub(r"<a\b[^>]*>", "", body)
-            # Remove closing </a> tags
-            body = re.sub(r"</a>", "", body)
-
-        if remove_star:
-            # Remove the first asterisk and any following whitespace
-            body = re.sub(r"<p>\*\s*", "<p>", body, count=1)
-
-        def add_margin_bottom(match):
-            tag = match.group(0)
-            if "style=" in tag:
-                # Append to existing style
-                return re.sub(
-                    r'style="([^"]*)"',
-                    lambda m: f'style="{m.group(1).rstrip(";")}; margin-bottom: 0px;"',
-                    tag,
-                )
-            else:
-                # Add new style attribute
-                return tag[:-1] + ' style="margin-bottom: 0px;">'
-
-        if remove_margin_bottom:
-            # Apply to opening <p> tags only
-            body = re.sub(r"<p\b[^>]*?>", add_margin_bottom, body)
-
-        if max_length:
-            body = self._html_truncate(body, max_length)
-
-        return body
-
-    def _html_truncate(self, html_string, max_length):
-        if not html_string or not isinstance(html_string, str):
-            return ""
-
-        try:
-            # a wrapping div is safer for fragments
-            doc = html.fromstring(f"<div>{html_string}</div>")
-        except (etree.ParserError, etree.XMLSyntaxError):
-            # Fallback for invalid HTML
-            return (html_string or "")[:max_length]
-
-        length = 0
-        nodes_to_remove = []
-        truncated = False
-
-        for element in doc.iter():
-            if truncated:
-                nodes_to_remove.append(element)
-                continue
-
-            # Process text of the element
-            text = element.text or ""
-            if length + len(text) >= max_length:
-                element.text = text[: max_length - length]
-                element.tail = None
-                for child in element:
-                    nodes_to_remove.append(child)
-                truncated = True
-            else:
-                length += len(text)
-
-            if truncated:
-                continue
-
-            # Process tail of the element
-            tail = element.tail or ""
-            if length + len(tail) >= max_length:
-                element.tail = tail[: max_length - length]
-                truncated = True
-            else:
-                length += len(tail)
-
-        for node in nodes_to_remove:
-            if node.getparent() is not None:
-                node.getparent().remove(node)
-
-        # Return inner html of the wrapper div
-        return (doc.text or "") + "".join(etree.tostring(child, encoding="unicode") for child in doc)
+    def _format_message_for_summary(self, message):
+        text = message.body or message.subject or ""
+        # Handle Markup objects by stripping HTML tags
+        if hasattr(text, "striptags"):
+            text = text.striptags()
+        if len(text) > 100:
+            text = text[:97] + "..."
+        return text
 
     @api.depends("message_ids.body")
     def _compute_latest_internal_notes(self):
         for record in self:
             formatted_notes = [
-                self._format_message_body(
-                    message.body,
-                    remove_links=True,
-                    remove_star=False,
-                    remove_margin_bottom=True,
-                    max_length=100,
-                )
-                for message in record.internal_note_ids[:3]
+                self._format_message_for_summary(message) for message in record.internal_note_ids[:3]
             ]
             if len(formatted_notes) > 0:
                 record.internal_notes_summary = "".join(formatted_notes)
@@ -433,16 +347,7 @@ class MailThreadReviewMixin(models.AbstractModel):
             sorted_messages = record.external_message_ids.sorted(key=lambda m: m.create_date, reverse=True)[
                 :3
             ]
-            formatted_messages = [
-                self._format_message_body(
-                    message.body or message.subject or "",
-                    remove_links=True,
-                    remove_star=False,
-                    remove_margin_bottom=True,
-                    max_length=100,
-                )
-                for message in sorted_messages
-            ]
+            formatted_messages = [self._format_message_for_summary(message) for message in sorted_messages]
             if len(formatted_messages) > 0:
                 record.external_messages_summary = "".join(formatted_messages)
             else:

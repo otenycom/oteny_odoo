@@ -56,6 +56,7 @@
                             This was previously in the use_project_deadline_from field, but it was giving errors on the client and since in 99% of cases it was invisible, we disabled it.
                             options="{'whitelist_fname': 'use_project_deadline_from_options'}"  
                             -->
+                            <field name="daily_prio" />
                             <field name="use_project_deadline_from" widget="filterable_selection"
                                 options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
                             <field
@@ -122,7 +123,7 @@
                             <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
                                 <!-- Because there is a handle-field, we must set the default_order to prevent Odoo from taking the handle's field as the primary sort field -->
                                 <list create="0" delete="0" edit="0" default_order="res_sortable_name,res_model,res_id,root_name,root_id,display_order">
-                                    <field name="sub_sequence" widget="handle" />
+                                    <field name="daily_prio" widget="handle" />
                                     <field name="active" column_invisible="True" />
                                     <field name="is_end_state" column_invisible="1" />
                                     <field name='indented_name' optional="show" width="260px" />
@@ -208,7 +209,6 @@
                             <group>
                                 <field name="workflow_id" on_change="1" options="{'no_create': True}" />
                                 <field name="state_id" on_change="1" options="{'no_create': True}" />
-                                <field name="sub_sequence" />
                             </group>
                         </page>
                     </notebook>
@@ -256,7 +256,7 @@
                 <field name="highlight_row_type" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
-                <field name="sub_sequence" widget="handle" optional="show" column_invisible="not context.get('default_is_this_a_template')" />
+                <field name="daily_prio" optional="show" />
                 <field name="res_name" optional="show" />
                 <field name="root_name" optional="hide" />
                 <field name='indented_name' optional="show" width="260px" />

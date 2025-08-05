@@ -12,7 +12,7 @@ _logger = logging.getLogger(__name__)
 class AutoAddService(models.Model):
     _name = "riverflow.auto.add.service"
     _description = "Auto Add Service"
-    _order = "applies_to_model, template_relative_timing desc, template_sub_sequence"
+    _order = "applies_to_model, template_relative_timing desc, template_daily_order"
 
     name = fields.Char(string="Name", compute="_compute_name", store=True, index=True)
     active = fields.Boolean(
@@ -52,9 +52,10 @@ class AutoAddService(models.Model):
         store=True,
         readonly=True,
     )
-    template_sub_sequence = fields.Integer(
-        related="service_template_id.sub_sequence",
-        string="Template Sub Sequence",
+    template_daily_order = fields.Integer(
+        related="service_template_id.daily_prio",
+        string="Priority",
+        help="Sort order for services that have the same deadline",
         store=True,
         readonly=True,
     )

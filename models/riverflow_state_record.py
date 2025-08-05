@@ -193,13 +193,13 @@ class RiverflowStateRecord(models.Model):
     internal_notes_summary = fields.Html(
         string="Internal Notes",
         compute="_compute_internal_notes_summary",
-        index=True,
+        index="trigram",
         store=True,
     )
     external_messages_summary = fields.Html(
         string="External Messages",
         compute="_compute_external_messages_summary",
-        index=True,
+        index="trigram",
         store=True,
     )
     unreviewed_message_count = fields.Integer(

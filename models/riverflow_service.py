@@ -214,9 +214,10 @@ class Service(models.Model):
         recursive=True,
     )
 
-    sub_sequence = fields.Integer(
-        default=10,
-        help="Orders services that have the same parent",
+    daily_prio = fields.Integer(
+        default=1,
+        string="Priority",
+        help="Orders services that have the same deadline",
         required=True,
     )
 
@@ -459,7 +460,7 @@ class Service(models.Model):
                 res_sortable_name = service.res_name
             service.res_sortable_name = res_sortable_name
 
-    @api.depends("root_id", "root_id.root_name", "name", "deadline", "sub_sequence")
+    @api.depends("root_id", "root_id.root_name", "name", "deadline", "daily_prio")
     def _compute_root_name(self):
         for service in self:
             root_service = service.root_id
@@ -467,9 +468,11 @@ class Service(models.Model):
             sortable_deadline = (
                 root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
             )
-            # TODO: it does not make sense to include sub_sequence, as root services are not ordered by sub_sequence but only by name and by deadline
-            # Only decendents of root services are ordered by sub_sequence (actually by deadline and then by sub_sequence)
-            service.root_name = f"{sortable_deadline} {root_service.sub_sequence:05d} {root_service.name}"
+            # TODO: it does not make sense to include daily_prio, as root services are not ordered by daily_prio but only by name and by deadline
+            # Only decendents of root services are ordered by daily_prio (actually by deadline and then by daily_prio)
+            service.root_name = (
+                f"{sortable_deadline} {root_service.relative_timing_formatted} {root_service.name}"
+            )
 
     @api.depends("parent_path")
     def _compute_root_id(self):
@@ -593,21 +596,28 @@ class Service(models.Model):
     def _compute_timing_json(self):
         for service in self:
             relative_days = ""
-            if service.is_days_relative_to_project_applicable:
-                relative_days = f"{self.relative_to_project_days_prefix()}{'+' if service.days_relative_to_project >= 0 else '-'}{abs(service.days_relative_to_project)}d"
-
-            if not service.deadline:
-                date_str = ""
+            if service.is_root_a_template:
+                relative_days = ""
+                date_str = self.relative_timing_formatted
                 days_remaining = ""
                 is_past = False
                 is_today = False
             else:
-                today = fields.Date.today()
-                days_remaining = (service.deadline - today).days
-                date_str = service.deadline.strftime(Service.DATE_FORMAT)
+                if service.is_days_relative_to_project_applicable:
+                    relative_days = f"{self.relative_to_project_days_prefix()}{'+' if service.days_relative_to_project >= 0 else '-'}{abs(service.days_relative_to_project)}d"
 
-                is_past = service.deadline < today
-                is_today = service.deadline == today
+                if not service.deadline:
+                    date_str = ""
+                    days_remaining = ""
+                    is_past = False
+                    is_today = False
+                else:
+                    today = fields.Date.today()
+                    days_remaining = (service.deadline - today).days
+                    date_str = service.deadline.strftime(Service.DATE_FORMAT)
+
+                    is_past = service.deadline < today
+                    is_today = service.deadline == today
 
             service.timing_json = {
                 "relative_days": relative_days,
@@ -624,12 +634,12 @@ class Service(models.Model):
     def _compute_relative_timing_formatted(self):
         for service in self:
             if not service.is_days_relative_to_project_applicable:
-                service.relative_timing_formatted = "On deadline date"
+                service.relative_timing_formatted = ""
             else:
                 prefix = service.relative_to_project_days_prefix()
                 days = service.days_relative_to_project
-                sign = "+" if days >= 0 else ""
-                service.relative_timing_formatted = f"{prefix} {sign}{days:02d}d".strip()
+                # sign = "+" if days >= 0 else ""
+                service.relative_timing_formatted = f"{prefix}{days:+03d}d"
 
     def relative_to_project_days_prefix(self):
         if self.use_project_deadline_from == "self":
@@ -660,23 +670,15 @@ class Service(models.Model):
         "parent_id",
         "root_name",
         "deadline",
-        "sub_sequence",
+        "daily_prio",
     )
     def _compute_display_order(self):
-        # if self.env.context.get("computing_sequence"):
-        #     return
-
         if any(isinstance(record.id, models.NewId) for record in self):
             return
 
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()
 
         for record in self:
-
-            # record.print_compute_sequence_counter()
-
-            # self = self.with_context(computing_sequence=True)
-            # try:
 
             # Retrieve all service records with the same root_id as the current record
             # we only set the display_order field of child nodes, the root nodes are sorted
@@ -756,7 +758,7 @@ class Service(models.Model):
                         children_ids,
                         key=lambda child_id: (
                             service_dict[child_id].deadline or date.max,
-                            service_dict[child_id].sub_sequence,
+                            service_dict[child_id].daily_prio,
                             service_dict[child_id].name,
                             service_dict[child_id].id,
                         ),
@@ -775,7 +777,7 @@ class Service(models.Model):
                     service_tree[None],
                     key=lambda root_id: (
                         service_dict[root_id].deadline or date.max,
-                        service_dict[root_id].sub_sequence,
+                        service_dict[root_id].daily_prio,
                         service_dict[root_id].name,
                         service_dict[root_id].id,
                     ),
@@ -820,6 +822,8 @@ class Service(models.Model):
     def create(self, vals_list):
         # current user is not subscribed to the chatter, because we have the radar-view, the review-count and top-3 external messages
         # this way, a team can keep track of the external messages instead of a single user
+        # Also, the user eventually sending messages in the chatter will be subscribed to the record thread; the
+        # user creating the service may not be involved in the actual execution of the service
         records = super(
             Service,
             self.with_context(
@@ -956,7 +960,7 @@ class Service(models.Model):
             "supplier_partner_id": template_service.supplier_partner_id.id,
             "supply_order_instructions": template_service.supply_order_instructions,
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
-            "sub_sequence": template_service.sub_sequence,
+            "daily_prio": template_service.daily_prio,
         }
 
         if deadline:
@@ -1209,7 +1213,7 @@ class Service(models.Model):
                     ("root_id", "=", self.root_id.id),
                 ]
 
-        all_siblings = self.search(siblings_domain)  # , order="sub_sequence")
+        all_siblings = self.search(siblings_domain)  # , order="daily_prio")
 
         target = self.browse(target_id) if target_id else self.env[self._name]
 
@@ -1252,7 +1256,7 @@ class Service(models.Model):
         sub_seq = 10
         for service_id in new_ordered_ids:
             # We browse and write one by one. This will trigger the recompute of dependent fields, which is intended.
-            self.browse(service_id).write({"sub_sequence": sub_seq})
+            self.browse(service_id).write({"daily_prio": sub_seq})
             sub_seq += 10
 
         return True
