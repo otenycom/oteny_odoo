@@ -320,7 +320,9 @@ class MailThreadReviewMixin(models.AbstractModel):
 
                 record.message_from_external_sender_ids = messages_from_external_senders
 
-    def _format_message_body(self, body, remove_links=False, remove_star=False, remove_margin_bottom=False):
+    def _format_message_body(
+        self, body, remove_links=False, remove_star=False, remove_margin_bottom=False, max_length=100
+    ):
         body = str(body)
 
         if remove_links:
@@ -356,7 +358,13 @@ class MailThreadReviewMixin(models.AbstractModel):
     def _compute_latest_internal_notes(self):
         for record in self:
             formatted_notes = [
-                self._format_message_body(message.body, True, False, True)
+                self._format_message_body(
+                    message.body,
+                    remove_links=True,
+                    remove_star=False,
+                    remove_margin_bottom=True,
+                    max_length=100,
+                )
                 for message in record.internal_note_ids[:3]
             ]
             if len(formatted_notes) > 0:
@@ -371,7 +379,13 @@ class MailThreadReviewMixin(models.AbstractModel):
                 :3
             ]
             formatted_messages = [
-                self._format_message_body(message.body or message.subject or "", True, False, True)
+                self._format_message_body(
+                    message.body or message.subject or "",
+                    remove_links=True,
+                    remove_star=False,
+                    remove_margin_bottom=True,
+                    max_length=100,
+                )
                 for message in sorted_messages
             ]
             if len(formatted_messages) > 0:
