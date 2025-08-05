@@ -13,50 +13,8 @@ const viewRegistry = registry.category("views");
 export class RiverflowListRenderer extends ListRenderer {
     setup() {
         super.setup();
-        this.orm = useService("orm");
-        this.notificationService = useService("notification");
     }
 
-    get canResequenceRows() {
-        // baseclass disallows drag and drop, if there is a sort order active on the list
-        // but we want to allow it because after dropping a row, we want to re-sort the list server-side
-        return true;
-    }
-
-    /**
-     * @override
-     */
-    async sortDrop(id, { previous }) {
-        const sourceRecord = this.props.list.records.find((rec) => rec.id === id);
-        const sourceRecordId = sourceRecord ? sourceRecord.resId : null;
-
-        if (!sourceRecordId) {
-            this.notificationService.add("Cannot reorder an unsaved record.", { type: "warning" });
-            return;
-        }
-
-        let targetRecordId = null;
-        if (previous) {
-            const targetRecord = this.props.list.records.find((rec) => rec.id === previous.dataset.id);
-            targetRecordId = targetRecord ? targetRecord.resId : null;
-        }
-
-        try {
-            await this.orm.call(
-                this.props.list.resModel,
-                "handle_drop_event",
-                [sourceRecordId],
-                { target_id: targetRecordId }
-            );
-
-
-            await sourceRecord.model.root.load();
-
-        } catch (e) {
-            console.error("Could not reorder records:", e);
-            this.notificationService.add("Failed to save the new order.", { type: "danger" });
-        }
-    }
 }
 
 

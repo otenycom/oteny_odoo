@@ -123,7 +123,6 @@
                             <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
                                 <!-- Because there is a handle-field, we must set the default_order to prevent Odoo from taking the handle's field as the primary sort field -->
                                 <list create="0" delete="0" edit="0" default_order="res_sortable_name,res_model,res_id,root_name,root_id,display_order">
-                                    <field name="daily_prio" widget="handle" />
                                     <field name="active" column_invisible="True" />
                                     <field name="is_end_state" column_invisible="1" />
                                     <field name='indented_name' optional="show" width="260px" />
@@ -137,6 +136,8 @@
                                         decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                         decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                                     />
+                                    <field name="daily_prio" optional="hide" />
+
                                     <field name="end_date" optional="hide" />
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                                     <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
@@ -256,7 +257,6 @@
                 <field name="highlight_row_type" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
-                <field name="daily_prio" optional="show" />
                 <field name="res_name" optional="show" />
                 <field name="root_name" optional="hide" />
                 <field name='indented_name' optional="show" width="260px" />
@@ -268,6 +268,7 @@
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-muted="is_end_state" />
+                <field name="daily_prio" optional="hide" />
                 <field name="end_date" optional="hide" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
                 <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
