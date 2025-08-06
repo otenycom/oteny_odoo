@@ -35,10 +35,19 @@
         <field name="color_int">7</field>
     </record>
 
+    <record id="state_taxi_registered" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_taxi_order" />
+        <field name="name">Registered</field>
+        <field name="sequence">40</field>
+        <field name="color_int">2</field>
+        <field name="is_end_state" eval="True" />
+        <field name="is_back_office_state" eval="True" />
+    </record>
+
     <record id="state_taxi_cancelled" model="riverflow.state">
         <field name="workflow_id" ref="workflow_service_taxi_order" />
         <field name="name">Cancelled</field>
-        <field name="sequence">40</field>
+        <field name="sequence">50</field>
         <field name="hide_in_statusbar">True</field>
         <field name="is_cancelled_state">True</field>
         <field name="is_end_state">True</field>
@@ -109,7 +118,7 @@
     <record id="trans_taxi_ordered_to_registered" model="riverflow.transition">
         <field name="name">Register</field>
         <field name="from_state_id" ref="state_taxi_ordered" />
-        <field name="to_state_id" ref="riverflow.back_office_state_registered" />
+        <field name="to_state_id" ref="state_taxi_registered" />
         <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="icon">fa-book</field>
         <field name="sequence">20</field>
@@ -139,7 +148,7 @@
     <record id="trans_taxi_confirmed_to_registered" model="riverflow.transition">
         <field name="name">Register</field>
         <field name="from_state_id" ref="state_taxi_confirmed" />
-        <field name="to_state_id" ref="riverflow.back_office_state_registered" />
+        <field name="to_state_id" ref="state_taxi_registered" />
         <field name="action_id" ref="riverflow.transition_action_register_service" />
         <field name="sequence">10</field>
         <field name="to_responsible_team_id" ref="riverflow.partner_team_finance" />
@@ -160,6 +169,17 @@
         <field name="to_state_id" ref="state_taxi_cancelled" />
         <field name="action_id" ref="riverflow.transition_action_default" />
         <field name="sequence">30</field>
+    </record>
+
+    <!-- Transitions from Registered -->
+    <record id="trans_taxi_registered_to_confirmed" model="riverflow.transition">
+        <field name="name">Return to Confirmed</field>
+        <field name="from_state_id" ref="state_taxi_registered" />
+        <field name="to_state_id" ref="state_taxi_confirmed" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-pencil</field>
+        <field name="sequence">10</field>
+        <field name="to_responsible_team_id" ref="riverflow.partner_team_logistics" />
     </record>
 
     <!-- Transitions from Cancelled -->

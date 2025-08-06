@@ -33,7 +33,7 @@
         "data/transition_action_data.xml",
         "data/workflow_service_task.xml",
         "data/service_email_workflow.xml",
-        "data/riverflow_back_office_workflow.xml",
+        # "data/riverflow_back_office_workflow.xml",
         "data/riverflow_taxi_order_workflow.xml",
         "data/riverflow_to_be_invoiced_workflow.xml",
         "data/riverflow_taxi_leg_workflow.xml",
