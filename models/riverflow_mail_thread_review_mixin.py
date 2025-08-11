@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 class MailThreadReviewMixin(models.AbstractModel):
     _name = "riverflow.mail.thread.review.mixin"
     _description = "Mail Thread Review Mixin"
-    _inherit = ["mail.thread"]
+    _inherit = ["mail.thread", "riverflow.highlight.row.mixin"]
 
     # -------------------------------------------------------------------------
     # FIELDS
@@ -338,6 +338,7 @@ class MailThreadReviewMixin(models.AbstractModel):
             ]
             if len(formatted_notes) > 0:
                 record.internal_notes_summary = "".join(formatted_notes)
+                self._update_user_write_date()
             else:
                 record.internal_notes_summary = False  # needed for Odoo search
 
@@ -350,6 +351,7 @@ class MailThreadReviewMixin(models.AbstractModel):
             formatted_messages = [self._format_message_for_summary(message) for message in sorted_messages]
             if len(formatted_messages) > 0:
                 record.external_messages_summary = "".join(formatted_messages)
+                self._update_user_write_date()
             else:
                 record.external_messages_summary = False  # needed for Odoo search
 

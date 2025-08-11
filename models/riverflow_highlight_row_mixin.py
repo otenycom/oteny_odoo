@@ -51,6 +51,10 @@ The highlighting is temporary and only lasts for 10 seconds."""
         for record in self:
             record.highlight_row_type = "info"
 
+    def _update_user_write_date(self):
+        """Call this from compute methods which reflect actual user changes."""
+        self.user_write_date = self.env.cr.now()
+
     @api.model_create_multi
     def create(self, vals_list):
         """Override create to set user_write_date on record creation."""

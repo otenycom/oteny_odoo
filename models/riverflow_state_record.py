@@ -218,6 +218,15 @@ class RiverflowStateRecord(models.Model):
         store=True,
     )
 
+    # Override from RiverflowHighlightRowMixin to make it computed
+    user_write_date = fields.Datetime(
+        "User Write Date",
+        help="Timestamp of the last user-initiated modification (excludes automated computed field updates).",
+        compute="_compute_user_write_date",
+        store=True,
+        readonly=True,
+    )
+
     company_id = fields.Many2one(
         "res.company",
         string="Company",
@@ -315,6 +324,17 @@ class RiverflowStateRecord(models.Model):
         if record.service_id:
             return record.service_id.unreviewed_message_count
         return 0
+
+    @api.depends("service_id.user_write_date")
+    def _compute_user_write_date(self):
+        for record in self:
+            record.user_write_date = self._compute_user_write_date_for_record(record)
+
+    @api.model
+    def _compute_user_write_date_for_record(self, record):
+        if record.service_id:
+            return record.service_id.user_write_date
+        return False
 
     @api.depends("service_id.tag_ids")
     def _compute_tag_ids(self):
