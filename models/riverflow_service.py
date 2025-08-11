@@ -11,7 +11,6 @@ class Service(models.Model):
         "riverflow.mail.thread.review.mixin",
         "riverflow.state.mixin",
         "riverflow.state.record.tracker.mixin",
-        "riverflow.highlight.row.mixin",
     ]
     _description = "Service"
     _parent_name = "parent_id"

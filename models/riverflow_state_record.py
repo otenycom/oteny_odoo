@@ -190,13 +190,13 @@ class RiverflowStateRecord(models.Model):
     color_int = fields.Integer(
         related="state_id.color_int",
     )
-    internal_notes_summary = fields.Html(
+    internal_notes_summary = fields.Text(
         string="Internal Notes",
         compute="_compute_internal_notes_summary",
         index="trigram",
         store=True,
     )
-    external_messages_summary = fields.Html(
+    external_messages_summary = fields.Text(
         string="External Messages",
         compute="_compute_external_messages_summary",
         index="trigram",

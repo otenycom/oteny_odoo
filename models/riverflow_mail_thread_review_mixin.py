@@ -1,7 +1,7 @@
 import random
 from lxml import etree, html
 from odoo import api, fields, models, tools, _
-from odoo.tools import html2plaintext, html_escape
+from odoo.tools import html2plaintext, html_escape, is_html_empty
 from markupsafe import Markup
 from odoo.tools.mail import email_split_and_format
 from odoo.addons.riverflow.util import is_neutralized_or_development  # type: ignore
@@ -75,7 +75,7 @@ class MailThreadReviewMixin(models.AbstractModel):
     )
 
     # todo: make this a JSON field and render the summaries properly, maybe with a custom widget and a popover
-    internal_notes_summary = fields.Html(
+    internal_notes_summary = fields.Text(
         string="Top 3 Internal Notes",
         help="Enter internal notes via the 'Log note' button in the Chatter",
         compute="_compute_latest_internal_notes",
@@ -103,7 +103,7 @@ class MailThreadReviewMixin(models.AbstractModel):
         store=True,
     )
 
-    external_messages_summary = fields.Html(
+    external_messages_summary = fields.Text(
         string="Top 3 External Messages",
         help="Send external messages via the 'Send message' button in the Chatter",
         compute="_compute_external_messages_summary",
@@ -323,37 +323,38 @@ class MailThreadReviewMixin(models.AbstractModel):
 
     def _format_message_for_summary(self, message):
         text = message.body or message.subject or ""
+
         # Handle Markup objects by stripping HTML tags
         if hasattr(text, "striptags"):
-            text = text.striptags()
+            if is_html_empty(text):
+                text = ""
+            else:
+                text = html2plaintext(text).replace("\n", " ")
         if len(text) > 100:
             text = text[:97] + "..."
         return text
 
+    def _compute_messages_summary(self, messages, field_name):
+        """Helper method to compute message summaries for both internal notes and external messages"""
+        # Sort messages by creation date, newest first
+        sorted_messages = messages.sorted(key=lambda m: m.create_date, reverse=True)
+        formatted_messages = [self._format_message_for_summary(message) for message in sorted_messages[:3]]
+        if len(formatted_messages) > 0:
+            summary = "\n".join(formatted_messages)
+            self[field_name] = summary
+            self._update_user_write_date()
+        else:
+            self[field_name] = False  # needed for Odoo search
+
     @api.depends("message_ids.body")
     def _compute_latest_internal_notes(self):
         for record in self:
-            formatted_notes = [
-                self._format_message_for_summary(message) for message in record.internal_note_ids[:3]
-            ]
-            if len(formatted_notes) > 0:
-                record.internal_notes_summary = "".join(formatted_notes)
-                self._update_user_write_date()
-            else:
-                record.internal_notes_summary = False  # needed for Odoo search
+            record._compute_messages_summary(record.internal_note_ids, "internal_notes_summary")
 
     @api.depends("message_ids.body")
     def _compute_external_messages_summary(self):
         for record in self:
-            sorted_messages = record.external_message_ids.sorted(key=lambda m: m.create_date, reverse=True)[
-                :3
-            ]
-            formatted_messages = [self._format_message_for_summary(message) for message in sorted_messages]
-            if len(formatted_messages) > 0:
-                record.external_messages_summary = "".join(formatted_messages)
-                self._update_user_write_date()
-            else:
-                record.external_messages_summary = False  # needed for Odoo search
+            record._compute_messages_summary(record.external_message_ids, "external_messages_summary")
 
     @api.depends("message_ids", "last_external_message_review_time")
     def _compute_unreviewed_message_ids(self):
