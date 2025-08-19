@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<odoo noupdate="0">
+    <!-- Workflow -->
+    <record id="workflow_service_arrange_send" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Arrange and Send Document</field>
+        <field name="description">Workflow for arranging and sending documents</field>
+        <field name="icon">fa-file-text</field>
+    </record>
+
+    <!-- States -->
+    <record id="state_service_arrange_not_started" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_arrange_send" />
+        <field name="name">Not Started</field>
+        <field name="sequence">10</field>
+        <field name="color_int">5</field>
+    </record>
+
+    <record id="state_service_arrange_in_progress" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_arrange_send" />
+        <field name="name">In Progress</field>
+        <field name="sequence">20</field>
+        <field name="color_int">5</field>
+    </record>
+
+    <record id="state_service_arrange_awaiting_reply" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_arrange_send" />
+        <field name="name">Awaiting Reply</field>
+        <field name="sequence">30</field>
+        <field name="color_int">5</field>
+    </record>
+    <record id="state_service_arrange_done" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_arrange_send" />
+        <field name="name">Done</field>
+        <field name="sequence">40</field>
+        <field name="is_end_state">True</field>
+        <field name="color_int">5</field>
+    </record>
+    <record id="state_service_arrange_not_needed" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_arrange_send" />
+        <field name="name">Not Needed</field>
+        <field name="sequence">50</field>
+        <field name="is_end_state">True</field>
+        <field name="hide_in_statusbar">True</field>
+        <field name="color_int">5</field>
+    </record>
+
+    <!-- Transitions -->
+    <!-- Transitions from no state -->
+    <record id="trans_arrange_1" model="riverflow.transition">
+        <field name="name">Later</field>
+        <field name="from_state_id" ref="" />
+        <field name="to_state_id" ref="state_service_arrange_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- Transitions from state Not Started -->
+    <record id="trans_arrange_in_progress" model="riverflow.transition">
+        <field name="name">In Progress</field>
+        <field name="from_state_id" ref="state_service_arrange_not_started" />
+        <field name="to_state_id" ref="state_service_arrange_in_progress" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_arrange_3" model="riverflow.transition">
+        <field name="name">Send Document</field>
+        <field name="from_state_id" ref="state_service_arrange_not_started" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_arrange_sent_already" model="riverflow.transition">
+        <field name="name">Sent already</field>
+        <field name="from_state_id" ref="state_service_arrange_not_started" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
+    </record>
+    <record id="trans_arrange_5" model="riverflow.transition">
+        <field name="name">Not Needed</field>
+        <field name="from_state_id" ref="state_service_arrange_not_started" />
+        <field name="to_state_id" ref="state_service_arrange_not_needed" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- Transitions from state In Progress -->
+    <record id="trans_arrange_in_progress_to_awaiting_reply" model="riverflow.transition">
+        <field name="name">Send Document</field>
+        <field name="from_state_id" ref="state_service_arrange_in_progress" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_arrange_in_progress_to_done" model="riverflow.transition">
+        <field name="name">Mark as Done</field>
+        <field name="from_state_id" ref="state_service_arrange_in_progress" />
+        <field name="to_state_id" ref="state_service_arrange_done" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
+    </record>
+    <record id="trans_arrange_in_progress_to_not_started" model="riverflow.transition">
+        <field name="name">Back to Not Started</field>
+        <field name="from_state_id" ref="state_service_arrange_in_progress" />
+        <field name="to_state_id" ref="state_service_arrange_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- Transitions from state Awaiting Reply -->
+    <record id="trans_arrange_awaiting_reply_to_done" model="riverflow.transition">
+        <field name="name">Mark as Done</field>
+        <field name="from_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="to_state_id" ref="state_service_arrange_done" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_arrange_awaiting_reply_resend" model="riverflow.transition">
+        <field name="name">Resend</field>
+        <field name="from_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from state Done -->
+    <record id="trans_arrange_done_to_awaiting_reply" model="riverflow.transition">
+        <field name="name">Resend</field>
+        <field name="from_state_id" ref="state_service_arrange_done" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">10</field>
+    </record>
+    <record id="trans_arrange_done_to_awaiting_reply_back" model="riverflow.transition">
+        <field name="name">Back to Awaiting Reply</field>
+        <field name="from_state_id" ref="state_service_arrange_done" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from state Not Needed -->
+    <record id="trans_arrange_6" model="riverflow.transition">
+        <field name="name">Send document after all</field>
+        <field name="from_state_id" ref="state_service_arrange_not_needed" />
+        <field name="to_state_id" ref="state_service_arrange_awaiting_reply" />
+        <field name="action_id" ref="riverflow.transition_action_email_sender" />
+        <field name="sequence">10</field>
+    </record>
+</odoo>
