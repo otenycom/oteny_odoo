@@ -465,13 +465,11 @@ class Service(models.Model):
             root_service = service.root_id
             # use format yyyy-mm-dd as its used for sorting
             sortable_deadline = (
-                root_service.deadline.strftime("%Y-%m-%d") if root_service.deadline else "2000-01-01"
+                root_service.deadline.strftime("%Y-%m-%d")
+                if root_service.deadline
+                else "2000-01-01"  # todo: in the 'else' adust a fixed date with day offset for sorting templates
             )
-            # TODO: it does not make sense to include daily_prio, as root services are not ordered by daily_prio but only by name and by deadline
-            # Only decendents of root services are ordered by daily_prio (actually by deadline and then by daily_prio)
-            service.root_name = (
-                f"{sortable_deadline} {root_service.relative_timing_formatted} {root_service.name}"
-            )
+            service.root_name = f"{sortable_deadline} {root_service.daily_prio:03d} {root_service.name}"
 
     @api.depends("parent_path")
     def _compute_root_id(self):

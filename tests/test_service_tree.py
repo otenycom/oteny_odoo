@@ -19,10 +19,12 @@ class ServiceDeadlineTestCase(TransactionCase):
         self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")]).unlink()
 
     def dump_services_to_console(self, services):
-        print("| indented_name              | deadline   |")
-        print("|----------------------------|------------|")
+        print("| indented_name              | deadline   | daily_prio |")
+        print("|----------------------------|------------|------------|")
         for service in services:
-            print(f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} |")
+            print(
+                f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} | {service.daily_prio:03d} |"
+            )
 
     def create_service_tree(self):
         self.cleanup_test_services()
@@ -407,3 +409,118 @@ class ServiceDeadlineTestCase(TransactionCase):
                 }
             ],
         )
+
+    def test_service_tree_identical_deadlines(self):
+        """Test that services with identical deadlines are ordered by daily_prio"""
+        self.cleanup_test_services()
+
+        # Create 2 root services with same deadline but different daily_prio
+        root_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX} A",
+                "project_deadline": "2024-06-15",
+                "daily_prio": 2,
+            }
+        )
+
+        root_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX} B",
+                "project_deadline": "2024-06-15",
+                "daily_prio": 1,
+            }
+        )
+
+        # Create 3 children for root_1 with same deadline but different priorities
+        child_1_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-10",
+                "daily_prio": 1,
+            }
+        )
+
+        child_1_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-10",
+                "daily_prio": 2,
+            }
+        )
+
+        child_1_3 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-10",
+                "daily_prio": 3,
+            }
+        )
+
+        # Create 3 grandchildren for each child of root_1
+        # Grandchildren of Child 1.1
+        self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Grandchild",
+                "parent_id": child_1_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-05",
+                "daily_prio": 1,
+            }
+        )
+
+        self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Grandchild",
+                "parent_id": child_1_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-05",
+                "daily_prio": 2,
+            }
+        )
+
+        self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Grandchild",
+                "parent_id": child_1_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-05",
+                "daily_prio": 3,
+            }
+        )
+
+        # Search for all test services
+        services = self.env["riverflow.service"].search(
+            [("name", "like", f"{self.TEST_PREFIX}%")],
+        )
+
+        # Debug: print the tree structure
+        print("\n=== Service Tree Structure (ordered by display_order) ===")
+        self.dump_services_to_console(services)
+
+        # Verify root services are ordered by daily_prio
+        root_services = services.filtered(lambda s: not s.parent_id)
+        self.assertEqual(len(root_services), 2, "Should have exactly 2 root services")
+
+        # Root with lower priority number should come first
+        self.assertEqual(root_services[0].daily_prio, 1, "First root should have priority 1")
+        self.assertEqual(root_services[1].daily_prio, 2, "Second root should have priority 2")
+
+        # Verify children of root_1 are ordered by daily_prio
+        root_1_children = root_1.child_ids.sorted(key=lambda r: r.display_order)
+        self.assertEqual(len(root_1_children), 3, "Root 1 should have 3 children")
+        self.assertEqual(root_1_children[0].daily_prio, 1, "First child of root 1 should have priority 1")
+        self.assertEqual(root_1_children[1].daily_prio, 2, "Second child of root 1 should have priority 2")
+        self.assertEqual(root_1_children[2].daily_prio, 3, "Third child of root 1 should have priority 3")
+
+        # Verify grandchildren of child_1_1 are ordered by daily_prio
+        gc_1_1 = child_1_1.child_ids.sorted(key=lambda r: r.display_order)
+        self.assertEqual(len(gc_1_1), 3, "Child 1.1 should have 3 grandchildren")
+        self.assertEqual(gc_1_1[0].daily_prio, 1)
+        self.assertEqual(gc_1_1[1].daily_prio, 2)
+        self.assertEqual(gc_1_1[2].daily_prio, 3)
