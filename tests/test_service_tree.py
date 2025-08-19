@@ -19,11 +19,11 @@ class ServiceDeadlineTestCase(TransactionCase):
         self.env["riverflow.service"].search([("name", "like", f"{self.TEST_PREFIX}%")]).unlink()
 
     def dump_services_to_console(self, services):
-        print("| indented_name              | deadline   | daily_prio |")
-        print("|----------------------------|------------|------------|")
+        print("| indented_name              | deadline   | daily_prio | root_name")
+        print("|----------------------------|------------|------------|------------|")
         for service in services:
             print(
-                f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} | {service.daily_prio:03d} |"
+                f"| {service.indented_name.replace(self.TEST_PREFIX, ''):<26} | {service.deadline} | {service.daily_prio:03d}       | {service.root_name:<26}"
             )
 
     def create_service_tree(self):
@@ -524,3 +524,82 @@ class ServiceDeadlineTestCase(TransactionCase):
         self.assertEqual(gc_1_1[0].daily_prio, 1)
         self.assertEqual(gc_1_1[1].daily_prio, 2)
         self.assertEqual(gc_1_1[2].daily_prio, 3)
+
+    def test_service_tree_different_deadlines(self):
+        """Test that service trees with different root deadlines are kept together and are ordered by root date"""
+        self.cleanup_test_services()
+
+        # Create 2 root services with same deadline but different daily_prio
+        root_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX} A",
+                "project_deadline": "2024-06-15",
+            }
+        )
+
+        root_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX} B",
+                "project_deadline": "2024-06-16",
+            }
+        )
+
+        # Create 3 children for root_1 with same deadline but different priorities
+        child_1_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-15",
+                "daily_prio": 1,
+            }
+        )
+
+        child_1_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-16",
+            }
+        )
+
+        child_1_3 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": "2024-06-17",
+            }
+        )
+
+        # Search for all test services
+        services = self.env["riverflow.service"].search(
+            [("name", "like", f"{self.TEST_PREFIX}%")],
+        )
+
+        # Debug: print the tree structure
+        print("\n=== Service Tree Structure (ordered by display_order) ===")
+        self.dump_services_to_console(services)
+
+        # Verify tree1 is followed by tree 2
+        root_1_services = services.filtered(lambda s: s.root_id == root_1)
+        root_2_services = services.filtered(lambda s: s.root_id == root_2)
+
+        self.assertEqual(len(root_1_services), 4, "Should have 4 services for root 1")
+        self.assertEqual(len(root_2_services), 1, "Should have 1 service for root 2")
+
+        # Get the actual sequence of service names from the search result
+        service_names = services.mapped("name")
+
+        # The first 4 services should be from root_1's tree.
+        self.assertIn(root_1.name, service_names[:4])
+        self.assertIn(child_1_1.name, service_names[:4])
+        self.assertIn(child_1_2.name, service_names[:4])
+        self.assertIn(child_1_3.name, service_names[:4])
+
+        # The last service should be root_2
+        self.assertEqual(service_names[4], root_2.name)
+
+        # check order within root_1's children
+        self.assertEqual(root_1.child_ids.mapped("name"), [child_1_1.name, child_1_2.name, child_1_3.name])

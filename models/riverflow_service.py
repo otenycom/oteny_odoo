@@ -463,13 +463,16 @@ class Service(models.Model):
     def _compute_root_name(self):
         for service in self:
             root_service = service.root_id
-            # use format yyyy-mm-dd as its used for sorting
-            sortable_deadline = (
-                root_service.deadline.strftime("%Y-%m-%d")
-                if root_service.deadline
-                else "2000-01-01"  # todo: in the 'else' adust a fixed date with day offset for sorting templates
-            )
+            if root_service.deadline:
+                sortable_deadline = root_service.deadline.strftime("%Y-%m-%d")
+            else:
+                sortable_deadline = self._generate_sortable_root_deadline().strftime("%Y-%m-%d")
+
             service.root_name = f"{sortable_deadline} {root_service.daily_prio:03d} {root_service.name}"
+
+    def _generate_sortable_root_deadline(self):
+        # In the derived class', generate date with day offset for sorting templates
+        return fields.Date.from_string("2000-01-01")
 
     @api.depends("parent_path")
     def _compute_root_id(self):
