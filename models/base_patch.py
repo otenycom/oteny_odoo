@@ -237,27 +237,20 @@ def patched_flush(self, fnames=None):
     # Get dirty fields from cache
     dirty_fields_dict = self.env.cache._dirty
 
-    if self._name == "rivermen.log.entry":
-        # Check if planned_start_date field is dirty for debugging
-        planned_start_date_field = self._fields.get("planned_start_date")
-        if planned_start_date_field and planned_start_date_field in dirty_fields_dict:
-            dirty_ids = dirty_fields_dict[planned_start_date_field]
-            if dirty_ids:
-                print(f"planned_start_date is dirty for log entry IDs: {dirty_ids}")
+    # Determine all fields of the current model that are dirty, regardless of `fnames`.
+    # The original_flush will clear all of them from the cache, so we must audit all of them.
+    all_dirty_model_fields = {
+        field
+        for field, dirty_ids in dirty_fields_dict.items()
+        if field.model_name == self._name and dirty_ids
+    }
 
-    if fnames is None:
-        # Get all dirty field names for this model
-        fnames = []
-        for field, dirty_ids in dirty_fields_dict.items():
-            if field.model_name == self._name and dirty_ids:
-                fnames.append(field.name)
-
-    if not fnames:
-        # No fields to flush
+    if not all_dirty_model_fields:
+        # No dirty fields for this model to worry about.
         return original_flush(self, fnames)
 
-    fields_dict = {name: self._fields[name] for name in fnames if name in self._fields}
-    loggable_fields_dict = {name: field for name, field in fields_dict.items() if not field.readonly}
+    # Filter for fields that we can and should log (not readonly).
+    loggable_fields_dict = {field.name: field for field in all_dirty_model_fields if not field.readonly}
 
     if not loggable_fields_dict:
         return original_flush(self, fnames)
@@ -272,6 +265,7 @@ def patched_flush(self, fnames=None):
         if records._ids:
             batch_ids = dirty_ids & set(records._ids)
         else:
+            # If `self` is an empty recordset, it implies we should flush for all dirty records of the model.
             batch_ids = dirty_ids
 
         if batch_ids:
