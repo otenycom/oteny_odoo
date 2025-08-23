@@ -87,6 +87,7 @@
                     <filter string="Change Type" name="group_by_change_type" context="{'group_by': 'change_type'}" />
                     <filter string="User" name="group_by_user" context="{'group_by': 'create_uid'}" />
                     <filter string="Date" name="group_by_date" context="{'group_by': 'create_date:day'}" />
+                    <filter string="Transaction ID" name="group_by_transaction_id" context="{'group_by': 'transaction_id'}" />
                 </group>
             </search>
         </field>

@@ -197,6 +197,17 @@ def patched_write(self, vals):
     if not hasattr(self.env, "_audit_old_values"):
         self.env._audit_old_values = defaultdict(dict)
 
+    # If a field is written to again, it should be logged again.
+    # We remove it from the logged_changes cache to allow the next flush to process it.
+    if hasattr(self.env, "_audit_logged_changes"):
+        logged_changes = self.env._audit_logged_changes
+        for field_name in vals:
+            if field_name in self._fields:
+                field = self._fields[field_name]
+                if field in logged_changes:
+                    # Remove the records being written from the set of logged changes for this field.
+                    logged_changes[field] -= set(self.ids)
+
     fields_to_check = {
         name: self._fields[name]
         for name in vals
@@ -232,6 +243,11 @@ def patched_flush(self, fnames=None):
     ):
         return original_flush(self, fnames)
 
+    # Use a transaction-level cache to prevent duplicate logging within the same transaction.
+    if not hasattr(self.env, "_audit_logged_changes"):
+        self.env._audit_logged_changes = defaultdict(set)
+    logged_changes = self.env._audit_logged_changes
+
     records = self
 
     # Get dirty fields from cache
@@ -255,7 +271,7 @@ def patched_flush(self, fnames=None):
     if not loggable_fields_dict:
         return original_flush(self, fnames)
 
-    # Collect all dirty record IDs for the fields we're flushing
+    # Collect all dirty record IDs for the fields we're flushing, skipping already logged ones.
     all_ids = set()
     batches = {}
 
@@ -268,12 +284,15 @@ def patched_flush(self, fnames=None):
             # If `self` is an empty recordset, it implies we should flush for all dirty records of the model.
             batch_ids = dirty_ids
 
-        if batch_ids:
-            batches[name] = batch_ids
-            all_ids.update(batch_ids)
+        # Filter out changes that have already been logged in this transaction
+        unlogged_ids = batch_ids - logged_changes[field]
+
+        if unlogged_ids:
+            batches[name] = unlogged_ids
+            all_ids.update(unlogged_ids)
 
     if not all_ids:
-        # No dirty records to flush
+        # All dirty fields have already been logged in this transaction.
         return original_flush(self, fnames)
 
     # Get display names for all affected records
@@ -371,6 +390,11 @@ def patched_flush(self, fnames=None):
             for log in logs:
                 log["transaction_id"] = txid
             self.env["oteny.audit.log"].sudo().create(logs)
+            # Mark these changes as logged to prevent duplicates in the same transaction.
+            for log in logs:
+                field = self._fields.get(log["field_name"])
+                if field:
+                    logged_changes[field].add(log["record_id"])
 
     # Clear old_values after flush
     if hasattr(self.env, "_audit_old_values"):
