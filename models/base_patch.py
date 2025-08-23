@@ -93,6 +93,7 @@ def patched_create(self, vals_list):
                         "record_id": record.id,
                         "record_display_name": record_display_name,
                         "field_name": col,
+                        "field_display_name": field.string,
                         "old_value": "",
                         "new_value": str(new_val_cached) if new_val_cached is not None else "",
                         "old_value_display_name": "",
@@ -101,6 +102,10 @@ def patched_create(self, vals_list):
                     }
                 )
         if logs:
+            self.env.cr.execute("SELECT txid_current()")
+            txid = self.env.cr.fetchone()[0]
+            for log in logs:
+                log["transaction_id"] = txid
             self.env["oteny.audit.log"].sudo().create(logs)
 
     return records
@@ -155,6 +160,7 @@ def patched_unlink(self):
                     "record_id": record.id,
                     "record_display_name": record_display_name,
                     "field_name": col,
+                    "field_display_name": field.string,
                     "old_value": str(old_val) if old_val is not None else "",
                     "new_value": "",
                     "old_value_display_name": old_val_display,
@@ -163,6 +169,10 @@ def patched_unlink(self):
                 }
             )
     if logs:
+        self.env.cr.execute("SELECT txid_current()")
+        txid = self.env.cr.fetchone()[0]
+        for log in logs:
+            log["transaction_id"] = txid
         self.env["oteny.audit.log"].sudo().create(logs)
 
     return original_unlink(self)
@@ -226,6 +236,14 @@ def patched_flush(self, fnames=None):
 
     # Get dirty fields from cache
     dirty_fields_dict = self.env.cache._dirty
+
+    if self._name == "rivermen.log.entry":
+        # Check if planned_start_date field is dirty for debugging
+        planned_start_date_field = self._fields.get("planned_start_date")
+        if planned_start_date_field and planned_start_date_field in dirty_fields_dict:
+            dirty_ids = dirty_fields_dict[planned_start_date_field]
+            if dirty_ids:
+                print(f"planned_start_date is dirty for log entry IDs: {dirty_ids}")
 
     if fnames is None:
         # Get all dirty field names for this model
@@ -343,6 +361,7 @@ def patched_flush(self, fnames=None):
                         "record_id": rid,
                         "record_display_name": display_names.get(rid, f"ID: {rid}"),
                         "field_name": name,
+                        "field_display_name": field.string,
                         "old_value": str(old_val) if old_val is not None else "",
                         "new_value": str(new_val) if new_val is not None else "",
                         "old_value_display_name": old_val_display,
@@ -353,6 +372,10 @@ def patched_flush(self, fnames=None):
 
     if logs:
         if self.env.registry.loaded:
+            self.env.cr.execute("SELECT txid_current()")
+            txid = self.env.cr.fetchone()[0]
+            for log in logs:
+                log["transaction_id"] = txid
             self.env["oteny.audit.log"].sudo().create(logs)
 
     # Clear old_values after flush

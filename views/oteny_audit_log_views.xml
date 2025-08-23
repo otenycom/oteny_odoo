@@ -8,13 +8,15 @@
             <list string="Audit Log" create="false" edit="false">
                 <field name="create_date" string="Timestamp" optional="show" />
                 <field name="create_uid" string="User" optional="show" widget="many2one_avatar_user" />
+                <field name="transaction_id" string="Transaction ID" optional="hide" />
                 <field name="model_name" optional="show" />
                 <field name="record_id" optional="show" />
                 <field name="record_display_name" optional="show" />
-                <field name="field_name" optional="show" />
-                <field name="old_value" optional="show" />
+                <field name="field_name" optional="hide" />
+                <field name="field_display_name" optional="show" />
+                <field name="old_value" optional="hide" />
                 <field name="old_value_display_name" optional="show" />
-                <field name="new_value" optional="show" />
+                <field name="new_value" optional="hide" />
                 <field name="new_value_display_name" optional="show" />
                 <field name="change_type" optional="show" />
             </list>
@@ -34,9 +36,9 @@
                             <field name="change_type" readonly="1" />
                         </group>
                         <group>
-                            <field name="model_name" readonly="1" />
-                            <field name="record_id" readonly="1" />
+                            <field name="record_ref" readonly="1" />
                             <field name="record_display_name" readonly="1" />
+                            <field name="field_display_name" readonly="1" />
                             <field name="field_name" readonly="1" />
                         </group>
                     </group>
@@ -64,6 +66,7 @@
             <search string="Search Audit Log">
                 <field name="model_name" />
                 <field name="field_name" />
+                <field name="field_display_name" />
                 <field name="record_id" />
                 <field name="record_display_name" />
                 <field name="change_type" />
@@ -80,7 +83,7 @@
                 <group expand="0" string="Group By">
                     <filter string="Model" name="group_by_model" context="{'group_by': 'model_name'}" />
                     <filter string="Record" name="group_by_record" context="{'group_by': 'record_display_name'}" />
-                    <filter string="Field" name="group_by_field" context="{'group_by': 'field_name'}" />
+                    <filter string="Field" name="group_by_field" context="{'group_by': 'field_display_name'}" />
                     <filter string="Change Type" name="group_by_change_type" context="{'group_by': 'change_type'}" />
                     <filter string="User" name="group_by_user" context="{'group_by': 'create_uid'}" />
                     <filter string="Date" name="group_by_date" context="{'group_by': 'create_date:day'}" />

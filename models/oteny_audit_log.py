@@ -1,5 +1,5 @@
 # audit_log/models/audit_log.py
-from odoo import fields, models
+from odoo import fields, models, api
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -10,17 +10,42 @@ class OtenyAuditLog(models.Model):
     _description = "Oteny Audit Log"
     _order = "id desc"
 
+    transaction_id = fields.Integer(required=False, string="Transaction ID")
     model_name = fields.Char(required=True)
-    record_id = fields.Integer(required=True)
+    record_id = fields.Integer(required=True, string="Record ID")
+    record_ref = fields.Reference(
+        string="Record Link",
+        selection="_selection_record_ref",
+        compute="_compute_record_ref",
+        readonly=True,
+    )
     record_display_name = fields.Char(string="Record Name")
-    field_name = fields.Char(required=True)
-    old_value = fields.Text()
-    new_value = fields.Text()
-    old_value_display_name = fields.Char(string="Old Value Name")
-    new_value_display_name = fields.Char(string="New Value Name")
+    field_name = fields.Char(required=True, string="Field Raw Name")
+    field_display_name = fields.Char(string="Field")
+    old_value = fields.Text(string="Old Value Raw")
+    new_value = fields.Text(string="New Value Raw")
+    old_value_display_name = fields.Char(string="Old Value")
+    new_value_display_name = fields.Char(string="New Value")
     change_type = fields.Selection(
         [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")], required=True
     )
+
+    def _selection_record_ref(self):
+        models = self.env["ir.model"].search([])
+        return [(model.model, model.name) for model in models]
+
+    @api.depends("model_name", "record_id")
+    def _compute_record_ref(self):
+        for log in self:
+            if (
+                log.model_name
+                and log.record_id
+                and self.env["ir.model"].search_count([("model", "=", log.model_name)])
+            ):
+                record = self.env[log.model_name].browse(log.record_id).exists()
+                log.record_ref = record or False
+            else:
+                log.record_ref = False
 
     def _is_model_ignored(self, model_name):
         """Check if a model should be ignored by the audit log."""
