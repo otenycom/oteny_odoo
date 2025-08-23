@@ -4,31 +4,6 @@
 
 This module provides comprehensive audit logging for Odoo 18, capturing all database changes (CREATE, UPDATE, DELETE) during the ORM flush cycle.
 
-## Key Implementation Details
-
-### Transaction __slots__ Workaround
-
-The Odoo 18 `Transaction` class uses `__slots__` which prevents dynamic attribute addition:
-
-```python
-class Transaction:
-    __slots__ = ('_Transaction__file_open_tmp_paths', 'cache', 'envs', 'protected', 'registry', 'tocompute')
-```
-
-This means we cannot do:
-
-```python
-self.env.transaction.prev_values = defaultdict(dict)  # ❌ Raises AttributeError
-```
-
-### Solution: Use Environment Instead
-
-The `Environment` class does not use `__slots__`, allowing dynamic attributes:
-
-```python
-self.env._audit_prev_values = defaultdict(dict)  # ✅ Works perfectly
-```
-
 ## Implementation Details
 
 ### 1. Patched Methods

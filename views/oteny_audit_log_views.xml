@@ -97,6 +97,17 @@
         <field name="search_view_id" ref="oteny_audit_log_view_search" />
     </record>
 
+    <record id="action_oteny_audit_log_install" model="ir.actions.server">
+        <field name="name">Enable Audit Log for all models</field>
+        <field name="model_id" ref="model_oteny_audit_log" />
+        <field name="binding_model_id" ref="model_oteny_audit_log" />
+        <field name="state">code</field>
+        <field name="code">
+            action = model.install_for_all_models_action()
+        </field>
+    </record>
+
+
     <menuitem
         id="oteny_audit_log_menu_root"
         name="Audit"
@@ -110,5 +121,20 @@
         action="action_oteny_audit_log"
         sequence="10"
     />
+
+    <menuitem
+        id="oteny_audit_log_config_menu"
+        name="Configuration"
+        parent="oteny_audit_log_menu_root"
+        sequence="20"
+    >
+        <menuitem
+            id="oteny_audit_log_config_menu_install"
+            name="Enable Audit Log for all models"
+            action="action_oteny_audit_log_install"
+            sequence="10"
+        />
+    </menuitem>
+
 
 </odoo>
