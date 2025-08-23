@@ -15,16 +15,18 @@ def _get_display_value(field, value, record_env):
         return ""
     try:
         if field.type == "many2one" and isinstance(value, int):
-            return record_env[field.comodel_name].browse(value).display_name
+            return record_env[field.comodel_name].sudo().browse(value).display_name
         if field.type in ["one2many", "many2many"] and isinstance(value, (list, tuple)):
-            records = record_env[field.comodel_name].browse(list(value))
+            records = record_env[field.comodel_name].sudo().browse(list(value))
             return ", ".join(records.mapped("display_name"))
         if field.type == "selection":
             selection_values = dict(field.get_values(record_env))
             return selection_values.get(value, str(value))
     except Exception:
         # Fallback to string representation in case of errors (e.g., deleted records)
-        return str(value)
+        # Limit string representation to 1000 characters to prevent excessive storage
+        str_value = str(value)
+        return str_value[:1000] + "..." if len(str_value) > 1000 else str_value
     return str(value)
 
 
@@ -94,7 +96,7 @@ def patched_create(self, vals_list):
                     }
                 )
         if logs:
-            self.env["oteny.audit.log"].create(logs)
+            self.env["oteny.audit.log"].sudo().create(logs)
 
     return records
 
@@ -152,7 +154,7 @@ def patched_unlink(self):
                 }
             )
     if logs:
-        self.env["oteny.audit.log"].create(logs)
+        self.env["oteny.audit.log"].sudo().create(logs)
 
     return original_unlink(self)
 
@@ -334,7 +336,7 @@ def patched_flush(self, fnames=None):
 
     if logs:
         if self.env.registry.loaded:
-            self.env["oteny.audit.log"].create(logs)
+            self.env["oteny.audit.log"].sudo().create(logs)
 
     # Clear old_values after flush
     if hasattr(self.env, "_audit_old_values"):
