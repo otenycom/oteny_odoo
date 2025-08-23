@@ -22,6 +22,22 @@ class OtenyAuditLog(models.Model):
         [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")], required=True
     )
 
+    def _is_model_ignored(self, model_name):
+        """Check if a model should be ignored by the audit log."""
+        if not model_name:
+            return True
+
+        # Always ignore the audit log model itself
+        if model_name == self._name:
+            return True
+
+        # Ignore models with specific prefixes
+        ignored_prefixes = ["ir.", "base.", "bus.", "mail.push", "mail.tracking"]
+        if any(model_name.startswith(prefix) for prefix in ignored_prefixes):
+            return True
+
+        return False
+
     def install_for_all_models_action(self):
         """This will be part of the post install hook for every new module, needs to be run manually for now
         goals: make an action record for all models to view their log
@@ -41,7 +57,7 @@ action = {
         )
 
         for model in models_to_install:
-            if model.model.startswith("ir.") or model.model.startswith("base."):
+            if self._is_model_ignored(model.model):
                 continue
 
             _logger.info(f"Checking/creating audit log action for model {model.model}")
