@@ -123,22 +123,18 @@ class TestAuditLog(TransactionCase):
         """Test that adding a user to a group logs an update"""
         # Create a test user
         main_company = self.env.ref("base.main_company")
-        user = (
-            self.env["res.users"]
-            .with_context(oteny_audit_ignore=True)
-            .create(
-                {
-                    "name": "Group Test User",
-                    "login": "test_group_user@example.com",
-                    "company_id": main_company.id,
-                    "company_ids": [(6, 0, [main_company.id])],
-                }
-            )
+        user = self.env["res.users"].create(
+            {
+                "name": "Group Test User",
+                "login": "test_group_user@example.com",
+                "company_id": main_company.id,
+                "company_ids": [(6, 0, [main_company.id])],
+            }
         )
 
-        # ensure the user doesn't have the system group
-        group_system = self.env.ref("base.group_system")
-        self.assertNotIn(group_system, user.groups_id)
+        # ensure the user doesn't have the group_sanitize_override
+        group_html = self.env.ref("base.group_sanitize_override")
+        self.assertNotIn(group_html, user.groups_id)
 
         # Clear any logs from creation
         self.env["oteny.audit.log"].search(
@@ -151,7 +147,7 @@ class TestAuditLog(TransactionCase):
         initial_groups = user.groups_id
 
         # Add the user to the system group
-        user.write({"groups_id": [(4, self.group_system.id, 0)]})
+        user.write({"groups_id": [(4, group_html.id, 0)]})
         user.flush_recordset()
 
         # Check that update logs were created
@@ -169,17 +165,19 @@ class TestAuditLog(TransactionCase):
         log = update_logs
 
         final_groups = user.groups_id
+        # Compare display names directly - they contain group names like 'Technical / Access to export feature'
+        expected_prev_display = ", ".join(sorted(g.display_name for g in initial_groups))
+        expected_new_display = ", ".join(sorted(g.display_name for g in final_groups))
 
-        # expected values as sets for order-independent comparison
-        expected_prev_set = {f"{g.id}, {g.display_name}" for g in initial_groups}
-        expected_new_set = {f"{g.id}, {g.display_name}" for g in final_groups}
+        actual_prev_display = (
+            ", ".join(sorted(log.old_value_display_name.split(", "))) if log.old_value_display_name else ""
+        )
+        actual_new_display = (
+            ", ".join(sorted(log.new_value_display_name.split(", "))) if log.new_value_display_name else ""
+        )
 
-        # actual values from log, parsed into sets
-        actual_prev_set = set(log.old_value.split(", ")) if log.old_value else set()
-        actual_new_set = set(log.new_value.split(", ")) if log.new_value else set()
-
-        self.assertEqual(actual_prev_set, expected_prev_set)
-        self.assertEqual(actual_new_set, expected_new_set)
+        self.assertEqual(actual_prev_display, expected_prev_display)
+        self.assertEqual(actual_new_display, expected_new_display)
 
     def test_no_recursion_on_audit_log(self):
         """Test that audit log operations don't trigger recursive logging"""

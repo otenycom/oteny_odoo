@@ -179,43 +179,121 @@ def patched_write(self, vals):
     if not self or not vals:
         return original_write(self, vals)
 
-    # Initialize old_values attribute on environment if not present
-    # This stores the original values before the write operation
-    # We use env instead of env.transaction because Transaction uses __slots__
-    if not hasattr(self.env, "_audit_old_values"):
-        self.env._audit_old_values = defaultdict(dict)
-
-    # If a field is written to again, it should be logged again.
-    # We remove it from the logged_changes cache to allow the next flush to process it.
-    if hasattr(self.env, "_audit_logged_changes"):
-        logged_changes = self.env._audit_logged_changes
-        for field_name in vals:
-            if field_name in self._fields:
-                field = self._fields[field_name]
-                if field in logged_changes:
-                    # Remove the records being written from the set of logged changes for this field.
-                    logged_changes[field] -= set(self.ids)
-
+    # Get all storable, non-readonly fields from vals
     fields_to_check = {
         name: self._fields[name]
         for name in vals
         if name in self._fields and self._fields[name].store and not self._fields[name].readonly
     }
 
-    # Check current dirty fields using the cache._dirty API
-    dirty_fields = self.env.cache._dirty
+    relational_fields = {n: f for n, f in fields_to_check.items() if f.type in ("one2many", "many2many")}
+    scalar_fields = {n: f for n, f in fields_to_check.items() if f.type not in ("one2many", "many2many")}
 
-    for record in self:
-        for name, field in fields_to_check.items():
-            # Check if this field is already dirty for this record
-            if record.id not in dirty_fields.get(field, set()):
-                # First modification: capture old value from cache if present
-                if self.env.cache.contains(record, field):
-                    old_val = self.env.cache.get(record, field)
-                    self.env._audit_old_values[field][record.id] = old_val
+    # --- IMMEDIATE LOGGING FOR RELATIONAL FIELDS ---
+    # Relational field writes (like m2m with commands) are executed immediately.
+    # We must capture the state before and after the original_write call.
+    if relational_fields:
+        # Pre-fetch old values for all records and all relational fields at once
+        old_values_list = self.read(list(relational_fields.keys()))
+        old_values_map = {rec["id"]: rec for rec in old_values_list}
 
-    # Proceed with original write (updates cache and marks dirty)
-    return original_write(self, vals)
+    # --- DEFERRED LOGGING SETUP FOR SCALAR FIELDS ---
+    # Scalar fields are not written until flush, so we just capture the old value
+    # and let patched_flush handle the logging.
+    if scalar_fields:
+        if not hasattr(self.env, "_audit_old_values"):
+            self.env._audit_old_values = defaultdict(dict)
+
+        # If a field is written to again, it should be logged again.
+        # We remove it from the logged_changes cache to allow the next flush to process it.
+        if hasattr(self.env, "_audit_logged_changes"):
+            logged_changes = self.env._audit_logged_changes
+            for field in scalar_fields.values():
+                if field in logged_changes:
+                    # Remove the records being written from the set of logged changes for this field.
+                    logged_changes[field] -= set(self.ids)
+
+        dirty_fields = self.env.cache._dirty
+        # Pre-fetch scalar fields not in cache to get their old values
+        records_to_read_ids = {
+            rec.id
+            for rec in self
+            for field in scalar_fields.values()
+            if rec.id is not None
+            and rec.id not in dirty_fields.get(field, set())
+            and not self.env.cache.contains(rec, field)
+        }
+        if records_to_read_ids:
+            self.browse(list(records_to_read_ids)).read(list(scalar_fields.keys()))
+
+        for record in self:
+            for name, field in scalar_fields.items():
+                # Check if this field is already dirty for this record
+                if record.id not in dirty_fields.get(field, set()):
+                    # First modification: capture old value from cache if present
+                    if self.env.cache.contains(record, field):
+                        old_val = self.env.cache.get(record, field)
+                        self.env._audit_old_values[field][record.id] = old_val
+
+    # Perform the original write for ALL fields
+    result = original_write(self, vals)
+
+    # --- FINISH IMMEDIATE LOGGING FOR RELATIONAL FIELDS ---
+    if relational_fields:
+        # Invalidate cache to ensure we re-read from the database
+        self.invalidate_recordset(fnames=list(relational_fields.keys()))
+        new_values_list = self.read(list(relational_fields.keys()))
+        new_values_map = {rec["id"]: rec for rec in new_values_list}
+
+        logs = []
+        for record in self:
+            old_rec_vals = old_values_map.get(record.id, {})
+            new_rec_vals = new_values_map.get(record.id, {})
+            try:
+                record_display_name = record.display_name
+            except Exception:
+                record_display_name = f"ID: {record.id}"
+
+            for name, field in relational_fields.items():
+                old_ids = old_rec_vals.get(name, [])
+                new_ids = new_rec_vals.get(name, [])
+
+                # Odoo's read() returns a list of IDs for m2m.
+                # To compare, we can just compare the sets of IDs.
+                if set(old_ids) != set(new_ids):
+                    # To get display values, we need to browse.
+                    old_records = self.env[field.comodel_name].browse(old_ids)
+                    new_records = self.env[field.comodel_name].browse(new_ids)
+
+                    old_val_cache = field.convert_to_cache(old_records, record)
+                    new_val_cache = field.convert_to_cache(new_records, record)
+
+                    old_val_display = _get_display_value(field, old_val_cache, record.env)
+                    new_val_display = _get_display_value(field, new_val_cache, record.env)
+
+                    logs.append(
+                        {
+                            "model_name": self._name,
+                            "record_id": record.id,
+                            "record_display_name": record_display_name,
+                            "field_name": name,
+                            "field_display_name": field.string,
+                            "old_value": str(old_val_cache) if old_val_cache is not None else "",
+                            "new_value": str(new_val_cache) if new_val_cache is not None else "",
+                            "old_value_display_name": old_val_display,
+                            "new_value_display_name": new_val_display,
+                            "change_type": "update",
+                        }
+                    )
+        if logs:
+            if self.env.registry.loaded:
+                self.env.cr.execute("SELECT txid_current()")
+                txid = self.env.cr.fetchone()[0]
+                for log in logs:
+                    log["transaction_id"] = txid
+                self.env["oteny.audit.log"].sudo().create(logs)
+
+    return result
 
 
 def patched_flush(self, fnames=None):
@@ -335,19 +413,26 @@ def patched_flush(self, fnames=None):
             old_val = old_values.get(rid, {}).get(name)
             # Get new value from cache (it might still be there after flush)
             try:
-                new_val = self.env.cache.get(record, field, None)
-            except:
-                # If not in cache, try to get from database
-                query = SQL(
-                    "SELECT %s FROM %s WHERE id = %s",
-                    SQL.identifier(field.name),
-                    SQL.identifier(self._table),
-                    rid,
-                )
-                self.env.cr.execute(query)
-                result = self.env.cr.fetchone()
-                db_val = result[0] if result else None
-                new_val = field.convert_to_cache(db_val, record) if db_val is not None else None
+                if field.column_type:
+                    # For simple fields, try cache then direct SQL for performance
+                    new_val = self.env.cache.get(record, field, None)
+                    if new_val is None:
+                        query = SQL(
+                            "SELECT %s FROM %s WHERE id = %s",
+                            SQL.identifier(field.name),
+                            SQL.identifier(self._table),
+                            rid,
+                        )
+                        self.env.cr.execute(query)
+                        result = self.env.cr.fetchone()
+                        db_val = result[0] if result else None
+                        new_val = field.convert_to_cache(db_val, record) if db_val is not None else None
+                else:
+                    # For relational fields (m2m, o2m), read from recordset
+                    new_val_from_rec = record[name]
+                    new_val = field.convert_to_cache(new_val_from_rec, record)
+            except Exception:
+                new_val = None
 
             if old_val != new_val:
                 old_val_display = _get_display_value(field, old_val, record.env)
