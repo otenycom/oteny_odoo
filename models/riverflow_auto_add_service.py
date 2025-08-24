@@ -182,12 +182,8 @@ class AutoAddService(models.Model):
         if to_create:
             for service_vals in to_create:
                 service_context = self.env["riverflow.service"].with_context(
-                    {
-                        "default_res_id": service_vals["res_id"],
-                        "default_res_model": service_vals["res_model"],
-                        "default_created_by_auto_add_service_id": service_vals[
-                            "created_by_auto_add_service_id"
-                        ],
-                    }
+                    default_res_id=service_vals["res_id"],
+                    default_res_model=service_vals["res_model"],
+                    default_created_by_auto_add_service_id=service_vals["created_by_auto_add_service_id"],
                 )
                 service_context._create_services_from_template(service_vals["template_id"])

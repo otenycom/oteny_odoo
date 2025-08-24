@@ -13,6 +13,7 @@ class RiverflowStateRecord(models.Model):
     _inherit = [
         "riverflow.highlight.row.mixin",
     ]
+    _oteny_audit_ignore = True
 
     active = fields.Boolean(
         default=True,

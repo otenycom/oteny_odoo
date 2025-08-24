@@ -827,10 +827,8 @@ class Service(models.Model):
         records = super(
             Service,
             self.with_context(
-                **{
-                    "mail_create_nosubscribe": True,  # At create or message_post, do not subscribe the current user to the record thread
-                    "mail_auto_subscribe_no_notify": True,  # Do no notify users set as followers of the mail thread
-                }
+                mail_create_nosubscribe=True,  # At create or message_post, do not subscribe the current user to the record thread
+                mail_auto_subscribe_no_notify=True,  # Do no notify users set as followers of the mail thread
             ),
         ).create(vals_list)
         for record in records:
@@ -973,9 +971,7 @@ class Service(models.Model):
         if parent_id:
             vals["parent_id"] = parent_id
 
-        new_service = (
-            self.env["riverflow.service"].with_context(context={"mail_create_nosubscribe": True}).create(vals)
-        )
+        new_service = self.env["riverflow.service"].with_context(mail_create_nosubscribe=True).create(vals)
 
         # Copy the legs from the template
         for leg in template_service.leg_ids:

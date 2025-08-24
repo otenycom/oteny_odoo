@@ -4,6 +4,7 @@ from odoo import fields, models, api
 class CheckResult(models.Model):
     _name = "riverflow.check.result"
     _description = "Base Check Result"
+    _oteny_audit_ignore = True
 
     name = fields.Char(string="Name", store=True)
     check_type = fields.Selection([], string="Check Type", required=True)
