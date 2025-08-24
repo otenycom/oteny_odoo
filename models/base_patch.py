@@ -404,35 +404,22 @@ def patched_flush(self, fnames=None):
     # Perform original flush
     original_flush(self, fnames)
 
-    # Log changes using old_values
+    # After flush, re-read all flushed fields to get their new values
+    if all_ids:
+        new_values_list = self.browse(list(all_ids)).read(list(loggable_fields_dict.keys()))
+        new_values_map = {rec["id"]: rec for rec in new_values_list}
+    else:
+        new_values_map = {}
+
+    # Log changes using old and new values
     logs = []
-    for name in loggable_fields_dict:
-        field = loggable_fields_dict[name]
+    for name, field in loggable_fields_dict.items():
         for rid in batches.get(name, []):
             record = self.browse(rid)
             old_val = old_values.get(rid, {}).get(name)
-            # Get new value from cache (it might still be there after flush)
-            try:
-                if field.column_type:
-                    # For simple fields, try cache then direct SQL for performance
-                    new_val = self.env.cache.get(record, field, None)
-                    if new_val is None:
-                        query = SQL(
-                            "SELECT %s FROM %s WHERE id = %s",
-                            SQL.identifier(field.name),
-                            SQL.identifier(self._table),
-                            rid,
-                        )
-                        self.env.cr.execute(query)
-                        result = self.env.cr.fetchone()
-                        db_val = result[0] if result else None
-                        new_val = field.convert_to_cache(db_val, record) if db_val is not None else None
-                else:
-                    # For relational fields (m2m, o2m), read from recordset
-                    new_val_from_rec = record[name]
-                    new_val = field.convert_to_cache(new_val_from_rec, record)
-            except Exception:
-                new_val = None
+
+            new_val_raw = new_values_map.get(rid, {}).get(name)
+            new_val = field.convert_to_cache(new_val_raw, record)
 
             if old_val != new_val:
                 old_val_display = _get_display_value(field, old_val, record.env)
