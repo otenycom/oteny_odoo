@@ -1,5 +1,6 @@
 # audit_log/models/audit_log.py
 from odoo import fields, models, api
+from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -47,18 +48,25 @@ class OtenyAuditLog(models.Model):
             else:
                 log.record_ref = False
 
-    def _is_model_ignored(self, model_name):
+    def _is_audit_ignored(self, model_name):
         """Check if a model should be ignored by the audit log."""
-        if not model_name:
-            return True
-
         # Always ignore the audit log model itself
         if model_name == self._name:
             return True
 
-        # Ignore models with specific prefixes
-        ignored_prefixes = ["ir.", "base.", "bus.", "mail.push", "mail.tracking"]
-        if any(model_name.startswith(prefix) for prefix in ignored_prefixes):
+        if self.env.context.get("oteny_audit_ignore", False):
+            return True
+
+        if self.env.context.get(MODULE_UNINSTALL_FLAG, False):
+            return True
+
+        model_class = self.env[model_name]
+        if hasattr(model_class, "_oteny_audit_ignore"):
+            return model_class._oteny_audit_ignore
+
+        # Ignore system models by default, can be overridden by _oteny_audit_ignore in the model
+        ignored_model_prefixes = ["ir.ui.view", "bus.", "mail.push", "mail.tracking", "res.device.log"]
+        if any(model_name.startswith(prefix) for prefix in ignored_model_prefixes):
             return True
 
         return False
@@ -82,7 +90,7 @@ action = {
         )
 
         for model in models_to_install:
-            if self._is_model_ignored(model.model):
+            if self._is_audit_ignored(model.model):
                 continue
 
             _logger.info(f"Checking/creating audit log action for model {model.model}")

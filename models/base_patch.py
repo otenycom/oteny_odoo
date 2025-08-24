@@ -33,11 +33,7 @@ def _get_display_value(field, value, record_env):
 @api.model_create_multi
 def patched_create(self, vals_list):
     # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if (
-        not self.env.registry.loaded
-        or self._name not in self.env
-        or self.env["oteny.audit.log"]._is_model_ignored(self._name)
-    ):
+    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
         return original_create(self, vals_list)
 
     records = original_create(self, vals_list)
@@ -113,11 +109,7 @@ def patched_create(self, vals_list):
 
 def patched_unlink(self):
     # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if (
-        not self.env.registry.loaded
-        or self._name not in self.env
-        or self.env["oteny.audit.log"]._is_model_ignored(self._name)
-    ):
+    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
         return original_unlink(self)
 
     # Skip if no records are being unlinked
@@ -180,11 +172,7 @@ def patched_unlink(self):
 
 def patched_write(self, vals):
     # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if (
-        not self.env.registry.loaded
-        or self._name not in self.env
-        or self.env["oteny.audit.log"]._is_model_ignored(self._name)
-    ):
+    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
         return original_write(self, vals)
 
     # Skip if no records or values are provided
@@ -236,11 +224,7 @@ def patched_flush(self, fnames=None):
     Compatible with Odoo 18's flush signature.
     """
     # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if (
-        not self.env.registry.loaded
-        or self._name not in self.env
-        or self.env["oteny.audit.log"]._is_model_ignored(self._name)
-    ):
+    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
         return original_flush(self, fnames)
 
     # Use a transaction-level cache to prevent duplicate logging within the same transaction.
