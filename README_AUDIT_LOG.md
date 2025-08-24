@@ -20,7 +20,7 @@ Old values are stored on the environment (`env._audit_prev_values`) as a nested 
 ```python
 {
     field_object: {
-        record_id: prev_value
+        record_id: old_value
     }
 }
 ```

@@ -8,6 +8,6 @@ class TestAudit(TransactionCase):
         main_partner = self.env.ref("base.main_partner")
         main_partner.name = "Test"
         main_partner.write({"name": "Test2"})
-        self.assertEqual(main_partner.name, "Test")
+        self.assertEqual(main_partner.name, "Test2")
 
         # TODO: assert the update is in the audit log

@@ -1,23 +1,22 @@
 # test_audit_log.py
 from odoo.tests import TransactionCase
+from odoo.tests import tagged
 
 
+@tagged("oteny_audit", "post_install", "-at_install")
 class TestAuditLog(TransactionCase):
     """Test the audit log functionality"""
 
     def setUp(self):
         super().setUp()
-        self.audit_log_model = self.env["oteny.audit.log"]
-        # Using res.partner as a test model since it's always available
-        self.test_model = self.env["res.partner"]
 
     def test_create_logs_insert(self):
         """Test that creating a record logs an insert"""
         # Count existing logs
-        initial_count = self.audit_log_model.search_count([])
+        initial_count = self.env["oteny.audit.log"].search_count([])
 
         # Create a test partner
-        partner = self.test_model.create(
+        partner = self.env["res.partner"].create(
             {
                 "name": "Test Partner for Audit",
                 "email": "test@example.com",
@@ -25,7 +24,7 @@ class TestAuditLog(TransactionCase):
         )
 
         # Check that logs were created
-        new_logs = self.audit_log_model.search(
+        new_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
@@ -39,12 +38,12 @@ class TestAuditLog(TransactionCase):
         name_log = new_logs.filtered(lambda l: l.field_name == "name")
         self.assertTrue(name_log, "Name field should be logged")
         self.assertEqual(name_log.new_value, "Test Partner for Audit")
-        self.assertEqual(name_log.prev_value, "")
+        self.assertEqual(name_log.old_value, "")
 
     def test_write_logs_update(self):
         """Test that updating a record logs an update"""
         # Create a test partner
-        partner = self.test_model.create(
+        partner = self.env["res.partner"].create(
             {
                 "name": "Initial Name",
                 "email": "initial@example.com",
@@ -52,7 +51,7 @@ class TestAuditLog(TransactionCase):
         )
 
         # Clear any logs from creation
-        self.audit_log_model.search(
+        self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
@@ -71,7 +70,7 @@ class TestAuditLog(TransactionCase):
         partner.flush_recordset()
 
         # Check that update logs were created
-        update_logs = self.audit_log_model.search(
+        update_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
@@ -84,13 +83,13 @@ class TestAuditLog(TransactionCase):
         # Check that name field was logged correctly
         name_log = update_logs.filtered(lambda l: l.field_name == "name")
         if name_log:
-            self.assertEqual(name_log.prev_value, "Initial Name")
+            self.assertEqual(name_log.old_value, "Initial Name")
             self.assertEqual(name_log.new_value, "Updated Name")
 
     def test_unlink_logs_delete(self):
         """Test that deleting a record logs a delete"""
         # Create a test partner
-        partner = self.test_model.create(
+        partner = self.env["res.partner"].create(
             {
                 "name": "To Be Deleted",
                 "email": "delete@example.com",
@@ -104,7 +103,7 @@ class TestAuditLog(TransactionCase):
         partner.unlink()
 
         # Check that delete logs were created
-        delete_logs = self.audit_log_model.search(
+        delete_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner_id),
@@ -117,27 +116,89 @@ class TestAuditLog(TransactionCase):
         # Check that name field was logged
         name_log = delete_logs.filtered(lambda l: l.field_name == "name")
         if name_log:
-            self.assertEqual(name_log.prev_value, partner_name)
+            self.assertEqual(name_log.old_value, partner_name)
             self.assertEqual(name_log.new_value, "")
+
+    def test_write_logs_m2m_group_add(self):
+        """Test that adding a user to a group logs an update"""
+        # Create a test user
+        main_company = self.env.ref("base.main_company")
+        user = (
+            self.env["res.users"]
+            .with_context(oteny_audit_ignore=True)
+            .create(
+                {
+                    "name": "Group Test User",
+                    "login": "test_group_user@example.com",
+                    "company_id": main_company.id,
+                    "company_ids": [(6, 0, [main_company.id])],
+                }
+            )
+        )
+
+        # ensure the user doesn't have the system group
+        group_system = self.env.ref("base.group_system")
+        self.assertNotIn(group_system, user.groups_id)
+
+        # Clear any logs from creation
+        self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.users"),
+                ("record_id", "=", user.id),
+            ]
+        ).unlink()
+
+        initial_groups = user.groups_id
+
+        # Add the user to the system group
+        user.write({"groups_id": [(4, self.group_system.id, 0)]})
+        user.flush_recordset()
+
+        # Check that update logs were created
+        update_logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.users"),
+                ("record_id", "=", user.id),
+                ("change_type", "=", "update"),
+                ("field_name", "=", "groups_id"),
+            ]
+        )
+
+        self.assertEqual(len(update_logs), 1, "One update log for groups_id should be created")
+
+        log = update_logs
+
+        final_groups = user.groups_id
+
+        # expected values as sets for order-independent comparison
+        expected_prev_set = {f"{g.id}, {g.display_name}" for g in initial_groups}
+        expected_new_set = {f"{g.id}, {g.display_name}" for g in final_groups}
+
+        # actual values from log, parsed into sets
+        actual_prev_set = set(log.old_value.split(", ")) if log.old_value else set()
+        actual_new_set = set(log.new_value.split(", ")) if log.new_value else set()
+
+        self.assertEqual(actual_prev_set, expected_prev_set)
+        self.assertEqual(actual_new_set, expected_new_set)
 
     def test_no_recursion_on_audit_log(self):
         """Test that audit log operations don't trigger recursive logging"""
         # Create an audit log entry directly
-        initial_count = self.audit_log_model.search_count([])
+        initial_count = self.env["oteny.audit.log"].search_count([])
 
-        log = self.audit_log_model.create(
+        log = self.env["oteny.audit.log"].create(
             {
                 "model_name": "test.model",
                 "record_id": 1,
                 "field_name": "test_field",
-                "prev_value": "old",
+                "old_value": "old",
                 "new_value": "new",
                 "change_type": "update",
             }
         )
 
         # Check that no additional logs were created for the audit log itself
-        new_count = self.audit_log_model.search_count(
+        new_count = self.env["oteny.audit.log"].search_count(
             [
                 ("model_name", "=", "oteny.audit.log"),
             ]

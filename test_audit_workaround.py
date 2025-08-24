@@ -48,7 +48,7 @@ def test_environment_attribute():
             # Verify we can use it
             test_field = "test_field"
             test_record_id = 123
-            test_value = "prev_value"
+            test_value = "old_value"
 
             env._audit_prev_values[test_field][test_record_id] = test_value
             retrieved_value = env._audit_prev_values[test_field][test_record_id]
