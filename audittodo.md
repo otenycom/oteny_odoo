@@ -12,7 +12,7 @@
 - [x] generated entries, state records: ignore audit logging using context flag
 - [x] manu2many support: fields_to_check write werkt niet voor user groeps: {'company_ids': 'res.users.company_ids', 'groups_id': 'res.users.groups_id'}
 - ! List changes to sub-models under the log for a parent record, eg service changes listed when viewing the log of a log entry
-  - create oteny_audit_ref_log to link descendant log records to their parent log record
+  - create oteny_audit_parent_ref to link descendant log records to their parent log record
   - create a model to merge join the audit log records with the audit log parent ref table
 
     ```py

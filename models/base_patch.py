@@ -9,6 +9,67 @@ original_write = models.BaseModel.write
 original_flush = models.BaseModel._flush
 
 
+def _create_parent_log_references(env, model, log_records):
+    """
+    Creates parent references for audit log records if the model has a parent field defined.
+    `env`: The Odoo environment.
+    `model`: The model class being audited.
+    `log_records`: A recordset of `oteny.audit.log`.
+    """
+    parent_field_name = getattr(model, "_oteny_audit_parent_field", None)
+    if not parent_field_name or parent_field_name not in model._fields:
+        return
+
+    parent_refs = []
+
+    # Group log records by their source record id to minimize queries
+    logs_by_record_id = defaultdict(list)
+    for log in log_records:
+        logs_by_record_id[log.record_id].append(log.id)
+
+    if not logs_by_record_id:
+        return
+
+    # Browse all source records at once
+    records_with_logs = env[model._name].browse(list(logs_by_record_id.keys()))
+
+    for record in records_with_logs:
+        # Check if the record still exists before trying to access its fields
+        if not record.exists():
+            continue
+        try:
+            parent_record = record[parent_field_name]
+            if parent_record:
+                for log_id in logs_by_record_id[record.id]:
+                    parent_refs.append(
+                        {
+                            "audit_log_id": log_id,
+                            "parent_model_name": parent_record._name,
+                            "parent_record_id": parent_record.id,
+                        }
+                    )
+        except Exception:
+            # Failsafe for cases where parent record might be deleted or access rights issues.
+            continue
+
+    if parent_refs:
+        env["oteny.audit.log.parent.ref"].sudo().create(parent_refs)
+
+
+def _create_audit_logs(env, model, logs):
+    """Helper to create audit log records and their parent references."""
+    if not logs or not env.registry.loaded:
+        return
+
+    env.cr.execute("SELECT txid_current()")
+    txid = env.cr.fetchone()[0]
+    for log in logs:
+        log["transaction_id"] = txid
+
+    log_records = env["oteny.audit.log"].sudo().create(logs)
+    _create_parent_log_references(env, model, log_records)
+
+
 def _get_display_value(field, value, record_env):
     """Helper to get the display value for a field's value."""
     if value is None or value is False:
@@ -102,11 +163,7 @@ def patched_create(self, vals_list):
                     }
                 )
         if logs:
-            self.env.cr.execute("SELECT txid_current()")
-            txid = self.env.cr.fetchone()[0]
-            for log in logs:
-                log["transaction_id"] = txid
-            self.env["oteny.audit.log"].sudo().create(logs)
+            _create_audit_logs(self.env, self, logs)
 
     return records
 
@@ -165,11 +222,7 @@ def patched_unlink(self):
                 }
             )
     if logs:
-        self.env.cr.execute("SELECT txid_current()")
-        txid = self.env.cr.fetchone()[0]
-        for log in logs:
-            log["transaction_id"] = txid
-        self.env["oteny.audit.log"].sudo().create(logs)
+        _create_audit_logs(self.env, self, logs)
 
     return original_unlink(self)
 
@@ -205,13 +258,13 @@ def patched_write(self, vals):
     # Scalar fields are not written until flush, so we just capture the old value
     # and let patched_flush handle the logging.
     if scalar_fields:
-        if not hasattr(self.env, "_audit_old_values"):
-            self.env._audit_old_values = defaultdict(dict)
+        if not hasattr(self.env.cr, "_audit_old_values"):
+            self.env.cr._audit_old_values = defaultdict(dict)
 
         # If a field is written to again, it should be logged again.
         # We remove it from the logged_changes cache to allow the next flush to process it.
-        if hasattr(self.env, "_audit_logged_changes"):
-            logged_changes = self.env._audit_logged_changes
+        if hasattr(self.env.cr, "_audit_logged_changes"):
+            logged_changes = self.env.cr._audit_logged_changes
             for field in scalar_fields.values():
                 if field in logged_changes:
                     # Remove the records being written from the set of logged changes for this field.
@@ -237,7 +290,7 @@ def patched_write(self, vals):
                     # First modification: capture old value from cache if present
                     if self.env.cache.contains(record, field):
                         old_val = self.env.cache.get(record, field)
-                        self.env._audit_old_values[field][record.id] = old_val
+                        self.env.cr._audit_old_values[field][record.id] = old_val
 
     # Perform the original write for ALL fields
     result = original_write(self, vals)
@@ -290,12 +343,7 @@ def patched_write(self, vals):
                         }
                     )
         if logs:
-            if self.env.registry.loaded:
-                self.env.cr.execute("SELECT txid_current()")
-                txid = self.env.cr.fetchone()[0]
-                for log in logs:
-                    log["transaction_id"] = txid
-                self.env["oteny.audit.log"].sudo().create(logs)
+            _create_audit_logs(self.env, self, logs)
 
     return result
 
@@ -310,9 +358,9 @@ def patched_flush(self, fnames=None):
         return original_flush(self, fnames)
 
     # Use a transaction-level cache to prevent duplicate logging within the same transaction.
-    if not hasattr(self.env, "_audit_logged_changes"):
-        self.env._audit_logged_changes = defaultdict(set)
-    logged_changes = self.env._audit_logged_changes
+    if not hasattr(self.env.cr, "_audit_logged_changes"):
+        self.env.cr._audit_logged_changes = defaultdict(set)
+    logged_changes = self.env.cr._audit_logged_changes
 
     records = self
 
@@ -372,38 +420,40 @@ def patched_flush(self, fnames=None):
     # Collect old values
     old_values = {}
     missing_queries = defaultdict(list)  # field: [ids needing DB query]
+    audit_old_values = getattr(self.env.cr, "_audit_old_values", {})
 
-    # First try to get old values from our saved env._audit_old_values
-    if hasattr(self.env, "_audit_old_values"):
-        for name in loggable_fields_dict:
-            field = loggable_fields_dict[name]
-            for rid in batches.get(name, []):
-                if field in self.env._audit_old_values and rid in self.env._audit_old_values[field]:
-                    old_values.setdefault(rid, {})[name] = self.env._audit_old_values[field][rid]
-                else:
-                    # Need to query the database for the old value
-                    missing_queries[field].append(rid)
-    else:
-        # No saved old values, need to query all from database
-        for name, field in loggable_fields_dict.items():
-            for rid in batches.get(name, []):
+    for name, field in loggable_fields_dict.items():
+        field_old_values = audit_old_values.get(field, {})
+        for rid in batches.get(name, []):
+            if rid in field_old_values:
+                old_values.setdefault(rid, {})[name] = field_old_values[rid]
+            else:
                 missing_queries[field].append(rid)
 
-    # Query database for missing old values
-    for field, miss_ids in missing_queries.items():
-        if miss_ids and field.column_type:
+    # Query database for missing old values in a single batch
+    if missing_queries:
+        all_missing_ids = list({rid for rids in missing_queries.values() for rid in rids})
+        all_missing_fields = list(missing_queries.keys())
+        if all_missing_ids:
+            field_names = [field.name for field in all_missing_fields if field.column_type]
             query = SQL(
                 "SELECT id, %s FROM %s WHERE id IN %s",
-                SQL.identifier(field.name),
+                SQL(", ").join(SQL.identifier(col) for col in field_names),
                 SQL.identifier(self._table),
-                tuple(miss_ids),
+                tuple(all_missing_ids),
             )
             self.env.cr.execute(query)
-            db_data = self.env.cr.dictfetchall()
-            for row in db_data:
-                record = self.browse(row["id"])
-                val = field.convert_to_cache(row[field.name], record)
-                old_values.setdefault(row["id"], {})[field.name] = val
+            db_data_map = {row["id"]: row for row in self.env.cr.dictfetchall()}
+
+            for field in all_missing_fields:
+                if field.name not in field_names:
+                    continue
+                for rid in missing_queries[field]:
+                    row = db_data_map.get(rid)
+                    if row:
+                        record = self.browse(rid)
+                        val = field.convert_to_cache(row[field.name], record)
+                        old_values.setdefault(rid, {})[field.name] = val
 
     # Perform original flush
     original_flush(self, fnames)
@@ -417,6 +467,10 @@ def patched_flush(self, fnames=None):
 
     # Log changes using old and new values
     logs = []
+    if not hasattr(self.env.cr, "_audit_most_recent_log"):
+        self.env.cr._audit_most_recent_log = defaultdict(lambda: defaultdict(dict))
+    most_recent_logs = self.env.cr._audit_most_recent_log
+
     for name, field in loggable_fields_dict.items():
         for rid in batches.get(name, []):
             record = self.browse(rid)
@@ -426,6 +480,14 @@ def patched_flush(self, fnames=None):
             new_val = field.convert_to_cache(new_val_raw, record)
 
             if old_val != new_val:
+                most_recent = most_recent_logs[field].get(rid)
+                if (
+                    most_recent
+                    and most_recent.get("old_value") == old_val
+                    and most_recent.get("new_value") == new_val
+                ):
+                    continue
+
                 old_val_display = _get_display_value(field, old_val, record.env)
                 new_val_display = _get_display_value(field, new_val, record.env)
                 logs.append(
@@ -442,30 +504,28 @@ def patched_flush(self, fnames=None):
                         "change_type": "update",
                     }
                 )
+                most_recent_logs[field][rid] = {"old_value": old_val, "new_value": new_val}
 
     if logs:
-        if self.env.registry.loaded:
-            self.env.cr.execute("SELECT txid_current()")
-            txid = self.env.cr.fetchone()[0]
-            for log in logs:
-                log["transaction_id"] = txid
-            self.env["oteny.audit.log"].sudo().create(logs)
-            # Mark these changes as logged to prevent duplicates in the same transaction.
-            for log in logs:
-                field = self._fields.get(log["field_name"])
-                if field:
-                    logged_changes[field].add(log["record_id"])
+        _create_audit_logs(self.env, self, logs)
+        # Mark these changes as logged to prevent duplicates in the same transaction.
+        for log in logs:
+            field = self._fields.get(log["field_name"])
+            if field:
+                logged_changes[field].add(log["record_id"])
 
     # Clear old_values after flush
-    if hasattr(self.env, "_audit_old_values"):
+    if hasattr(self.env.cr, "_audit_old_values"):
         # Only clear the fields/records we just flushed
+        audit_old_values = self.env.cr._audit_old_values
         for name, field in loggable_fields_dict.items():
-            if field in self.env._audit_old_values:
+            if field in audit_old_values:
+                field_old_values = audit_old_values[field]
                 for rid in batches.get(name, []):
-                    self.env._audit_old_values[field].pop(rid, None)
+                    field_old_values.pop(rid, None)
                 # If no more records for this field, remove the field entry
-                if not self.env._audit_old_values[field]:
-                    del self.env._audit_old_values[field]
+                if not field_old_values:
+                    del audit_old_values[field]
 
 
 models.BaseModel.create = patched_create

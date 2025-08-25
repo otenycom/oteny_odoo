@@ -103,11 +103,11 @@
 
     <record id="action_oteny_audit_log_install" model="ir.actions.server">
         <field name="name">Enable Audit Log for all models</field>
-        <field name="model_id" ref="model_oteny_audit_log" />
+        <field name="model_id" ref="base.model_ir_model" />
         <field name="binding_model_id" ref="model_oteny_audit_log" />
         <field name="state">code</field>
         <field name="code">
-            action = model.install_for_all_models_action()
+            action = env['oteny.audit.log'].install_for_all_models_action()
         </field>
     </record>
 

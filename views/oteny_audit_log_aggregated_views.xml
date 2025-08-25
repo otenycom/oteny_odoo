@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View for Aggregated Audit Log -->
+    <record id="view_oteny_audit_log_aggregated_list" model="ir.ui.view">
+        <field name="name">oteny.audit.log.aggregated.list</field>
+        <field name="model">oteny.audit.log.aggregated</field>
+        <field name="arch" type="xml">
+            <list string="Aggregated Audit Log">
+                <field name="create_date" string="Timestamp" />
+                <field name="is_child_log" invisible="1" />
+                <field name="child_record_ref" string="Child Record" invisible="not is_child_log" />
+                <field name="field_display_name" />
+                <field name="old_value_display_name" />
+                <field name="new_value_display_name" />
+                <field name="create_uid" string="User" />
+                <field name="change_type" />
+                <field name="transaction_id" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View for Aggregated Audit Log -->
+    <record id="view_oteny_audit_log_aggregated_form" model="ir.ui.view">
+        <field name="name">oteny.audit.log.aggregated.form</field>
+        <field name="model">oteny.audit.log.aggregated</field>
+        <field name="arch" type="xml">
+            <form string="Audit Log Entry">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date" string="Timestamp" />
+                            <field name="create_uid" string="User" />
+                            <field name="record_ref" string="Parent Record" />
+                            <field name="change_type" />
+                            <field name="transaction_id" />
+                        </group>
+                        <group>
+                            <field name="is_child_log" />
+                            <field
+                                name="child_record_ref"
+                                string="Child Record"
+                                invisible="not is_child_log"
+                            />
+                        </group>
+                    </group>
+                    <group string="Changed Field Details">
+                        <field name="field_display_name" />
+                        <field name="old_value_display_name" />
+                        <field name="new_value_display_name" />
+                    </group>
+                    <group string="Raw Values">
+                        <field name="field_name" />
+                        <field name="old_value" />
+                        <field name="new_value" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>
