@@ -383,7 +383,7 @@ def patched_flush(self, fnames=None):
         # No saved old values, need to query all from database
         for name, field in loggable_fields_dict.items():
             for rid in batches.get(name, []):
-                missing_queries[field].append(rid)
+                d[field].append(rid)
 
     # Query database for missing old values
     for field, miss_ids in missing_queries.items():
