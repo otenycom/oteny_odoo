@@ -15,6 +15,7 @@ class OtenyAuditLogParentRef(models.Model):
     )
     parent_model_name = fields.Char(required=True, index=True, string="Parent Model")
     parent_record_id = fields.Integer(required=True, index=True, string="Parent Record ID")
+    parent_record_display_name = fields.Char(string="Parent Record Name")
 
     _sql_constraints = [
         (

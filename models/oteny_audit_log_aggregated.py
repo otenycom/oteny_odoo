@@ -1,11 +1,19 @@
-from odoo import fields, models
+from odoo import api, fields, models, tools
 
 
 class OtenyAuditLogAggregated(models.Model):
     _name = "oteny.audit.log.aggregated"
     _description = "Aggregated Audit Log (including children)"
     _auto = False
-    _order = "id desc"
+    _order = "create_date DESC, id DESC"
+
+    highlight_row = fields.Boolean(
+        "Highlight Row",
+        readonly=True,
+    )
+
+    audit_log_id = fields.Many2one("oteny.audit.log", string="Audit Log", readonly=True)
+    parent_record_display_name = fields.Char(string="Parent Record Name", readonly=True)
 
     # --- Fields from oteny.audit.log ---
     transaction_id = fields.Integer(readonly=True, string="Transaction ID")
@@ -58,19 +66,95 @@ class OtenyAuditLogAggregated(models.Model):
             else:
                 log.child_record_ref = False
 
-    @property
-    def _table_query(self):
-        return """
-            (
-                -- Direct logs for a parent record
+    def _compute_highlight_row(self):
+        for record in self:
+            record.highlight_row = record.transaction_group_toggle
+
+    def init(self):
+        tools.drop_view_if_exists(self.env.cr, self._table)
+        self.env.cr.execute(
+            """
+            CREATE OR REPLACE VIEW %s AS (
+                WITH combined_logs AS (
+                    (
+                        -- Direct logs for a parent record
+                        SELECT
+                            id,
+                            id as audit_log_id,
+                            create_date,
+                            create_uid,
+                            transaction_id,
+                            model_name,
+                            record_id,
+                            record_display_name,
+                            record_display_name AS parent_record_display_name,
+                            field_name,
+                            field_display_name,
+                            old_value,
+                            new_value,
+                            old_value_display_name,
+                            new_value_display_name,
+                            change_type,
+                            FALSE AS is_child_log,
+                            NULL AS child_model_name,
+                            NULL AS child_record_id
+                        FROM
+                            oteny_audit_log
+                    )
+                    UNION ALL
+                    (
+                        -- Child logs linked to a parent record
+                        SELECT
+                            (ref.audit_log_id + 1000000000) AS id,
+                            ref.audit_log_id AS audit_log_id,
+                            log.create_date,
+                            log.create_uid,
+                            log.transaction_id,
+                            ref.parent_model_name AS model_name,
+                            ref.parent_record_id AS record_id,
+                            log.record_display_name,
+                            ref.parent_record_display_name,
+                            log.field_name,
+                            log.field_display_name,
+                            log.old_value,
+                            log.new_value,
+                            log.old_value_display_name,
+                            log.new_value_display_name,
+                            log.change_type,
+                            TRUE AS is_child_log,
+                            log.model_name AS child_model_name,
+                            log.record_id AS child_record_id
+                        FROM
+                            oteny_audit_log_parent_ref ref
+                        JOIN
+                            oteny_audit_log log ON ref.audit_log_id = log.id
+                    )
+                ),
+                lagged_logs AS (
+                    SELECT
+                        *,
+                        CASE WHEN
+                            LAG(transaction_id) OVER (PARTITION BY model_name, record_id ORDER BY create_date DESC, id DESC)
+                            IS DISTINCT FROM transaction_id
+                        THEN 1 ELSE 0 END AS transaction_changed
+                    FROM combined_logs
+                ),
+                grouped_logs AS (
+                    SELECT
+                        *,
+                        SUM(transaction_changed) OVER (PARTITION BY model_name, record_id ORDER BY create_date DESC, id DESC) AS transaction_group
+                    FROM lagged_logs
+                )
                 SELECT
                     id,
+                    audit_log_id,
                     create_date,
                     create_uid,
                     transaction_id,
                     model_name,
                     record_id,
                     record_display_name,
+                    parent_record_display_name,
                     field_name,
                     field_display_name,
                     old_value,
@@ -78,36 +162,12 @@ class OtenyAuditLogAggregated(models.Model):
                     old_value_display_name,
                     new_value_display_name,
                     change_type,
-                    FALSE AS is_child_log,
-                    NULL AS child_model_name,
-                    NULL AS child_record_id
-                FROM
-                    oteny_audit_log
-            )
-            UNION ALL
-            (
-                -- Child logs linked to a parent record
-                SELECT
-                    (ref.audit_log_id + 1000000000) AS id,
-                    log.create_date,
-                    log.create_uid,
-                    log.transaction_id,
-                    ref.parent_model_name AS model_name,
-                    ref.parent_record_id AS record_id,
-                    log.record_display_name,
-                    log.field_name,
-                    log.field_display_name,
-                    log.old_value,
-                    log.new_value,
-                    log.old_value_display_name,
-                    log.new_value_display_name,
-                    log.change_type,
-                    TRUE AS is_child_log,
-                    log.model_name AS child_model_name,
-                    log.record_id AS child_record_id
-                FROM
-                    oteny_audit_log_parent_ref ref
-                JOIN
-                    oteny_audit_log log ON ref.audit_log_id = log.id
+                    is_child_log,
+                    child_model_name,
+                    child_record_id,
+                    MOD(transaction_group, 2) = 1 AS highlight_row
+                FROM grouped_logs
             )
         """
+            % self._table
+        )

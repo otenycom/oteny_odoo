@@ -6,15 +6,17 @@
         <field name="model">oteny.audit.log.aggregated</field>
         <field name="arch" type="xml">
             <list string="Aggregated Audit Log">
+                <field name="highlight_row" column_invisible="1" />
                 <field name="create_date" string="Timestamp" />
-                <field name="is_child_log" invisible="1" />
-                <field name="child_record_ref" string="Child Record" invisible="not is_child_log" />
+                <field name="create_uid" string="User" />
+                <field name="parent_record_display_name" string="Parent Record" />
+                <field name="record_display_name" string="Record" />
                 <field name="field_display_name" />
+                <field name="change_type" string="Change" />
                 <field name="old_value_display_name" />
                 <field name="new_value_display_name" />
-                <field name="create_uid" string="User" />
-                <field name="change_type" />
-                <field name="transaction_id" />
+                <field name="transaction_id" optional="show" />
+                <field name="audit_log_id" optional="hide" />
             </list>
         </field>
     </record>
@@ -30,25 +32,27 @@
                         <group>
                             <field name="create_date" string="Timestamp" />
                             <field name="create_uid" string="User" />
-                            <field name="record_ref" string="Parent Record" />
                             <field name="change_type" />
-                            <field name="transaction_id" />
-                        </group>
-                        <group>
-                            <field name="is_child_log" />
+                            <field name="record_ref" string="Parent Record Link" />
+                            <field name="is_child_log" invisible="1" />
                             <field
                                 name="child_record_ref"
                                 string="Child Record"
                                 invisible="not is_child_log"
                             />
                         </group>
+                        <group>
+                            <field name="transaction_id" />
+                            <field name="audit_log_id" />
+                            <field name="parent_record_display_name" string="Parent Record Name" />
+                        </group>
                     </group>
-                    <group string="Changed Field Details">
+                    <group string="Changed Field Values">
                         <field name="field_display_name" />
                         <field name="old_value_display_name" />
                         <field name="new_value_display_name" />
                     </group>
-                    <group string="Raw Values">
+                    <group string="Raw Field Values">
                         <field name="field_name" />
                         <field name="old_value" />
                         <field name="new_value" />

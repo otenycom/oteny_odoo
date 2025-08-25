@@ -40,12 +40,18 @@ def _create_parent_log_references(env, model, log_records):
         try:
             parent_record = record[parent_field_name]
             if parent_record:
+                parent_display_name = (
+                    parent_record.display_name
+                    if hasattr(parent_record, "display_name")
+                    else f"ID: {parent_record.id}"
+                )
                 for log_id in logs_by_record_id[record.id]:
                     parent_refs.append(
                         {
                             "audit_log_id": log_id,
                             "parent_model_name": parent_record._name,
                             "parent_record_id": parent_record.id,
+                            "parent_record_display_name": parent_display_name,
                         }
                     )
         except Exception:
