@@ -15,7 +15,7 @@
   - [x] create oteny_audit_parent_ref to link descendant log records to their parent log record
   - [x] create a model to merge join the audit log records with the audit log parent ref table
     - [ ] mem leak check: Cleanup all fields we stuffed in the cr if the tx changes; store the tx id in the cr as well (only needed if cr is pooled)
-    - [ ] when inserting a log entry, some updates done after the insert are shown before the insert in the log, see if we can fix
+    - [~] when inserting a log entry, some updates done after the insert are shown before the insert in the log, see if we can fix; fixed by ordering on create_date of the audit log record?
     - [~] the aggregated view does not show the primary record name; this is an issue if you view the log for multiple records from the list
     - [ ] Add more parent_field_names to other models, currently:
         [x] service.log_entry_id (or better via res_model,res_id)
