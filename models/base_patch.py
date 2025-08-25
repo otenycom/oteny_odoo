@@ -70,7 +70,11 @@ def patched_create(self, vals_list):
             for col in columns:
                 field = model_fields[col]
                 raw_val = new_values.get(record.id, {}).get(col)
-                new_val_cached = field.convert_to_cache(str(raw_val), record) if raw_val is not None else None
+                new_val_cached = (
+                    field.convert_to_cache(raw_val if not isinstance(raw_val, dict) else str(raw_val), record)
+                    if raw_val is not None
+                    else None
+                )
 
                 if new_val_cached is None:
                     continue
