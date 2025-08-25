@@ -12,6 +12,7 @@
 - [x] manu2many support: fields_to_check write werkt niet voor user groeps: {'company_ids': 'res.users.company_ids', 'groups_id': 'res.users.groups_id'}
 - List changes to sub-models under the log for a parent record, eg service changes listed when viewing the log of a log entry
   - create oteny_audit_ref_log to link descendant log records to their parent log record
+- Audit log cleaner cronjob
 - List view for parent+child audit log changes in a single list
 - highlight of grid based on transaction_id changing between rows, so each single transaction is easily recognized by the user
 - audit viewer should show record name als single row (header), with the field changes below; makes the list less wide and helps visual focus
