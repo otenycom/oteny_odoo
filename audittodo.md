@@ -16,9 +16,10 @@
   - [x] create a model to merge join the audit log records with the audit log parent ref table
     - [ ] mem leak check: Cleanup all fields we stuffed in the cr if the tx changes; store the tx id in the cr as well (only needed if cr is pooled)
     - [~] when inserting a log entry, some updates done after the insert are shown before the insert in the log, see if we can fix; fixed by ordering on create_date of the audit log record?
-    - [~] the aggregated view does not show the primary record name; this is an issue if you view the log for multiple records from the list
+    - [x] the aggregated view does not show the primary record name; this is an issue if you view the log for multiple records from the list
     - [ ] Add more parent_field_names to other models, currently:
-        [x] service.log_entry_id (or better via res_model,res_id)
+        [x] service.log_entry_id (later: via res_model,res_id)
+        [x] rivercreds to employee; state/trans to wf; all employee models in rivermen to employee (timesheet,etc)
         [ ] mail.message via res_model,res_id
         [ ] service travel leg (to service, which should recursively log to entry)
     - Computed fields seem to be logged for services when we change the state/date for a parent log entry (end_date_for_calendar,project_deadline)
@@ -26,6 +27,7 @@
     - Top 3 External Messages: for services not logged, but Top 3 Internal messages is actually logged for Entries. why?
 
 - ! Audit log cleaner cronjob
+- ! Access rights check when viewing the audit log, hide or obfuscate values as '**No Access**', for models/records to which the user has no rights
 - Globally disable Odoo's Tracking mixin when oteny_audit is installed/active; cleans up the Chatter and saves performance and space
 - List view for parent+child audit log changes in a single list
     Log Entry ABC PIETJE PUG 10/10/25 10:00:11

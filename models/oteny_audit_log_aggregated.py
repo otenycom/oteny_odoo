@@ -11,13 +11,19 @@ class OtenyAuditLogAggregated(models.Model):
         "Highlight Row",
         readonly=True,
     )
+    highlight_row_type = fields.Char("Highlight Row Type", readonly=True)
 
     audit_log_id = fields.Many2one("oteny.audit.log", string="Audit Log", readonly=True)
     parent_record_display_name = fields.Char(string="Parent Record Name", readonly=True)
 
     # --- Fields from oteny.audit.log ---
     transaction_id = fields.Integer(readonly=True, string="Transaction ID")
-    model_name = fields.Char(readonly=True)
+    model_name = fields.Char(readonly=True, string="Parent Model Name")
+    model_display_name = fields.Char(
+        string="Parent Model",
+        compute="_compute_model_display_name",
+        readonly=True,
+    )
     record_id = fields.Integer(readonly=True, string="Record ID")
     record_ref = fields.Reference(
         string="Record Link",
@@ -28,6 +34,12 @@ class OtenyAuditLogAggregated(models.Model):
     record_display_name = fields.Char(string="Record Name", readonly=True)
     field_name = fields.Char(readonly=True, string="Field Raw Name")
     field_display_name = fields.Char(string="Field", readonly=True)
+    field_model_name = fields.Char(string="Model Name", readonly=True)
+    field_model_display_name = fields.Char(
+        string="Model",
+        compute="_compute_field_model_display_name",
+        readonly=True,
+    )
     old_value = fields.Text(string="Old Value Raw", readonly=True)
     new_value = fields.Text(string="New Value Raw", readonly=True)
     old_value_display_name = fields.Char(string="Old Value", readonly=True)
@@ -66,6 +78,30 @@ class OtenyAuditLogAggregated(models.Model):
             else:
                 log.child_record_ref = False
 
+    def _compute_model_display_name(self):
+        for log in self:
+            if not log.model_name:
+                log.model_display_name = ""
+                continue
+            try:
+                model = self.env[log.model_name]
+                log.model_display_name = model._description
+            except KeyError:
+                log.model_display_name = log.model_name
+
+    def _compute_field_model_display_name(self):
+        for log in self:
+            if not log.field_model_name:
+                log.field_model_display_name = ""
+                continue
+            try:
+                model = self.env[log.field_model_name]
+                log.field_model_display_name = model._description
+            except KeyError:
+                # Fallback to the technical model name if the model is not found
+                # (e.g., module uninstalled)
+                log.field_model_display_name = log.field_model_name
+
     def _compute_highlight_row(self):
         for record in self:
             record.highlight_row = record.transaction_group_toggle
@@ -93,6 +129,7 @@ class OtenyAuditLogAggregated(models.Model):
                             record_display_name AS parent_record_display_name,
                             field_name,
                             field_display_name,
+                            model_name AS field_model_name,
                             old_value,
                             new_value,
                             old_value_display_name,
@@ -100,7 +137,8 @@ class OtenyAuditLogAggregated(models.Model):
                             change_type,
                             FALSE AS is_child_log,
                             NULL AS child_model_name,
-                            NULL AS child_record_id
+                            NULL AS child_record_id,
+                            'muted' AS highlight_row_type
                         FROM
                             oteny_audit_log
                     )
@@ -119,6 +157,7 @@ class OtenyAuditLogAggregated(models.Model):
                             ref.parent_record_display_name,
                             log.field_name,
                             log.field_display_name,
+                            log.model_name AS field_model_name,
                             log.old_value,
                             log.new_value,
                             log.old_value_display_name,
@@ -126,7 +165,8 @@ class OtenyAuditLogAggregated(models.Model):
                             log.change_type,
                             TRUE AS is_child_log,
                             log.model_name AS child_model_name,
-                            log.record_id AS child_record_id
+                            log.record_id AS child_record_id,
+                            'muted' AS highlight_row_type
                         FROM
                             oteny_audit_log_parent_ref ref
                         JOIN
@@ -172,6 +212,7 @@ class OtenyAuditLogAggregated(models.Model):
                     parent_record_display_name,
                     field_name,
                     field_display_name,
+                    field_model_name,
                     old_value,
                     new_value,
                     old_value_display_name,
@@ -180,6 +221,7 @@ class OtenyAuditLogAggregated(models.Model):
                     is_child_log,
                     child_model_name,
                     child_record_id,
+                    highlight_row_type,
                     MOD(transaction_group, 2) = 1 AS highlight_row
                 FROM grouped_logs
             )
