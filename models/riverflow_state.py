@@ -7,6 +7,7 @@ class RiverflowWorkflowState(models.Model):
     _description = "Workflow state"
     _order = "workflow_id,sequence,name,id"
     _rec_name = "display_name"
+    _oteny_audit_parent_field = "workflow_id"
 
     name = fields.Char("State name", required=True)
     description = fields.Text("Description", required=False)

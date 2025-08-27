@@ -7,6 +7,7 @@ class RiverflowTransition(models.Model):
     _description = "Workflow state transition"
     _order = "workflow_id,from_state_id,sequence,name,id"
     _rec_name = "display_name"
+    _oteny_audit_parent_field = "workflow_id"
 
     name = fields.Char("Transition name", required=True)
     description = fields.Html("Description", required=False, sanitize_style=True)
