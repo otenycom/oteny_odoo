@@ -10,7 +10,6 @@
     "data": [
         "security/ir.model.access.csv",
         "views/oteny_audit_log_views.xml",
-        "views/oteny_audit_log_aggregated_views.xml",
     ],
     # "assets": {
     #     "web.assets_backend": [

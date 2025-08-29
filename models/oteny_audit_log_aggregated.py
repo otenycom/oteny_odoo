@@ -21,7 +21,6 @@ class OtenyAuditLogAggregated(models.Model):
     model_name = fields.Char(readonly=True, string="Parent Model Name")
     model_display_name = fields.Char(
         string="Parent Model",
-        compute="_compute_model_display_name",
         readonly=True,
     )
     record_id = fields.Integer(readonly=True, string="Record ID")
@@ -37,7 +36,6 @@ class OtenyAuditLogAggregated(models.Model):
     field_model_name = fields.Char(string="Model Name", readonly=True)
     field_model_display_name = fields.Char(
         string="Model",
-        compute="_compute_field_model_display_name",
         readonly=True,
     )
     old_value = fields.Text(string="Old Value Raw", readonly=True)
@@ -54,6 +52,10 @@ class OtenyAuditLogAggregated(models.Model):
     # --- Fields to distinguish parent/child logs ---
     is_child_log = fields.Boolean(string="Is Child Log?", readonly=True)
     child_model_name = fields.Char(string="Child Model", readonly=True)
+    child_model_display_name = fields.Char(
+        string="Child Model Display Name",
+        readonly=True,
+    )
     child_record_id = fields.Integer(string="Child Record ID", readonly=True)
     child_record_ref = fields.Reference(
         string="Child Record Link",
@@ -78,30 +80,6 @@ class OtenyAuditLogAggregated(models.Model):
             else:
                 log.child_record_ref = False
 
-    def _compute_model_display_name(self):
-        for log in self:
-            if not log.model_name:
-                log.model_display_name = ""
-                continue
-            try:
-                model = self.env[log.model_name]
-                log.model_display_name = model._description
-            except KeyError:
-                log.model_display_name = log.model_name
-
-    def _compute_field_model_display_name(self):
-        for log in self:
-            if not log.field_model_name:
-                log.field_model_display_name = ""
-                continue
-            try:
-                model = self.env[log.field_model_name]
-                log.field_model_display_name = model._description
-            except KeyError:
-                # Fallback to the technical model name if the model is not found
-                # (e.g., module uninstalled)
-                log.field_model_display_name = log.field_model_name
-
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute(
@@ -114,46 +92,55 @@ class OtenyAuditLogAggregated(models.Model):
                     (
                         -- Direct logs for a parent record
                         SELECT
-                            id,
-                            id as audit_log_id,
-                            create_date,
-                            create_uid,
-                            transaction_id,
-                            model_name,
-                            record_id,
-                            record_display_name,
-                            record_display_name AS parent_record_display_name,
-                            field_name,
-                            field_display_name,
-                            model_name AS field_model_name,
-                            old_value,
-                            new_value,
-                            old_value_display_name,
-                            new_value_display_name,
-                            change_type,
+                            al.id,
+                            al.id as audit_log_id,
+                            al.create_date,
+                            al.create_uid,
+                            al.transaction_id,
+                            al.model_name,
+                            COALESCE(im.name->>'en_US', al.model_name) AS model_display_name,
+                            al.record_id,
+                            al.record_display_name,
+                            al.record_display_name AS parent_record_display_name,
+                            al.field_name,
+                            al.field_display_name,
+                            al.model_name AS field_model_name,
+                            COALESCE(im2.name->>'en_US', al.model_name) AS field_model_display_name,
+                            al.old_value,
+                            al.new_value,
+                            al.old_value_display_name,
+                            al.new_value_display_name,
+                            al.change_type,
                             FALSE AS is_child_log,
                             NULL AS child_model_name,
+                            NULL AS child_model_display_name,
                             NULL AS child_record_id,
                             'muted' AS highlight_row_type
                         FROM
-                            oteny_audit_log
+                            oteny_audit_log al
+                        LEFT JOIN
+                            ir_model im ON al.model_name = im.model
+                        LEFT JOIN
+                            ir_model im2 ON al.model_name = im2.model
                     )
                     UNION ALL
                     (
                         -- Child logs linked to a parent record
                         SELECT
-                            (ref.id * 1000000000 + ref.audit_log_id) AS id,
+                            CAST((1000000000 + ref.audit_log_id) AS BIGINT) AS id,
                             ref.audit_log_id AS audit_log_id,
                             log.create_date,
                             log.create_uid,
                             log.transaction_id,
                             ref.parent_model_name AS model_name,
+                            COALESCE(im.name->>'en_US', ref.parent_model_name) AS model_display_name,
                             ref.parent_record_id AS record_id,
                             log.record_display_name,
                             ref.parent_record_display_name,
                             log.field_name,
                             log.field_display_name,
                             log.model_name AS field_model_name,
+                            COALESCE(im2.name->>'en_US', log.model_name) AS field_model_display_name,
                             log.old_value,
                             log.new_value,
                             log.old_value_display_name,
@@ -161,12 +148,19 @@ class OtenyAuditLogAggregated(models.Model):
                             log.change_type,
                             TRUE AS is_child_log,
                             log.model_name AS child_model_name,
+                            COALESCE(im3.name->>'en_US', log.model_name) AS child_model_display_name,
                             log.record_id AS child_record_id,
                             'muted' AS highlight_row_type
                         FROM
                             oteny_audit_log_parent_ref ref
                         JOIN
                             oteny_audit_log log ON ref.audit_log_id = log.id
+                        LEFT JOIN
+                            ir_model im ON ref.parent_model_name = im.model
+                        LEFT JOIN
+                            ir_model im2 ON log.model_name = im2.model
+                        LEFT JOIN
+                            ir_model im3 ON log.model_name = im3.model
                     )
                 ),
                 -- This CTE identifies the start of each new transaction.
@@ -203,12 +197,14 @@ class OtenyAuditLogAggregated(models.Model):
                     create_uid,
                     transaction_id,
                     model_name,
+                    model_display_name,
                     record_id,
                     record_display_name,
                     parent_record_display_name,
                     field_name,
                     field_display_name,
                     field_model_name,
+                    field_model_display_name,
                     old_value,
                     new_value,
                     old_value_display_name,
@@ -216,6 +212,7 @@ class OtenyAuditLogAggregated(models.Model):
                     change_type,
                     is_child_log,
                     child_model_name,
+                    child_model_display_name,
                     child_record_id,
                     highlight_row_type,
                     MOD(transaction_group, 2) = 1 AS highlight_row
