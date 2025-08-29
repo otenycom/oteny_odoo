@@ -10,23 +10,6 @@ class OtenyAuditLog(models.Model):
     _description = "Oteny Audit Log"
     _order = "id desc"
 
-    @api.model
-    def disable_mail_tracking_system_wide(self):
-        """Disable mail tracking system-wide by setting a configuration parameter."""
-        # Add a context key that will be checked by our mail.thread override
-        self.env.registry._mail_tracking_disabled = True
-        self.env["ir.config_parameter"].sudo().set_param("mail.tracking_disabled", "1")
-        _logger.info("Mail tracking has been disabled system-wide via configuration parameter")
-
-    @api.model
-    def enable_mail_tracking_system_wide(self):
-        """Enable mail tracking system-wide by setting a configuration parameter."""
-        # Remove the context key
-        if hasattr(self.env.registry, "_mail_tracking_disabled"):
-            delattr(self.env.registry, "_mail_tracking_disabled")
-        self.env["ir.config_parameter"].sudo().set_param("mail.tracking_disabled", "0")
-        _logger.info("Mail tracking has been enabled system-wide via configuration parameter")
-
     transaction_id = fields.Integer(required=False, string="Transaction ID")
     model_name = fields.Char(required=True)
     record_id = fields.Integer(required=True, string="Record ID")
