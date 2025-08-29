@@ -116,6 +116,7 @@
         id="oteny_audit_log_menu_root"
         name="Audit"
         sequence="99"
+        web_icon="oteny_audit,static/description/icon.png"
     />
 
     <menuitem
