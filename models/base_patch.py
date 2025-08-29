@@ -76,6 +76,41 @@ def _create_audit_logs(env, model, logs):
     _create_parent_log_references(env, model, log_records)
 
 
+def _safe_convert_to_cache(field, raw_value, record):
+    """
+    Safely convert a raw value to cache format with fallback handling.
+
+    This function handles edge cases where database values may be in unexpected formats,
+    such as serialized dictionary strings or corrupted data.
+
+    Args:
+        field: The Odoo field object
+        raw_value: The raw value from database or input
+        record: The record instance for context
+
+    Returns:
+        The converted value in cache format, or string representation as fallback
+    """
+    if raw_value is None:
+        return None
+
+    try:
+        # Handle special cases for raw values
+        if isinstance(raw_value, dict):
+            # Convert dict to string for storage/logging purposes
+            value_for_cache = str(raw_value)
+        else:
+            value_for_cache = raw_value
+
+        # Attempt the conversion
+        return field.convert_to_cache(value_for_cache, record)
+
+    except (ValueError, TypeError) as e:
+        # Fallback: if conversion fails, use the raw value as string
+        # This handles cases where database contains unexpected data formats
+        return str(raw_value)
+
+
 def _get_display_value(field, value, record_env):
     """Helper to get the display value for a field's value."""
     if value is None or value is False:
@@ -137,11 +172,7 @@ def patched_create(self, vals_list):
             for col in columns:
                 field = model_fields[col]
                 raw_val = new_values.get(record.id, {}).get(col)
-                new_val_cached = (
-                    field.convert_to_cache(raw_val if not isinstance(raw_val, dict) else str(raw_val), record)
-                    if raw_val is not None
-                    else None
-                )
+                new_val_cached = _safe_convert_to_cache(field, raw_val, record)
 
                 if new_val_cached is None:
                     continue
@@ -211,7 +242,7 @@ def patched_unlink(self):
         for col in columns:
             field = model_fields[col]
             raw_val = old_values.get(record.id, {}).get(col)
-            old_val = field.convert_to_cache(raw_val, record) if raw_val is not None else None
+            old_val = _safe_convert_to_cache(field, raw_val, record)
             old_val_display = _get_display_value(field, old_val, record.env)
             logs.append(
                 {
@@ -461,15 +492,20 @@ def patched_flush(self, fnames=None):
                     row = db_data_map.get(rid)
                     if row:
                         record = self.browse(rid)
-                        val = field.convert_to_cache(row[field.name], record)
+                        val = _safe_convert_to_cache(field, row[field.name], record)
                         old_values.setdefault(rid, {})[field.name] = val
 
     # Perform original flush
     original_flush(self, fnames)
 
     # After flush, re-read all flushed fields to get their new values
+    # Use oteny_audit_ignore context to prevent infinite recursion
     if all_ids:
-        new_values_list = self.browse(list(all_ids)).read(list(loggable_fields_dict.keys()))
+        new_values_list = (
+            self.browse(list(all_ids))
+            .with_context(oteny_audit_ignore=True)
+            .read(list(loggable_fields_dict.keys()))
+        )
         new_values_map = {rec["id"]: rec for rec in new_values_list}
     else:
         new_values_map = {}
@@ -486,7 +522,7 @@ def patched_flush(self, fnames=None):
             old_val = old_values.get(rid, {}).get(name)
 
             new_val_raw = new_values_map.get(rid, {}).get(name)
-            new_val = field.convert_to_cache(new_val_raw, record)
+            new_val = _safe_convert_to_cache(field, new_val_raw, record)
 
             if old_val != new_val:
                 most_recent = most_recent_logs[field].get(rid)

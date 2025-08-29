@@ -71,8 +71,8 @@ class OtenyAuditLog(models.Model):
         return False
 
     def install_for_all_models_action(self):
-        """This will be part of the post install hook for every new module, needs to be run manually for now
-        goals: make an action record for all models to view their log
+        """Create audit log actions for all models that don't already have them.
+        This will be called automatically when modules are installed.
         """
         ACTION_CODE = """
 action = {
@@ -84,23 +84,25 @@ action = {
     "target": "current",
 }
 """
-        models_to_install = self.env["ir.model"].search(
-            [("transient", "=", False), ("model", "!=", self._name)]
-        )
+        # Get all non-transient models except ourselves
+        all_models = self.env["ir.model"].search([("transient", "=", False), ("model", "!=", self._name)])
 
-        for model in models_to_install:
+        module_name = "oteny_audit"
+        actions_created = 0
+        actions_updated = 0
+
+        _logger.info(f"Starting audit log action setup for {len(all_models)} models")
+
+        for model in all_models:
             if self._is_audit_ignored(model.model):
                 continue
 
-            _logger.info(f"Checking/creating audit log action for model {model.model}")
-
-            action_name = f"Audit Log for {model.name}"
-
-            module_name = "oteny_audit"
             action_xml_id = f'{module_name}.action_audit_log_{model.model.replace(".", "_")}'
 
-            action = self.env.ref(action_xml_id, raise_if_not_found=False)
+            # Check if action already exists
+            existing_action = self.env.ref(action_xml_id, raise_if_not_found=False)
 
+            action_name = f"Audit Log for {model.name}"
             action_vals = {
                 "name": action_name,
                 "model_id": model.id,
@@ -109,13 +111,16 @@ action = {
                 "binding_view_types": "list,form",
                 "code": ACTION_CODE.strip(),
             }
-            if action:
-                _logger.info(f"Action already exists for model {model.model}, updating it.")
-                action.write(action_vals)
+
+            if existing_action:
+                _logger.debug(f"Action already exists for model {model.model}, updating it.")
+                existing_action.write(action_vals)
+                actions_updated += 1
             else:
-                _logger.info(f"Creating action for model {model.model}")
+                _logger.info(f"Creating audit log action for model {model.model}")
                 new_action = self.env["ir.actions.server"].create(action_vals)
 
+                # Create XML ID for the action
                 self.env["ir.model.data"].create(
                     {
                         "name": action_xml_id.split(".")[1],
@@ -125,14 +130,16 @@ action = {
                         "noupdate": True,
                     }
                 )
-                _logger.info(f"Created action for model {model.model}")
+                actions_created += 1
+
+        _logger.info(f"Audit log action setup complete: {actions_created} created, {actions_updated} updated")
 
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
             "params": {
-                "title": "Installation Complete",
-                "message": "Audit log actions have been installed for relevant models.",
+                "title": "Audit Log Setup Complete",
+                "message": f"Created {actions_created} new audit actions, updated {actions_updated} existing ones.",
                 "sticky": False,
             },
         }

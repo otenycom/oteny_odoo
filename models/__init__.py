@@ -4,3 +4,5 @@ from . import oteny_audit_log_aggregated
 from . import base_patch
 from . import oteny_audit_test_models as test_models
 from . import mail_thread_override
+from . import ir_module_module
+from . import registry_patch
