@@ -264,13 +264,15 @@ def patched_write(self, vals):
     # Scalar fields are not written until flush, so we just capture the old value
     # and let patched_flush handle the logging.
     if scalar_fields:
-        if not hasattr(self.env.cr, "_audit_old_values"):
-            self.env.cr._audit_old_values = defaultdict(dict)
+        # Use transaction-scoped storage instead of cursor attributes
+        audit_data = self.env.cr.precommit.data.setdefault("oteny_audit", {})
+        if "old_values" not in audit_data:
+            audit_data["old_values"] = defaultdict(dict)
 
         # If a field is written to again, it should be logged again.
         # We remove it from the logged_changes cache to allow the next flush to process it.
-        if hasattr(self.env.cr, "_audit_logged_changes"):
-            logged_changes = self.env.cr._audit_logged_changes
+        if "logged_changes" in audit_data:
+            logged_changes = audit_data["logged_changes"]
             for field in scalar_fields.values():
                 if field in logged_changes:
                     # Remove the records being written from the set of logged changes for this field.
@@ -296,7 +298,7 @@ def patched_write(self, vals):
                     # First modification: capture old value from cache if present
                     if self.env.cache.contains(record, field):
                         old_val = self.env.cache.get(record, field)
-                        self.env.cr._audit_old_values[field][record.id] = old_val
+                        audit_data["old_values"][field][record.id] = old_val
 
     # Perform the original write for ALL fields
     result = original_write(self, vals)
@@ -363,10 +365,11 @@ def patched_flush(self, fnames=None):
     if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
         return original_flush(self, fnames)
 
-    # Use a transaction-level cache to prevent duplicate logging within the same transaction.
-    if not hasattr(self.env.cr, "_audit_logged_changes"):
-        self.env.cr._audit_logged_changes = defaultdict(set)
-    logged_changes = self.env.cr._audit_logged_changes
+    # Use transaction-scoped storage to prevent duplicate logging within the same transaction.
+    audit_data = self.env.cr.precommit.data.setdefault("oteny_audit", {})
+    if "logged_changes" not in audit_data:
+        audit_data["logged_changes"] = defaultdict(set)
+    logged_changes = audit_data["logged_changes"]
 
     records = self
 
@@ -426,7 +429,7 @@ def patched_flush(self, fnames=None):
     # Collect old values
     old_values = {}
     missing_queries = defaultdict(list)  # field: [ids needing DB query]
-    audit_old_values = getattr(self.env.cr, "_audit_old_values", {})
+    audit_old_values = audit_data.get("old_values", {})
 
     for name, field in loggable_fields_dict.items():
         field_old_values = audit_old_values.get(field, {})
@@ -473,9 +476,9 @@ def patched_flush(self, fnames=None):
 
     # Log changes using old and new values
     logs = []
-    if not hasattr(self.env.cr, "_audit_most_recent_log"):
-        self.env.cr._audit_most_recent_log = defaultdict(lambda: defaultdict(dict))
-    most_recent_logs = self.env.cr._audit_most_recent_log
+    if "most_recent_logs" not in audit_data:
+        audit_data["most_recent_logs"] = defaultdict(lambda: defaultdict(dict))
+    most_recent_logs = audit_data["most_recent_logs"]
 
     for name, field in loggable_fields_dict.items():
         for rid in batches.get(name, []):
@@ -521,9 +524,9 @@ def patched_flush(self, fnames=None):
                 logged_changes[field].add(log["record_id"])
 
     # Clear old_values after flush
-    if hasattr(self.env.cr, "_audit_old_values"):
+    if "old_values" in audit_data:
         # Only clear the fields/records we just flushed
-        audit_old_values = self.env.cr._audit_old_values
+        audit_old_values = audit_data["old_values"]
         for name, field in loggable_fields_dict.items():
             if field in audit_old_values:
                 field_old_values = audit_old_values[field]
