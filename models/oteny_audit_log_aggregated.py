@@ -102,10 +102,6 @@ class OtenyAuditLogAggregated(models.Model):
                 # (e.g., module uninstalled)
                 log.field_model_display_name = log.field_model_name
 
-    def _compute_highlight_row(self):
-        for record in self:
-            record.highlight_row = record.transaction_group_toggle
-
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute(
@@ -146,7 +142,7 @@ class OtenyAuditLogAggregated(models.Model):
                     (
                         -- Child logs linked to a parent record
                         SELECT
-                            (ref.audit_log_id + 1000000000) AS id,
+                            (ref.id * 1000000000 + ref.audit_log_id) AS id,
                             ref.audit_log_id AS audit_log_id,
                             log.create_date,
                             log.create_uid,

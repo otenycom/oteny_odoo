@@ -37,13 +37,9 @@ class OtenyAuditLog(models.Model):
     @api.depends("model_name", "record_id")
     def _compute_record_ref(self):
         for log in self:
-            if (
-                log.model_name
-                and log.record_id
-                and self.env["ir.model"].search_count([("model", "=", log.model_name)])
-            ):
+            if log.model_name and log.record_id and log.model_name in self.env:
                 record = self.env[log.model_name].browse(log.record_id).exists()
-                log.record_ref = record or False
+                log.record_ref = f"{log.model_name},{record.id}" if record else False
             else:
                 log.record_ref = False
 
