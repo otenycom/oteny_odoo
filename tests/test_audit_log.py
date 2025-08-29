@@ -9,6 +9,19 @@ class TestAuditLog(TransactionCase):
 
     def setUp(self):
         super().setUp()
+        # Store original tracking state from registry
+        self._original_tracking_state = getattr(self.env.registry, "_mail_tracking_disabled", False)
+        # Ensure tracking is enabled for initial tests
+        if hasattr(self.env.registry, "_mail_tracking_disabled"):
+            delattr(self.env.registry, "_mail_tracking_disabled")
+
+    def tearDown(self):
+        super().tearDown()
+        # Restore original tracking state
+        if self._original_tracking_state:
+            self.env.registry._mail_tracking_disabled = True
+        elif hasattr(self.env.registry, "_mail_tracking_disabled"):
+            delattr(self.env.registry, "_mail_tracking_disabled")
 
     def test_create_logs_insert(self):
         """Test that creating a record logs an insert"""
@@ -203,3 +216,27 @@ class TestAuditLog(TransactionCase):
         )
 
         self.assertEqual(new_count, 0, "No audit logs should be created for audit log model itself")
+
+    def test_tracking_disable_system_wide(self):
+        """Test that tracking can be disabled and enabled system-wide"""
+        # Test that we can disable tracking
+        self.env["oteny.audit.log"].disable_mail_tracking_system_wide()
+
+        # Verify registry flag is set
+        self.assertTrue(
+            getattr(self.env.registry, "_mail_tracking_disabled", False),
+            "Registry flag should be set when tracking is disabled",
+        )
+
+        # Test that we can enable tracking
+        self.env["oteny.audit.log"].enable_mail_tracking_system_wide()
+
+        # Verify registry flag is cleared
+        self.assertFalse(
+            getattr(self.env.registry, "_mail_tracking_disabled", False),
+            "Registry flag should be cleared when tracking is enabled",
+        )
+
+        # Test that the configuration parameter is also set correctly
+        disabled_param = self.env["ir.config_parameter"].sudo().get_param("mail.tracking_disabled")
+        self.assertEqual(disabled_param, "0", "Configuration parameter should be '0' when enabled")

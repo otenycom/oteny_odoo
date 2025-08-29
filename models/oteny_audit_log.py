@@ -1,6 +1,5 @@
 # audit_log/models/audit_log.py
 from odoo import fields, models, api
-from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -10,6 +9,23 @@ class OtenyAuditLog(models.Model):
     _name = "oteny.audit.log"
     _description = "Oteny Audit Log"
     _order = "id desc"
+
+    @api.model
+    def disable_mail_tracking_system_wide(self):
+        """Disable mail tracking system-wide by setting a configuration parameter."""
+        # Add a context key that will be checked by our mail.thread override
+        self.env.registry._mail_tracking_disabled = True
+        self.env["ir.config_parameter"].sudo().set_param("mail.tracking_disabled", "1")
+        _logger.info("Mail tracking has been disabled system-wide via configuration parameter")
+
+    @api.model
+    def enable_mail_tracking_system_wide(self):
+        """Enable mail tracking system-wide by setting a configuration parameter."""
+        # Remove the context key
+        if hasattr(self.env.registry, "_mail_tracking_disabled"):
+            delattr(self.env.registry, "_mail_tracking_disabled")
+        self.env["ir.config_parameter"].sudo().set_param("mail.tracking_disabled", "0")
+        _logger.info("Mail tracking has been enabled system-wide via configuration parameter")
 
     transaction_id = fields.Integer(required=False, string="Transaction ID")
     model_name = fields.Char(required=True)
@@ -50,22 +66,26 @@ class OtenyAuditLog(models.Model):
 
     def _is_audit_ignored(self, model_name):
         """Check if a model should be ignored by the audit log."""
-        # Always ignore the audit log model itself
-        if model_name == self._name:
-            return True
-
         if self.env.context.get("oteny_audit_ignore", False):
-            return True
-
-        if self.env.context.get(MODULE_UNINSTALL_FLAG, False):
             return True
 
         model_class = self.env[model_name]
         if hasattr(model_class, "_oteny_audit_ignore"):
             return model_class._oteny_audit_ignore
 
+        # Ignore TransientModel models (wizards) by default
+        if getattr(model_class, "_transient", False):
+            return True
+
         # Ignore system models by default, can be overridden by _oteny_audit_ignore in the model
-        ignored_model_prefixes = ["ir.ui.view", "bus.", "mail.push", "mail.tracking", "res.device.log"]
+        ignored_model_prefixes = [
+            "oteny.audit",
+            "ir.ui.view",
+            "bus.",
+            "mail.push",
+            "mail.tracking",
+            "res.device.log",
+        ]
         if any(model_name.startswith(prefix) for prefix in ignored_model_prefixes):
             return True
 
