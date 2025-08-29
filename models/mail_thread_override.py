@@ -7,6 +7,7 @@ original_mailthread_create = MailThread.create
 original_mailthread_write = MailThread.write
 
 
+@api.model_create_multi
 def patched_mailthread_create(self, vals_list):
     """Override MailThread.create to disable tracking by default."""
     return original_mailthread_create(self.with_context(tracking_disable=True), vals_list)
