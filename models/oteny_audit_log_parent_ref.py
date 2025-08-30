@@ -17,10 +17,5 @@ class OtenyAuditLogParentRef(models.Model):
     parent_record_id = fields.Integer(required=True, index=True, string="Parent Record ID")
     parent_record_display_name = fields.Char(string="Parent Record Name")
 
-    _sql_constraints = [
-        (
-            "audit_log_id_unique",
-            "unique(audit_log_id)",
-            "An audit log entry can only have one parent reference.",
-        )
-    ]
+    # Removed unique constraint to allow multiple parent references per audit log
+    # This enables hierarchical parent reference tracking (immediate parent, grandparent, etc.)

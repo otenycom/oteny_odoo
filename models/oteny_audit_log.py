@@ -10,10 +10,11 @@ class OtenyAuditLog(models.Model):
     _description = "Oteny Audit Log"
     _order = "id desc"
 
-    # Predefined parent keys for well-known models
-    # Format: {model_name: "field1,field2,..."}
+    # Predefined parent references or id-keys for well-known models
     _model_parent_keys = {
         "mail.message": "model,res_id",
+        "ir.attachment": "res_model,res_id",
+        "mail.followers": "res_model,res_id",
         "res.partner": "parent_id",
     }
 

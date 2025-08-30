@@ -14,7 +14,7 @@ class OtenyAuditLogAggregated(models.Model):
     highlight_row_type = fields.Char("Highlight Row Type", readonly=True)
 
     audit_log_id = fields.Many2one("oteny.audit.log", string="Audit Log", readonly=True)
-    parent_record_display_name = fields.Char(string="Parent Record Name", readonly=True)
+    parent_record_display_name = fields.Char(string="Parent Record", readonly=True)
 
     # --- Fields from oteny.audit.log ---
     transaction_id = fields.Integer(readonly=True, string="Transaction ID")
@@ -30,7 +30,7 @@ class OtenyAuditLogAggregated(models.Model):
         compute="_compute_record_ref",
         readonly=True,
     )
-    record_display_name = fields.Char(string="Record Name", readonly=True)
+    record_display_name = fields.Char(string="Record", readonly=True)
     field_name = fields.Char(readonly=True, string="Field Raw Name")
     field_display_name = fields.Char(string="Field", readonly=True)
     field_model_name = fields.Char(string="Model Name", readonly=True)
@@ -45,6 +45,7 @@ class OtenyAuditLogAggregated(models.Model):
     change_type = fields.Selection(
         [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")],
         readonly=True,
+        string="Change",
     )
     create_date = fields.Datetime(string="Timestamp", readonly=True)
     create_uid = fields.Many2one("res.users", string="User", readonly=True)

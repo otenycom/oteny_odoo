@@ -51,23 +51,25 @@ def _create_parent_log_references_unified(env, model, log_records):
             # and return all parent references found through recursion (ordered: immediate -> top-most)
             all_parent_refs = _resolve_parent_reference_unified(env, record, max_depth=3)
 
-            # Use the top-most parent (last in the list) for the parent reference
+            # Create parent reference records for each level of recursion
             # List order: [immediate_parent, grandparent, great-grandparent, ...]
+            # We create one set of parent references per record, then associate them with all audit logs for that record
             if all_parent_refs:
-                top_parent_ref = all_parent_refs[-1]  # Last item is the top-most parent
-                parent_model_name = top_parent_ref["parent_model_name"]
-                parent_record_id = top_parent_ref["parent_record_id"]
-                parent_display_name = top_parent_ref["parent_display_name"]
+                for parent_ref_data in all_parent_refs:
+                    parent_model_name = parent_ref_data["parent_model_name"]
+                    parent_record_id = parent_ref_data["parent_record_id"]
+                    parent_display_name = parent_ref_data["parent_display_name"]
 
-                for log_id in logs_by_record_id[record.id]:
-                    parent_refs.append(
-                        {
-                            "audit_log_id": log_id,
-                            "parent_model_name": parent_model_name,
-                            "parent_record_id": parent_record_id,
-                            "parent_record_display_name": parent_display_name,
-                        }
-                    )
+                    # Create parent reference for each audit log of this record
+                    for log_id in logs_by_record_id[record.id]:
+                        parent_refs.append(
+                            {
+                                "audit_log_id": log_id,
+                                "parent_model_name": parent_model_name,
+                                "parent_record_id": parent_record_id,
+                                "parent_record_display_name": parent_display_name,
+                            }
+                        )
         except Exception:
             # Failsafe for cases where parent record might be deleted or access rights issues.
             continue

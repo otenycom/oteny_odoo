@@ -255,12 +255,13 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
 
-        # Verify the parent reference details
-        parent_ref = parent_refs[0]
-        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
-        self.assertEqual(parent_ref.parent_record_id, parent_partner.id, "Parent record ID should match")
+        # Verify that at least one parent reference points to the expected parent partner
+        partner_parent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        )
+        self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
         self.assertEqual(
-            parent_ref.parent_record_display_name,
+            partner_parent_refs[0].parent_record_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -314,12 +315,13 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
 
-        # Verify the parent reference details
-        parent_ref = parent_refs[0]
-        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
-        self.assertEqual(parent_ref.parent_record_id, parent_partner.id, "Parent record ID should match")
+        # Verify that at least one parent reference points to the expected parent partner
+        partner_parent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        )
+        self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
         self.assertEqual(
-            parent_ref.parent_record_display_name,
+            partner_parent_refs[0].parent_record_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -382,16 +384,28 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
 
-        # Verify the parent reference points to GRANDPARENT, not immediate parent
-        parent_ref = parent_refs[0]
-        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        # Verify that we have parent references pointing to both immediate parent and grandparent
+        immediate_parent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        )
+        grandparent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == grandparent_partner.id
+        )
+
+        self.assertTrue(
+            immediate_parent_refs, "Should have parent references pointing to the immediate parent"
+        )
+        self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent")
+
         self.assertEqual(
-            parent_ref.parent_record_id, grandparent_partner.id, "Parent record ID should be grandparent"
+            immediate_parent_refs[0].parent_record_display_name,
+            parent_partner.display_name,
+            "Immediate parent display name should match",
         )
         self.assertEqual(
-            parent_ref.parent_record_display_name,
+            grandparent_refs[0].parent_record_display_name,
             grandparent_partner.display_name,
-            "Parent display name should be grandparent",
+            "Grandparent display name should match",
         )
 
     def test_recursive_parent_keys_message_to_grandparent(self):
@@ -454,14 +468,26 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
 
-        # Verify the parent reference points to GRANDPARENT due to recursive resolution
-        parent_ref = parent_refs[0]
-        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        # Verify that we have parent references pointing to both immediate parent and grandparent
+        immediate_parent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        )
+        grandparent_refs = parent_refs.filtered(
+            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == grandparent_partner.id
+        )
+
+        self.assertTrue(
+            immediate_parent_refs, "Should have parent references pointing to the immediate parent partner"
+        )
+        self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent partner")
+
         self.assertEqual(
-            parent_ref.parent_record_id, grandparent_partner.id, "Parent record ID should be grandparent"
+            immediate_parent_refs[0].parent_record_display_name,
+            parent_partner.display_name,
+            "Immediate parent display name should match",
         )
         self.assertEqual(
-            parent_ref.parent_record_display_name,
+            grandparent_refs[0].parent_record_display_name,
             grandparent_partner.display_name,
-            "Parent display name should be grandparent",
+            "Grandparent display name should match",
         )

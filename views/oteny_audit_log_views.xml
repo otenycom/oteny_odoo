@@ -153,12 +153,12 @@
                 <field name="highlight_row_type" column_invisible="1" />
                 <field name="create_date" string="Timestamp" optional="show" />
                 <field name="create_uid" string="User" optional="show" />
-                <field name="model_display_name" string="Parent Model" optional="show" />
-                <field name="parent_record_display_name" string="Parent Record" optional="show" />
-                <field name="record_display_name" string="Record" optional="show" />
-                <field name="field_model_display_name" string="Table Name" optional="show" />
+                <field name="model_display_name" optional="show" />
+                <field name="parent_record_display_name" optional="show" />
+                <field name="record_display_name" optional="show" />
+                <field name="field_model_display_name" optional="show" />
                 <field name="field_display_name" optional="show" />
-                <field name="change_type" string="Change" optional="show" />
+                <field name="change_type" optional="show" />
                 <field name="old_value_display_name" optional="show" />
                 <field name="new_value_display_name" optional="show" />
                 <field name="transaction_id" optional="hide" />
@@ -177,35 +177,38 @@
                     <group>
                         <group>
                             <field name="create_date" string="Timestamp" />
+                            <field name="transaction_id" groups="base.group_no_one" />
+                            <field name="audit_log_id" groups="base.group_no_one" />
                             <field name="create_uid" string="User" />
                             <field name="change_type" />
-                            <field name="model_display_name" string="Parent Model" />
-                            <field name="record_ref" string="Parent Record Link" />
+                        </group>
+                        <group>
+                            <field name="model_display_name" invisible="not is_child_log" />
+                            <field name="parent_record_display_name" invisible="not is_child_log" />
+                            <field name="record_display_name" />
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Changed Field Values">
+                            <field name="record_ref" />
                             <field name="is_child_log" invisible="1" />
                             <field
                                 name="child_record_ref"
                                 string="Child Record"
                                 invisible="not is_child_log"
                             />
+                            <field name="field_model_display_name" />
+                            <field name="field_display_name" />
+                            <field name="old_value_display_name" />
+                            <field name="new_value_display_name" />
                         </group>
-                        <group>
-                            <field name="transaction_id" />
-                            <field name="audit_log_id" />
-                            <field name="model_display_name" string="Parent Model" />
-                            <field name="parent_record_display_name" string="Parent Record Name" />
+                        <group string="Raw Field Values">
+                            <field name="record_id" />
+                            <field name="field_model_name" />
+                            <field name="field_name" />
+                            <field name="old_value" />
+                            <field name="new_value" />
                         </group>
-                    </group>
-                    <group string="Changed Field Values">
-                        <field name="field_display_name" />
-                        <field name="field_model_display_name" />
-                        <field name="old_value_display_name" />
-                        <field name="new_value_display_name" />
-                    </group>
-                    <group string="Raw Field Values">
-                        <field name="field_name" />
-                        <field name="field_model_name" />
-                        <field name="old_value" />
-                        <field name="new_value" />
                     </group>
                 </sheet>
             </form>
