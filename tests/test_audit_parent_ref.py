@@ -48,7 +48,7 @@ class TestAuditParentRef(TransactionCase):
             [
                 ("model_name", "=", self.child_model._name),
                 ("record_id", "=", child_record.id),
-                ("change_type", "=", "insert"),
+                ("change_type", "=", "i"),
                 ("field_name", "=", "name"),
             ]
         )
@@ -68,7 +68,7 @@ class TestAuditParentRef(TransactionCase):
             [
                 ("model_name", "=", self.child_model._name),
                 ("record_id", "=", child_record.id),
-                ("change_type", "=", "update"),
+                ("change_type", "=", "u"),
                 ("field_name", "=", "name"),
             ]
         )
@@ -94,7 +94,7 @@ class TestAuditParentRef(TransactionCase):
         self.assertEqual(len(child_logs_in_aggregated), 3, "Aggregated log should show 3 child logs.")
 
         # Check the insert logs (name and parent_id)
-        insert_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "insert")
+        insert_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "i")
         self.assertEqual(len(insert_logs), 2, "Should have two insert logs for the child.")
 
         insert_log_name = insert_logs.filtered(lambda r: r.field_name == "name")
@@ -108,7 +108,7 @@ class TestAuditParentRef(TransactionCase):
         self.assertEqual(insert_log_parent.new_value_display_name, self.parent_record.display_name)
 
         # Check the update log (name)
-        update_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "update")
+        update_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "u")
         self.assertEqual(len(update_logs), 1, "Should have one update log for the child.")
         self.assertEqual(update_logs.field_name, "name")
         self.assertEqual(update_logs.old_value, "Test Child 1")

@@ -76,9 +76,9 @@
                 <field name="new_value_display_name" />
                 <field name="create_uid" />
                 <separator />
-                <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'insert')]" />
-                <filter string="Updates" name="updates" domain="[('change_type', '=', 'update')]" />
-                <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'delete')]" />
+                <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'i')]" />
+                <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
+                <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'd')]" />
                 <separator />
                 <group expand="0" string="Group By">
                     <filter string="Model" name="group_by_model" context="{'group_by': 'model_name'}" />
@@ -121,9 +121,9 @@
                 <field name="is_child_log" />
                 <field name="child_model_name" />
                 <separator />
-                <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'insert')]" />
-                <filter string="Updates" name="updates" domain="[('change_type', '=', 'update')]" />
-                <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'delete')]" />
+                <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'i')]" />
+                <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
+                <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'd')]" />
                 <filter string="Child Logs" name="child_logs" domain="[('is_child_log', '=', True)]" />
                 <filter string="Parent Logs" name="parent_logs" domain="[('is_child_log', '=', False)]" />
                 <separator />

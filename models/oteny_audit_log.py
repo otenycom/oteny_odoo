@@ -34,9 +34,7 @@ class OtenyAuditLog(models.Model):
     new_value = fields.Text(string="New Value Raw")
     old_value_display_name = fields.Char(string="Old Value")
     new_value_display_name = fields.Char(string="New Value")
-    change_type = fields.Selection(
-        [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")], required=True
-    )
+    change_type = fields.Selection([("i", "Insert"), ("u", "Update"), ("d", "Delete")], required=True)
 
     def _selection_record_ref(self):
         models = self.env["ir.model"].search([])
@@ -68,6 +66,7 @@ class OtenyAuditLog(models.Model):
         ignored_model_prefixes = [
             "oteny.audit",
             "ir.ui.view",
+            "ir.model.data",
             "bus.",
             "mail.push",
             "mail.tracking",

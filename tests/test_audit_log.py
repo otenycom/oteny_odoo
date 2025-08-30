@@ -28,7 +28,7 @@ class TestAuditLog(TransactionCase):
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
-                ("change_type", "=", "insert"),
+                ("change_type", "=", "i"),
             ]
         )
 
@@ -74,7 +74,7 @@ class TestAuditLog(TransactionCase):
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
-                ("change_type", "=", "update"),
+                ("change_type", "=", "u"),
             ]
         )
 
@@ -107,7 +107,7 @@ class TestAuditLog(TransactionCase):
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner_id),
-                ("change_type", "=", "delete"),
+                ("change_type", "=", "d"),
             ]
         )
 
@@ -155,7 +155,7 @@ class TestAuditLog(TransactionCase):
             [
                 ("model_name", "=", "res.users"),
                 ("record_id", "=", user.id),
-                ("change_type", "=", "update"),
+                ("change_type", "=", "u"),
                 ("field_name", "=", "groups_id"),
             ]
         )
@@ -191,7 +191,7 @@ class TestAuditLog(TransactionCase):
                 "field_name": "test_field",
                 "old_value": "old",
                 "new_value": "new",
-                "change_type": "update",
+                "change_type": "u",
             }
         )
 

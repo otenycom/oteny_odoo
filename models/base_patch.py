@@ -310,7 +310,7 @@ def patched_create(self, vals_list):
                         "new_value": str(new_val_cached) if new_val_cached is not None else "",
                         "old_value_display_name": "",
                         "new_value_display_name": new_val_display,
-                        "change_type": "insert",
+                        "change_type": "i",
                     }
                 )
         if logs:
@@ -369,7 +369,7 @@ def patched_unlink(self):
                     "new_value": "",
                     "old_value_display_name": old_val_display,
                     "new_value_display_name": "",
-                    "change_type": "delete",
+                    "change_type": "d",
                 }
             )
     if logs:
@@ -492,7 +492,7 @@ def patched_write(self, vals):
                             "new_value": str(new_val_cache) if new_val_cache is not None else "",
                             "old_value_display_name": old_val_display,
                             "new_value_display_name": new_val_display,
-                            "change_type": "update",
+                            "change_type": "u",
                         }
                     )
         if logs:
@@ -661,7 +661,7 @@ def patched_flush(self, fnames=None):
                         "new_value": str(new_val) if new_val is not None else "",
                         "old_value_display_name": old_val_display,
                         "new_value_display_name": new_val_display,
-                        "change_type": "update",
+                        "change_type": "u",
                     }
                 )
                 most_recent_logs[field][rid] = {"old_value": old_val, "new_value": new_val}

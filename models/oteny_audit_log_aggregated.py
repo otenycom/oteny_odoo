@@ -43,7 +43,7 @@ class OtenyAuditLogAggregated(models.Model):
     old_value_display_name = fields.Char(string="Old Value", readonly=True)
     new_value_display_name = fields.Char(string="New Value", readonly=True)
     change_type = fields.Selection(
-        [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")],
+        [("i", "Insert"), ("u", "Update"), ("d", "Delete")],
         readonly=True,
         string="Change",
     )
