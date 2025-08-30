@@ -197,6 +197,11 @@ action = {
         """
         Clean up old audit log records based on configuration.
         This method is called by the cron job.
+
+        Transaction Strategy:
+        - Commits after each batch to free memory and prevent timeouts
+        - Handles large datasets efficiently by processing in chunks
+        - Includes error handling for commit operations
         """
         config = self._get_cleanup_config()
 
@@ -204,10 +209,11 @@ action = {
             _logger.info("Audit log cleanup is disabled")
             return
 
-        # Calculate the cutoff date
-        from datetime import datetime, timedelta
+        # Calculate the cutoff date using Odoo's UTC time
+        from odoo.fields import Datetime
+        from datetime import timedelta
 
-        cutoff_date = datetime.now() - timedelta(days=config["retention_days"])
+        cutoff_date = Datetime.now() - timedelta(days=config["retention_days"])
 
         _logger.info(
             f"Starting audit log cleanup. Deleting records older than {config['retention_days']} days "
@@ -242,6 +248,13 @@ action = {
             # Delete the batch
             old_logs.unlink()
 
+            # Commit the transaction after each batch to free up memory and avoid timeouts
+            try:
+                self.env.cr.commit()
+                _logger.debug(f"Committed batch deletion of {batch_count} records")
+            except Exception as e:
+                _logger.warning(f"Failed to commit batch deletion: {e}")
+
             deleted_count += batch_count
             _logger.info(f"Deleted {deleted_count}/{old_logs_count} audit log records")
 
@@ -267,6 +280,13 @@ action = {
         )
         orphaned_refs_count = self.env.cr.rowcount
         _logger.info(f"Deleted {orphaned_refs_count} orphaned parent reference records")
+
+        # Commit the final cleanup
+        try:
+            self.env.cr.commit()
+            _logger.debug("Committed final cleanup of orphaned references")
+        except Exception as e:
+            _logger.warning(f"Failed to commit final cleanup: {e}")
 
         return {
             "deleted_logs": deleted_count,
