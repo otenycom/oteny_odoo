@@ -203,3 +203,265 @@ class TestAuditLog(TransactionCase):
         )
 
         self.assertEqual(new_count, 0, "No audit logs should be created for audit log model itself")
+
+    def test_predefined_parent_keys_mail_message(self):
+        """Test that predefined parent keys work for mail.message"""
+        # Create a test partner as the parent record
+        parent_partner = self.env["res.partner"].create(
+            {
+                "name": "Parent Partner for Message",
+                "email": "parent@example.com",
+            }
+        )
+
+        # Clear any logs from partner creation
+        self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", parent_partner.id),
+            ]
+        ).unlink()
+
+        # Create a mail message that references the partner
+        message = self.env["mail.message"].create(
+            {
+                "model": "res.partner",
+                "res_id": parent_partner.id,
+                "subject": "Test Message",
+                "body": "Test message body",
+                "message_type": "comment",
+            }
+        )
+
+        # Force flush to trigger audit logging
+        message.flush_recordset()
+
+        # Check that audit logs were created for the message
+        message_logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "mail.message"),
+                ("record_id", "=", message.id),
+            ]
+        )
+
+        self.assertTrue(message_logs, "Audit logs should be created for mail.message")
+
+        # Check that parent references were created using predefined keys
+        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+            [
+                ("audit_log_id", "in", message_logs.ids),
+            ]
+        )
+
+        self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
+
+        # Verify the parent reference details
+        parent_ref = parent_refs[0]
+        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        self.assertEqual(parent_ref.parent_record_id, parent_partner.id, "Parent record ID should match")
+        self.assertEqual(
+            parent_ref.parent_record_display_name,
+            parent_partner.display_name,
+            "Parent display name should match",
+        )
+
+    def test_predefined_parent_keys_res_partner(self):
+        """Test that predefined parent keys work for res.partner"""
+        # Create a parent partner
+        parent_partner = self.env["res.partner"].create(
+            {
+                "name": "Parent Partner",
+                "email": "parent@example.com",
+            }
+        )
+
+        # Clear any logs from parent partner creation
+        self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", parent_partner.id),
+            ]
+        ).unlink()
+
+        # Create a child partner
+        child_partner = self.env["res.partner"].create(
+            {
+                "name": "Child Partner",
+                "email": "child@example.com",
+                "parent_id": parent_partner.id,
+            }
+        )
+
+        # Force flush to trigger audit logging
+        child_partner.flush_recordset()
+
+        # Check that audit logs were created for the child partner
+        child_logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", child_partner.id),
+            ]
+        )
+
+        self.assertTrue(child_logs, "Audit logs should be created for child res.partner")
+
+        # Check that parent references were created using predefined keys
+        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+            [
+                ("audit_log_id", "in", child_logs.ids),
+            ]
+        )
+
+        self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
+
+        # Verify the parent reference details
+        parent_ref = parent_refs[0]
+        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        self.assertEqual(parent_ref.parent_record_id, parent_partner.id, "Parent record ID should match")
+        self.assertEqual(
+            parent_ref.parent_record_display_name,
+            parent_partner.display_name,
+            "Parent display name should match",
+        )
+
+    def test_recursive_parent_keys_grandparent_reference(self):
+        """Test that recursive parent key resolution works up to 2 levels (grandparent)"""
+        # Create a grandparent partner
+        grandparent_partner = self.env["res.partner"].create(
+            {
+                "name": "Grandparent Partner",
+                "email": "grandparent@example.com",
+            }
+        )
+
+        # Create a parent partner (child of grandparent)
+        parent_partner = self.env["res.partner"].create(
+            {
+                "name": "Parent Partner",
+                "email": "parent@example.com",
+                "parent_id": grandparent_partner.id,
+            }
+        )
+
+        # Clear any logs from partner creation
+        self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "in", [grandparent_partner.id, parent_partner.id]),
+            ]
+        ).unlink()
+
+        # Create a child partner (grandchild)
+        child_partner = self.env["res.partner"].create(
+            {
+                "name": "Child Partner",
+                "email": "child@example.com",
+                "parent_id": parent_partner.id,
+            }
+        )
+
+        # Force flush to trigger audit logging
+        child_partner.flush_recordset()
+
+        # Check that audit logs were created for the child partner
+        child_logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", child_partner.id),
+            ]
+        )
+
+        self.assertTrue(child_logs, "Audit logs should be created for child res.partner")
+
+        # Check that parent references were created and point to GRANDPARENT (not immediate parent)
+        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+            [
+                ("audit_log_id", "in", child_logs.ids),
+            ]
+        )
+
+        self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
+
+        # Verify the parent reference points to GRANDPARENT, not immediate parent
+        parent_ref = parent_refs[0]
+        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        self.assertEqual(
+            parent_ref.parent_record_id, grandparent_partner.id, "Parent record ID should be grandparent"
+        )
+        self.assertEqual(
+            parent_ref.parent_record_display_name,
+            grandparent_partner.display_name,
+            "Parent display name should be grandparent",
+        )
+
+    def test_recursive_parent_keys_message_to_grandparent(self):
+        """Test recursive parent key resolution for mail.message pointing through partners to grandparent"""
+        # Create a grandparent partner
+        grandparent_partner = self.env["res.partner"].create(
+            {
+                "name": "Grandparent Partner",
+                "email": "grandparent@example.com",
+            }
+        )
+
+        # Create a parent partner (child of grandparent)
+        parent_partner = self.env["res.partner"].create(
+            {
+                "name": "Parent Partner",
+                "email": "parent@example.com",
+                "parent_id": grandparent_partner.id,
+            }
+        )
+
+        # Clear any logs from partner creation
+        self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "in", [grandparent_partner.id, parent_partner.id]),
+            ]
+        ).unlink()
+
+        # Create a mail message that points to the immediate parent partner
+        message = self.env["mail.message"].create(
+            {
+                "model": "res.partner",
+                "res_id": parent_partner.id,  # Points to immediate parent
+                "subject": "Test Message to Parent",
+                "body": "Test message body",
+                "message_type": "comment",
+            }
+        )
+
+        # Force flush to trigger audit logging
+        message.flush_recordset()
+
+        # Check that audit logs were created for the message
+        message_logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "mail.message"),
+                ("record_id", "=", message.id),
+            ]
+        )
+
+        self.assertTrue(message_logs, "Audit logs should be created for mail.message")
+
+        # Check that parent references point to GRANDPARENT (not immediate parent)
+        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+            [
+                ("audit_log_id", "in", message_logs.ids),
+            ]
+        )
+
+        self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
+
+        # Verify the parent reference points to GRANDPARENT due to recursive resolution
+        parent_ref = parent_refs[0]
+        self.assertEqual(parent_ref.parent_model_name, "res.partner", "Parent model should be res.partner")
+        self.assertEqual(
+            parent_ref.parent_record_id, grandparent_partner.id, "Parent record ID should be grandparent"
+        )
+        self.assertEqual(
+            parent_ref.parent_record_display_name,
+            grandparent_partner.display_name,
+            "Parent display name should be grandparent",
+        )

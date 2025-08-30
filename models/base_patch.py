@@ -9,17 +9,24 @@ original_write = models.BaseModel.write
 original_flush = models.BaseModel._flush
 
 
-def _create_parent_log_references(env, model, log_records):
+def _create_parent_log_references_unified(env, model, log_records):
     """
-    Creates parent references for audit log records if the model has a parent field defined.
-    `env`: The Odoo environment.
-    `model`: The model class being audited.
-    `log_records`: A recordset of `oteny.audit.log`.
-    """
-    parent_field_name = getattr(model, "_oteny_audit_parent_field", None)
-    if not parent_field_name or parent_field_name not in model._fields:
-        return
+    Unified function to create parent references for audit log records.
+    Handles both model-defined _oteny_audit_parent_field and predefined _model_parent_keys.
 
+    Priority order:
+    1. _oteny_audit_parent_field (model-specific, takes precedence)
+    2. _model_parent_keys (global predefined mappings)
+
+    Both support:
+    - Single field references: "parent_id"
+    - Tuple format: "model,res_id"
+
+    Args:
+        env: The Odoo environment.
+        model: The model class being audited.
+        log_records: A recordset of `oteny.audit.log`.
+    """
     parent_refs = []
 
     # Group log records by their source record id to minimize queries
@@ -31,26 +38,33 @@ def _create_parent_log_references(env, model, log_records):
         return
 
     # Browse all source records at once
-    records_with_logs = env[model._name].browse(list(logs_by_record_id.keys()))
+    records_with_logs = env[model._name].sudo().browse(list(logs_by_record_id.keys()))
 
     for record in records_with_logs:
         # Check if the record still exists before trying to access its fields
         if not record.exists():
             continue
+
         try:
-            parent_record = record[parent_field_name]
-            if parent_record:
-                parent_display_name = (
-                    parent_record.display_name
-                    if hasattr(parent_record, "display_name")
-                    else f"ID: {parent_record.id}"
-                )
+            # Use unified parent resolution with recursion support
+            # The function will determine the appropriate config for each record individually
+            # and return all parent references found through recursion (ordered: immediate -> top-most)
+            all_parent_refs = _resolve_parent_reference_unified(env, record, max_depth=3)
+
+            # Use the top-most parent (last in the list) for the parent reference
+            # List order: [immediate_parent, grandparent, great-grandparent, ...]
+            if all_parent_refs:
+                top_parent_ref = all_parent_refs[-1]  # Last item is the top-most parent
+                parent_model_name = top_parent_ref["parent_model_name"]
+                parent_record_id = top_parent_ref["parent_record_id"]
+                parent_display_name = top_parent_ref["parent_display_name"]
+
                 for log_id in logs_by_record_id[record.id]:
                     parent_refs.append(
                         {
                             "audit_log_id": log_id,
-                            "parent_model_name": parent_record._name,
-                            "parent_record_id": parent_record.id,
+                            "parent_model_name": parent_model_name,
+                            "parent_record_id": parent_record_id,
                             "parent_record_display_name": parent_display_name,
                         }
                     )
@@ -60,6 +74,104 @@ def _create_parent_log_references(env, model, log_records):
 
     if parent_refs:
         env["oteny.audit.log.parent.ref"].sudo().create(parent_refs)
+
+
+def _resolve_parent_reference_unified(env, record, max_depth=3, current_depth=0):
+    """
+    Unified function to recursively resolve parent references up to max_depth levels.
+    Handles both single field references and tuple formats for both _oteny_audit_parent_field and _model_parent_keys.
+
+    Determines the appropriate parent configuration for each record individually:
+    1. First checks for model-specific _oteny_audit_parent_field
+    2. Falls back to predefined _model_parent_keys if no model-specific field exists
+
+    Args:
+        env: The Odoo environment.
+        record: The record to find parent for.
+        max_depth: Maximum recursion depth (default 3).
+        current_depth: Current recursion depth.
+
+    Returns:
+        list: List of parent reference data dictionaries, each containing:
+            - parent_model_name: The model name of the parent record
+            - parent_record_id: The ID of the parent record
+            - parent_display_name: The display name of the parent record
+    """
+    parent_refs = []
+
+    if current_depth >= max_depth:
+        return []
+
+    # Determine parent configuration for this specific record
+    parent_config = None
+
+    # Check for model-specific _oteny_audit_parent_field first (takes precedence)
+    model_parent_field = getattr(record.__class__, "_oteny_audit_parent_field", None)
+    if model_parent_field:
+        parent_config = model_parent_field
+    else:
+        # Fall back to predefined parent keys
+        parent_keys = getattr(env["oteny.audit.log"], "_model_parent_keys", {})
+        model_parent_key = parent_keys.get(record._name)
+        if model_parent_key:
+            parent_config = model_parent_key
+
+    if not parent_config:
+        return parent_refs
+
+    try:
+        # Parse the parent configuration - handle both single field and tuple formats
+        if "," in parent_config:
+            # Tuple format: "model,res_id" or similar
+            config_fields = [field.strip() for field in parent_config.split(",")]
+            if len(config_fields) == 2:
+                model_field, id_field = config_fields
+                if model_field in record._fields and id_field in record._fields:
+                    parent_model_name = record[model_field]
+                    parent_record_id = record[id_field]
+
+                    if parent_model_name and parent_record_id and parent_model_name in env:
+                        parent_record = env[parent_model_name].sudo().browse(parent_record_id).exists()
+        else:
+            # Single field format: "parent_id"
+            parent_field = parent_config
+            if parent_field in record._fields:
+                parent_record = record[parent_field]
+                if parent_record:
+                    parent_model_name = parent_record._name
+                    parent_record_id = parent_record.id
+
+        # If we found a parent, add it to our parent references list
+        if parent_record:
+            parent_display_name = (
+                parent_record.display_name
+                if hasattr(parent_record, "display_name")
+                else f"ID: {parent_record.id}"
+            )
+
+            parent_refs.append(
+                {
+                    "parent_model_name": parent_model_name,
+                    "parent_record_id": parent_record_id,
+                    "parent_display_name": parent_display_name,
+                }
+            )
+
+            # If we haven't reached max depth, recursively resolve the parent's parent
+            if current_depth < max_depth - 1:
+                # Recursively resolve the parent's parent (grandparent, great-grandparent, etc.)
+                # The function will determine the appropriate config for the parent record
+                child_parent_refs = _resolve_parent_reference_unified(
+                    env, parent_record, max_depth, current_depth + 1
+                )
+                # Add all parent references from the recursive call
+                parent_refs.extend(child_parent_refs)
+
+        return parent_refs
+
+    except Exception:
+        # Failsafe for cases where parent record might be deleted or access rights issues.
+        return parent_refs
 
 
 def _create_audit_logs(env, model, logs):
@@ -73,7 +185,7 @@ def _create_audit_logs(env, model, logs):
         log["transaction_id"] = txid
 
     log_records = env["oteny.audit.log"].sudo().create(logs)
-    _create_parent_log_references(env, model, log_records)
+    _create_parent_log_references_unified(env, model, log_records)
 
 
 def _safe_convert_to_cache(field, raw_value, record):
@@ -320,7 +432,7 @@ def patched_write(self, vals):
             and not self.env.cache.contains(rec, field)
         }
         if records_to_read_ids:
-            self.browse(list(records_to_read_ids)).read(list(scalar_fields.keys()))
+            self.sudo().browse(list(records_to_read_ids)).read(list(scalar_fields.keys()))
 
         for record in self:
             for name, field in scalar_fields.items():
@@ -358,8 +470,8 @@ def patched_write(self, vals):
                 # To compare, we can just compare the sets of IDs.
                 if set(old_ids) != set(new_ids):
                     # To get display values, we need to browse.
-                    old_records = self.env[field.comodel_name].browse(old_ids)
-                    new_records = self.env[field.comodel_name].browse(new_ids)
+                    old_records = self.env[field.comodel_name].sudo().browse(old_ids)
+                    new_records = self.env[field.comodel_name].sudo().browse(new_ids)
 
                     old_val_cache = field.convert_to_cache(old_records, record)
                     new_val_cache = field.convert_to_cache(new_records, record)
@@ -451,7 +563,7 @@ def patched_flush(self, fnames=None):
 
     # Get display names for all affected records
     display_names = {}
-    for rec in self.browse(all_ids):
+    for rec in self.sudo().browse(all_ids):
         try:
             display_names[rec.id] = rec.display_name
         except Exception:
@@ -491,7 +603,7 @@ def patched_flush(self, fnames=None):
                 for rid in missing_queries[field]:
                     row = db_data_map.get(rid)
                     if row:
-                        record = self.browse(rid)
+                        record = self.sudo().browse(rid)
                         val = _safe_convert_to_cache(field, row[field.name], record)
                         old_values.setdefault(rid, {})[field.name] = val
 
@@ -502,7 +614,8 @@ def patched_flush(self, fnames=None):
     # Use oteny_audit_ignore context to prevent infinite recursion
     if all_ids:
         new_values_list = (
-            self.browse(list(all_ids))
+            self.sudo()
+            .browse(list(all_ids))
             .with_context(oteny_audit_ignore=True)
             .read(list(loggable_fields_dict.keys()))
         )
@@ -518,7 +631,7 @@ def patched_flush(self, fnames=None):
 
     for name, field in loggable_fields_dict.items():
         for rid in batches.get(name, []):
-            record = self.browse(rid)
+            record = self.sudo().browse(rid)
             old_val = old_values.get(rid, {}).get(name)
 
             new_val_raw = new_values_map.get(rid, {}).get(name)

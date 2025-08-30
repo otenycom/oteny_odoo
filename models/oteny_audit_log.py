@@ -10,6 +10,13 @@ class OtenyAuditLog(models.Model):
     _description = "Oteny Audit Log"
     _order = "id desc"
 
+    # Predefined parent keys for well-known models
+    # Format: {model_name: "field1,field2,..."}
+    _model_parent_keys = {
+        "mail.message": "model,res_id",
+        "res.partner": "parent_id",
+    }
+
     transaction_id = fields.Integer(required=False, string="Transaction ID")
     model_name = fields.Char(required=True)
     record_id = fields.Integer(required=True, string="Record ID")
@@ -90,13 +97,18 @@ action = {
         module_name = "oteny_audit"
         actions_created = 0
         actions_updated = 0
+        actions_removed = 0
 
         _logger.info(f"Starting audit log action setup for {len(all_models)} models")
+
+        # Track which models should have audit actions
+        models_with_audit = set()
 
         for model in all_models:
             if self._is_audit_ignored(model.model):
                 continue
 
+            models_with_audit.add(model.model)
             action_xml_id = f'{module_name}.action_audit_log_{model.model.replace(".", "_")}'
 
             # Check if action already exists
@@ -117,7 +129,6 @@ action = {
                 existing_action.write(action_vals)
                 actions_updated += 1
             else:
-                _logger.info(f"Creating audit log action for model {model.model}")
                 new_action = self.env["ir.actions.server"].create(action_vals)
 
                 # Create XML ID for the action
@@ -132,7 +143,35 @@ action = {
                 )
                 actions_created += 1
 
-        _logger.info(f"Audit log action setup complete: {actions_created} created, {actions_updated} updated")
+        # Remove actions for models that are now ignored
+        # Find all existing audit log actions for this module
+        existing_xml_ids = self.env["ir.model.data"].search(
+            [
+                ("module", "=", module_name),
+                ("name", "like", "action_audit_log_%"),
+                ("model", "=", "ir.actions.server"),
+            ]
+        )
+
+        for xml_id_record in existing_xml_ids:
+            # Extract model name from XML ID
+            xml_id_name = xml_id_record.name
+            if xml_id_name.startswith("action_audit_log_"):
+                model_name_from_xml = xml_id_name[len("action_audit_log_") :].replace("_", ".")
+
+                # Check if this model should still have an audit action
+                if model_name_from_xml not in models_with_audit:
+                    # This model is now ignored, remove the action
+                    action_to_remove = self.env["ir.actions.server"].browse(xml_id_record.res_id)
+                    if action_to_remove.exists():
+                        _logger.debug(f"Removing audit action for ignored model {model_name_from_xml}")
+                        action_to_remove.unlink()
+                        actions_removed += 1
+
+        # Log all created, updated, and removed actions in a single message
+        _logger.info(
+            f"Audit log action setup complete: {actions_created} created, {actions_updated} updated, {actions_removed} removed"
+        )
 
         return {
             "type": "ir.actions.client",
