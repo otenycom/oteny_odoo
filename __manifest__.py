@@ -9,13 +9,10 @@
     """,
     "data": [
         "security/ir.model.access.csv",
+        "views/res_config_settings_views.xml",
         "views/oteny_audit_log_views.xml",
+        "data/ir_cron_data.xml",
     ],
-    # "assets": {
-    #     "web.assets_backend": [
-    #         "riveraudit/static/src/components/**/*",
-    #     ],
-    # },
     "demo": [],
     "application": True,
     "auto_install": False,

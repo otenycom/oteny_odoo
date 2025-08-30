@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.oteny_audit</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="80" />
+        <field name="inherit_id" ref="base.res_config_settings_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Audit" string="Audit" name="oteny_audit" groups="base.group_user">
+                    <setting string="Enable Audit Log Cleanup" help="Enable automatic cleanup of old audit log records">
+                        <field name="audit_log_cleanup_enabled" />
+                    </setting>
+
+                    <setting string="Retention Period (Days)" help="Number of days to keep audit log records before deletion">
+                        <field name="audit_log_retention_days" />
+                        <span> days</span>
+                    </setting>
+
+                    <setting string="Cleanup Batch Size" help="Number of records to delete in each batch during cleanup">
+                        <field name="audit_log_batch_size" />
+                        <span> records per batch</span>
+                    </setting>
+
+                    <setting string="Cleanup Pause (Seconds)" help="Number of seconds to pause between cleanup batches">
+                        <field name="audit_log_cleanup_pause_seconds" />
+                        <span> seconds</span>
+                    </setting>
+
+                    <setting string="Cleanup Cron Time" help="Cron expression for when to run the cleanup (default: 0 2 * * * = 2 AM daily)">
+                        <field name="audit_log_cleanup_cron_time" class="o_field_char" style="width: 200px;" />
+                        <div class="text-muted mt8">
+                            Format: minute hour day month day-of-week. Use "0 2 * * *" for 2 AM daily.
+                        </div>
+                    </setting>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Action for Audit Settings -->
+    <record id="action_oteny_audit_config_settings" model="ir.actions.act_window">
+        <field name="name">Audit Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'oteny_audit'}</field>
+    </record>
+</odoo>

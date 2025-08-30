@@ -260,6 +260,12 @@
     >
 
         <menuitem
+            id="oteny_audit_log_config_menu_settings"
+            name="Settings"
+            action="action_oteny_audit_config_settings"
+            sequence="5"
+        />
+        <menuitem
             id="oteny_audit_log_raw_menu"
             name="Raw Audit Log (Technical)"
             action="action_oteny_audit_log"

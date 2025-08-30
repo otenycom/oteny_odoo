@@ -182,3 +182,94 @@ action = {
                 "sticky": False,
             },
         }
+
+    def _get_cleanup_config(self):
+        """Get cleanup configuration from system parameters."""
+        get_param = self.env["ir.config_parameter"].sudo().get_param
+        return {
+            "enabled": get_param("oteny_audit.cleanup_enabled", "True").lower() == "true",
+            "retention_days": int(get_param("oteny_audit.retention_days", "180")),
+            "batch_size": int(get_param("oteny_audit.batch_size", "5000")),
+            "pause_seconds": int(get_param("oteny_audit.cleanup_pause_seconds", "5")),
+        }
+
+    def cleanup_old_audit_logs(self):
+        """
+        Clean up old audit log records based on configuration.
+        This method is called by the cron job.
+        """
+        config = self._get_cleanup_config()
+
+        if not config["enabled"]:
+            _logger.info("Audit log cleanup is disabled")
+            return
+
+        # Calculate the cutoff date
+        from datetime import datetime, timedelta
+
+        cutoff_date = datetime.now() - timedelta(days=config["retention_days"])
+
+        _logger.info(
+            f"Starting audit log cleanup. Deleting records older than {config['retention_days']} days "
+            f"(before {cutoff_date.date()}). Batch size: {config['batch_size']}, "
+            f"Pause: {config['pause_seconds']} seconds"
+        )
+
+        # Get total count of records to be deleted
+        old_logs_count = self.search_count([("create_date", "<", cutoff_date)])
+        _logger.info(f"Found {old_logs_count} audit log records to delete")
+
+        if old_logs_count == 0:
+            _logger.info("No old audit log records to delete")
+            return
+
+        deleted_count = 0
+        import time
+
+        # Delete in batches
+        while True:
+            # Find batch of records to delete
+            old_logs = self.search(
+                [("create_date", "<", cutoff_date)], limit=config["batch_size"], order="id"
+            )
+
+            if not old_logs:
+                break
+
+            batch_count = len(old_logs)
+            _logger.info(f"Deleting batch of {batch_count} audit log records...")
+
+            # Delete the batch
+            old_logs.unlink()
+
+            deleted_count += batch_count
+            _logger.info(f"Deleted {deleted_count}/{old_logs_count} audit log records")
+
+            # Check if there are more records to delete
+            remaining_count = self.search_count([("create_date", "<", cutoff_date)])
+            if remaining_count == 0:
+                break
+
+            # Pause between batches to allow DB to process
+            if config["pause_seconds"] > 0:
+                _logger.info(f"Pausing for {config['pause_seconds']} seconds...")
+                time.sleep(config["pause_seconds"])
+
+        _logger.info(f"Audit log cleanup completed. Deleted {deleted_count} records")
+
+        # Also clean up parent references for deleted logs
+        _logger.info("Cleaning up orphaned parent references...")
+        self.env.cr.execute(
+            """
+            DELETE FROM oteny_audit_log_parent_ref
+            WHERE audit_log_id NOT IN (SELECT id FROM oteny_audit_log)
+        """
+        )
+        orphaned_refs_count = self.env.cr.rowcount
+        _logger.info(f"Deleted {orphaned_refs_count} orphaned parent reference records")
+
+        return {
+            "deleted_logs": deleted_count,
+            "deleted_refs": orphaned_refs_count,
+            "cutoff_date": cutoff_date.date(),
+        }
