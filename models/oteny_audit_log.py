@@ -190,7 +190,7 @@ action = {
             "enabled": get_param("oteny_audit.cleanup_enabled", "True").lower() == "true",
             "retention_days": int(get_param("oteny_audit.retention_days", "180")),
             "batch_size": int(get_param("oteny_audit.batch_size", "5000")),
-            "pause_seconds": int(get_param("oteny_audit.cleanup_pause_seconds", "5")),
+            "pause_seconds": int(get_param("oteny_audit.cleanup_pause_seconds", "1")),
         }
 
     def cleanup_old_audit_logs(self):
