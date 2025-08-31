@@ -1,4 +1,5 @@
 from odoo import api, fields, models, tools
+import markupsafe
 
 
 class OtenyAuditLogAggregated(models.Model):
@@ -67,6 +68,82 @@ class OtenyAuditLogAggregated(models.Model):
         compute="_compute_child_record_ref",
         readonly=True,
     )
+    caption = fields.Html(string="Caption", readonly=True, compute="_compute_caption")
+
+    def _compute_caption(self):
+        # self can be ordered by the user in the view. We need to respect that order to check the 'previous' record.
+        log_list = list(self)
+        change_type_verbs = {"i": "Insert", "u": "Update", "d": "Delete"}
+
+        for i, log in enumerate(log_list):
+            caption_parts = []
+
+            # Determine if a header is needed for this log entry.
+            # A header is shown for the first item in a batch, or when the record being audited changes,
+            # or when the transaction ID changes.
+            show_header = False
+            if i == 0:
+                show_header = True
+            else:
+                prev_log = log_list[i - 1]
+
+                # The 'record' is defined by its model and ID.
+                # For child logs, this is the child's model/ID. For parent logs, it's the parent's.
+                current_record_key = (
+                    (log.field_model_name, log.child_record_id, log.change_type)
+                    if log.is_child_log
+                    else (log.model_name, log.record_id, log.change_type)
+                )
+                prev_record_key = (
+                    (prev_log.field_model_name, prev_log.child_record_id, prev_log.change_type)
+                    if prev_log.is_child_log
+                    else (prev_log.model_name, prev_log.record_id, prev_log.change_type)
+                )
+
+                if current_record_key != prev_record_key or log.transaction_id != prev_log.transaction_id:
+                    show_header = True
+
+            if show_header:
+                # The header displays info about the record being changed.
+                # For child logs, record_display_name is the child's name, and field_model_display_name is the child model.
+                # For direct logs, record_display_name is the record's name, and field_model_display_name is its model.
+                model_display = markupsafe.escape(log.field_model_display_name or "")
+                record_display = markupsafe.escape(log.record_display_name or "")
+                verb = change_type_verbs.get(log.change_type, "changed")
+                user_display = markupsafe.escape(log.create_uid.name if log.create_uid else "")
+                date_display = log.create_date.strftime("%d-%b-%Y %H:%M:%S") if log.create_date else ""
+
+                header_str = f"{verb} {model_display} <b>{record_display}</b> by <b>{user_display}</b> on {date_display}"
+                caption_parts.append(f"<div>{header_str}</div>")
+
+            # The second part of the caption describes the specific field change.
+            change_type = log.change_type
+            field_name = markupsafe.escape(log.field_display_name or "")
+
+            if change_type == "i":
+                new_val = markupsafe.escape(log.new_value_display_name or "")
+                field_change_str = f"Set <b>{field_name}</b> to <b>{new_val}</b>"
+            elif change_type == "u":
+                old_val = markupsafe.escape(log.old_value_display_name or "")
+                new_val = markupsafe.escape(log.new_value_display_name or "")
+                field_change_str = (
+                    f"Updated <b>{field_name}</b> from '<b>{old_val}</b>' to '<b>{new_val}</b>'"
+                )
+            elif change_type == "d":
+                old_val = markupsafe.escape(log.old_value_display_name or "")
+                field_change_str = f"<b>{field_name}</b> was <b>{old_val}</b>"
+            else:
+                field_change_str = ""
+
+            if field_change_str:
+                caption_parts.append(f"<div class='ms-4'>{field_change_str}</div>")
+
+            log.caption = markupsafe.Markup("".join(caption_parts))
+
+        # Ensure any records not processed (e.g. empty self) have a value
+        for log in self:
+            if log.caption is False:
+                log.caption = ""
 
     def _selection_record_ref(self):
         return self.env["oteny.audit.log"]._selection_record_ref()

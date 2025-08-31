@@ -149,19 +149,20 @@
         <field name="model">oteny.audit.log.aggregated</field>
         <field name="arch" type="xml">
             <list string="Aggregated Audit Log">
-                <field name="highlight_row" column_invisible="1" />
-                <field name="highlight_row_type" column_invisible="1" />
-                <field name="create_date" string="Timestamp" optional="show" width="100px" />
-                <field name="create_uid" string="User" optional="show" width="100px" />
+                <!-- <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" /> -->
+                <field name="caption" widget="html" optional="show" />
+                <field name="create_date" string="Timestamp" optional="hide" width="100px" />
+                <field name="create_uid" string="User" optional="hide" width="100px" />
                 <field name="model_display_name" optional="hide" width="150px" />
-                <field name="record_id" optional="show" width="100px" />
+                <field name="record_id" optional="hide" width="100px" />
                 <field name="parent_record_display_name" optional="hide" width="400px" />
-                <field name="field_model_display_name" optional="show" width="150px" />
-                <field name="record_display_name" optional="show" width="400px" />
-                <field name="change_type" optional="show" width="30px" />
-                <field name="field_display_name" optional="show" width="200px" />
-                <field name="old_value_display_name" optional="show" width="250px" />
-                <field name="new_value_display_name" optional="show" width="250px" />
+                <field name="field_model_display_name" optional="hide" width="150px" />
+                <field name="record_display_name" optional="hide" width="400px" />
+                <field name="change_type" optional="hide" width="30px" />
+                <field name="field_display_name" optional="hide" width="200px" />
+                <field name="old_value_display_name" optional="hide" width="250px" />
+                <field name="new_value_display_name" optional="hide" width="250px" />
                 <field name="transaction_id" optional="hide" width="100px" />
                 <field name="audit_log_id" optional="hide" width="170px" />
             </list>
@@ -386,7 +387,7 @@
         />
         <menuitem
             id="oteny_audit_log_raw_menu"
-            name="Raw Audit Log (Technical)"
+            name="Plain Audit Log"
             action="action_oteny_audit_log"
             sequence="15"
         />
@@ -394,12 +395,14 @@
             id="oteny_audit_log_config_menu_install"
             name="Enable Audit Log for all models"
             action="action_oteny_audit_log_install"
+            groups="base.group_no_one"
             sequence="10"
         />
         <menuitem
             id="oteny_audit_log_display_menu"
-            name="Audit Log Display"
+            name="Audit Log Display (SQL test/old)"
             action="action_oteny_audit_log_aggregated_display"
+            groups="base.group_no_one"
             sequence="20"
         />
     </menuitem>

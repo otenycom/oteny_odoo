@@ -117,7 +117,7 @@ class OtenyAuditLog(models.Model):
 action = {
     "name": "Audit Log",
     "type": "ir.actions.act_window",
-    "res_model": "oteny.audit.log.aggregated.display",
+    "res_model": "oteny.audit.log.aggregated",
     "view_mode": "list,form",
     "domain": [("model_name", "=", records._name), ("record_id", "in", records.ids)],
     "target": "current",
