@@ -42,192 +42,126 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
         self.env.cr.execute(
             """
             CREATE OR REPLACE VIEW %s AS (
-                WITH original_data AS (
-                    SELECT * FROM oteny_audit_log_aggregated
-                    WHERE transaction_id IS NOT NULL AND transaction_id > 0
-                ),
-                -- Generate transaction headers
-                transaction_headers AS (
+                WITH
+                -- Add row numbers to base logs to identify first entry per transaction/record
+                ranked_logs AS (
                     SELECT
-                        ((transaction_id::BIGINT) * 1000000000000 + 1) AS id,
-                        NULL::INTEGER AS audit_log_id,
-                        MIN(od.create_date) - INTERVAL '1 second' AS create_date,
-                        (ARRAY_AGG(od.create_uid ORDER BY od.create_date ASC))[1] AS create_uid,
+                        *,
+                        ROW_NUMBER() OVER (PARTITION BY transaction_id ORDER BY id ASC) as rn_tx,
+                        ROW_NUMBER() OVER (PARTITION BY transaction_id, model_name, record_id ORDER BY id ASC) as rn_record
+                    FROM
+                        oteny_audit_log
+                    WHERE
+                        transaction_id IS NOT NULL AND transaction_id > 0
+                ),
+                -- Assign a sequence number to each record group within a transaction for ordering
+                record_sequencing AS (
+                    SELECT
                         transaction_id,
-                        NULL::TEXT AS model_name,
-                        NULL::TEXT AS model_display_name,
-                        NULL::INTEGER AS record_id,
-                        NULL::TEXT AS record_display_name,
-                        NULL::TEXT AS parent_record_display_name,
-                        NULL::TEXT AS field_name,
-                        NULL::TEXT AS field_display_name,
-                        NULL::TEXT AS field_model_name,
-                        NULL::TEXT AS field_model_display_name,
-                        NULL::TEXT AS old_value,
-                        NULL::TEXT AS new_value,
-                        NULL::TEXT AS old_value_display_name,
-                        NULL::TEXT AS new_value_display_name,
-                        NULL::TEXT AS change_type,
-                        FALSE AS is_child_log,
-                        NULL::TEXT AS child_model_name,
-                        NULL::TEXT AS child_model_display_name,
-                        NULL::INTEGER AS child_record_id,
-                        'muted'::TEXT AS highlight_row_type,
-                        FALSE AS highlight_row,
-                        'transaction_header'::TEXT AS row_type,
-                        CONCAT(
-                            TO_CHAR(MIN(od.create_date), 'YYYY-MM-DD HH24:MI:SS'),
-                            ' by ',
-                            COALESCE((ARRAY_AGG(rp.name ORDER BY od.create_date ASC))[1], 'Unknown User')
-                        ) AS caption,
-                        0 AS display_sequence
-                    FROM original_data od
-                    LEFT JOIN res_users ru ON od.create_uid = ru.id
-                    LEFT JOIN res_partner rp ON ru.partner_id = rp.id
-                    GROUP BY transaction_id
-                ),
-
-                -- Generate record headers (one per unique record)
-                record_headers AS (
-                    SELECT
-                        ((transaction_id::BIGINT) * 1000000000000 +
-                         CASE WHEN is_child_log THEN child_record_id ELSE record_id END::BIGINT * 1000000 +
-                         LENGTH(CASE WHEN is_child_log THEN child_model_name ELSE model_name END) * 1000 + 2) AS id,
-                        NULL::INTEGER AS audit_log_id,
-                        MIN(create_date) - INTERVAL '0.5 second' AS create_date,
-                        MIN(create_uid) AS create_uid,
-                        transaction_id,
-                        CASE WHEN is_child_log THEN child_model_name ELSE model_name END AS model_name,
-                        CASE WHEN is_child_log THEN child_model_display_name ELSE model_display_name END AS model_display_name,
-                        CASE WHEN is_child_log THEN child_record_id ELSE record_id END AS record_id,
-                        CASE WHEN is_child_log THEN record_display_name ELSE record_display_name END AS record_display_name,
-                        parent_record_display_name,
-                        NULL::TEXT AS field_name,
-                        NULL::TEXT AS field_display_name,
-                        NULL::TEXT AS field_model_name,
-                        NULL::TEXT AS field_model_display_name,
-                        NULL::TEXT AS old_value,
-                        NULL::TEXT AS new_value,
-                        NULL::TEXT AS old_value_display_name,
-                        NULL::TEXT AS new_value_display_name,
-                        NULL::TEXT AS change_type,
-                        is_child_log,
-                        CASE WHEN is_child_log THEN child_model_name ELSE NULL END AS child_model_name,
-                        CASE WHEN is_child_log THEN child_model_display_name ELSE NULL END AS child_model_display_name,
-                        CASE WHEN is_child_log THEN child_record_id ELSE NULL END AS child_record_id,
-                        'muted'::TEXT AS highlight_row_type,
-                        FALSE AS highlight_row,
-                        'record_header'::TEXT AS row_type,
-                        CASE
-                            WHEN is_child_log THEN
-                                CONCAT(
-                                    COALESCE(child_model_display_name, child_model_name, 'Unknown Model'),
-                                    ' ',
-                                    COALESCE(CASE WHEN is_child_log THEN record_display_name ELSE record_display_name END, 'Unknown Child Record'),
-                                    ' on ',
-                                    COALESCE(model_display_name, model_name, 'Unknown Parent Model'),
-                                    ' ',
-                                    COALESCE(parent_record_display_name, 'Unknown Parent Record')
-                                )
-                            ELSE
-                                CONCAT(
-                                    COALESCE(model_display_name, model_name, 'Unknown Model'),
-                                    ' ',
-                                    COALESCE(CASE WHEN is_child_log THEN record_display_name ELSE record_display_name END, 'Unknown Record')
-                                )
-                        END AS caption,
-                        -- Use ROW_NUMBER to assign proper display sequences
-                        ROW_NUMBER() OVER (
-                            PARTITION BY transaction_id
-                            ORDER BY
-                                CASE WHEN is_child_log THEN child_record_id ELSE record_id END,
-                                CASE WHEN is_child_log THEN child_model_name ELSE model_name END
-                        ) * 100 + 1 AS display_sequence
-                    FROM original_data
-                    GROUP BY transaction_id,
-                             CASE WHEN is_child_log THEN child_record_id ELSE record_id END,
-                             CASE WHEN is_child_log THEN child_model_name ELSE model_name END,
-                             CASE WHEN is_child_log THEN child_model_display_name ELSE model_display_name END,
-                             CASE WHEN is_child_log THEN record_display_name ELSE record_display_name END,
-                             is_child_log, child_model_name, child_model_display_name, child_record_id,
-                             model_name, model_display_name, record_id, parent_record_display_name
-                ),
-
-                -- Generate field changes with matching display sequences
-                field_changes AS (
-                    SELECT
-                        od.id::BIGINT,
-                        od.audit_log_id,
-                        od.create_date,
-                        od.create_uid,
-                        od.transaction_id,
-                        od.model_name,
-                        od.model_display_name,
-                        od.record_id,
-                        od.record_display_name,
-                        od.parent_record_display_name,
-                        od.field_name,
-                        od.field_display_name,
-                        od.field_model_name,
-                        od.field_model_display_name,
-                        od.old_value,
-                        od.new_value,
-                        od.old_value_display_name,
-                        od.new_value_display_name,
-                        od.change_type,
-                        od.is_child_log,
-                        od.child_model_name,
-                        od.child_model_display_name,
-                        od.child_record_id,
-                        od.highlight_row_type,
-                        od.highlight_row,
-                        'field_change'::TEXT AS row_type,
-                        CASE
-                            WHEN od.change_type = 'i' THEN
-                                CONCAT(
-                                    'Insert ',
-                                    COALESCE(od.field_display_name, od.field_name, 'Unknown Field'),
-                                    ' to ',
-                                    COALESCE(od.new_value_display_name, od.new_value, '')
-                                )
-                            WHEN od.change_type = 'd' THEN
-                                CONCAT(
-                                    'Delete ',
-                                    COALESCE(od.field_display_name, od.field_name, 'Unknown Field'),
-                                    ' (was ',
-                                    COALESCE(od.old_value_display_name, od.old_value, ''),
-                                    ')'
-                                )
-                            ELSE -- 'u' for update
-                                CONCAT(
-                                    'Update ',
-                                    COALESCE(od.field_display_name, od.field_name, 'Unknown Field'),
-                                    ' from ',
-                                    COALESCE(od.old_value_display_name, od.old_value, ''),
-                                    ' to ',
-                                    COALESCE(od.new_value_display_name, od.new_value, '')
-                                )
-                        END AS caption,
-                        -- Calculate display sequence to match record headers
-                        rh.display_sequence + ROW_NUMBER() OVER (
-                            PARTITION BY od.transaction_id,
-                                         CASE WHEN od.is_child_log THEN od.child_record_id ELSE od.record_id END,
-                                         CASE WHEN od.is_child_log THEN od.child_model_name ELSE od.model_name END
-                            ORDER BY od.create_date DESC, od.id DESC
-                        ) AS display_sequence
-                    FROM original_data od
-                    JOIN record_headers rh ON
-                        od.transaction_id = rh.transaction_id AND
-                        CASE WHEN od.is_child_log THEN od.child_record_id ELSE od.record_id END = rh.record_id AND
-                        CASE WHEN od.is_child_log THEN od.child_model_name ELSE od.model_name END = rh.model_name
+                        model_name,
+                        record_id,
+                        -- Use DENSE_RANK to get a sequence for each record within a transaction, ordered by first appearance
+                        DENSE_RANK() OVER (PARTITION BY transaction_id ORDER BY MIN(id)) * 100 AS record_display_seq
+                    FROM ranked_logs
+                    GROUP BY transaction_id, model_name, record_id
                 )
-                -- Combine all rows
-                SELECT * FROM transaction_headers
+
+                -- 1. Transaction Headers
+                SELECT
+                    (l.transaction_id::bigint * 1000000000000 + 1) AS id,
+                    NULL::integer AS audit_log_id,
+                    l.create_date - interval '1 second' AS create_date,
+                    l.create_uid,
+                    l.transaction_id,
+                    NULL::varchar AS model_name,
+                    NULL::varchar AS model_display_name,
+                    NULL::integer AS record_id,
+                    NULL::varchar AS record_display_name,
+                    NULL::varchar AS parent_record_display_name,
+                    NULL::varchar AS field_name,
+                    NULL::varchar AS field_display_name,
+                    NULL::varchar AS field_model_name,
+                    NULL::varchar AS field_model_display_name,
+                    NULL::text AS old_value,
+                    NULL::text AS new_value,
+                    NULL::varchar AS old_value_display_name,
+                    NULL::varchar AS new_value_display_name,
+                    NULL::varchar AS change_type,
+                    FALSE AS is_child_log,
+                    NULL::varchar AS child_model_name,
+                    NULL::varchar AS child_model_display_name,
+                    NULL::integer AS child_record_id,
+                    'muted'::varchar AS highlight_row_type,
+                    FALSE AS highlight_row,
+                    'transaction_header'::varchar AS row_type,
+                    CONCAT(
+                        TO_CHAR(l.create_date, 'YYYY-MM-DD HH24:MI:SS'),
+                        ' by ',
+                        COALESCE((SELECT p.name::text FROM res_users u JOIN res_partner p ON u.partner_id = p.id WHERE u.id = l.create_uid), 'Unknown User')
+                    ) AS caption,
+                    1 AS display_sequence
+                FROM ranked_logs l
+                WHERE l.rn_tx = 1
+
                 UNION ALL
-                SELECT * FROM record_headers
+
+                -- 2. Record Headers
+                SELECT
+                    (l.transaction_id::bigint * 1000000000000 + l.record_id::bigint * 1000000 + 2) AS id,
+                    NULL::integer AS audit_log_id,
+                    l.create_date - interval '0.5 second' AS create_date,
+                    l.create_uid,
+                    l.transaction_id,
+                    l.model_name,
+                    (SELECT name::text FROM ir_model WHERE model = l.model_name) AS model_display_name,
+                    l.record_id,
+                    l.record_display_name::varchar,
+                    NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::text, NULL::text, NULL::varchar, NULL::varchar, NULL::varchar,
+                    FALSE, NULL::varchar, NULL::varchar, NULL::integer,
+                    'muted'::varchar,
+                    FALSE,
+                    'record_header'::varchar AS row_type,
+                    CONCAT(COALESCE((SELECT name::text FROM ir_model WHERE model = l.model_name), l.model_name), ' ', COALESCE(l.record_display_name::text, '')),
+                    rs.record_display_seq
+                FROM ranked_logs l
+                JOIN record_sequencing rs ON l.transaction_id = rs.transaction_id AND l.model_name = rs.model_name AND l.record_id = rs.record_id
+                WHERE l.rn_record = 1
+
                 UNION ALL
-                SELECT * FROM field_changes
-                ORDER BY transaction_id DESC, display_sequence ASC, create_date DESC, id DESC
-            )"""
+
+                -- 3. Field Changes
+                SELECT
+                    l.id::bigint,
+                    l.id AS audit_log_id,
+                    l.create_date,
+                    l.create_uid,
+                    l.transaction_id,
+                    l.model_name,
+                    (SELECT name::text FROM ir_model WHERE model = l.model_name),
+                    l.record_id,
+                    l.record_display_name::varchar,
+                    NULL,
+                    l.field_name,
+                    l.field_display_name,
+                    NULL, NULL,
+                    l.old_value,
+                    l.new_value,
+                    l.old_value_display_name,
+                    l.new_value_display_name,
+                    l.change_type,
+                    FALSE, NULL, NULL, NULL,
+                    NULL,
+                    FALSE,
+                    'field_change'::varchar AS row_type,
+                    CASE
+                        WHEN l.change_type = 'i' THEN CONCAT('Insert ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
+                        WHEN l.change_type = 'd' THEN CONCAT('Delete ', COALESCE(l.field_display_name, l.field_name), ' (was: ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ')')
+                        ELSE CONCAT('Update ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ' -> ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
+                    END,
+                    rs.record_display_seq + (ROW_NUMBER() OVER (PARTITION BY l.transaction_id, l.model_name, l.record_id ORDER BY l.id ASC))
+                FROM ranked_logs l
+                JOIN record_sequencing rs ON l.transaction_id = rs.transaction_id AND l.model_name = rs.model_name AND l.record_id = rs.record_id
+            )
+            """
             % self._table
         )

@@ -258,7 +258,7 @@
         <field name="name">oteny.audit.log.aggregated.display.list</field>
         <field name="model">oteny.audit.log.aggregated.display</field>
         <field name="arch" type="xml">
-            <list string="Audit Log Display" create="false" edit="false">
+            <list string="Audit Log Display" create="false" edit="false" decoration-bf="row_type == 'record_header' or row_type == 'transaction_header'">
                 <field name="caption" widget="text" />
                 <field name="row_type" widget="text" optional="show" />
             </list>
