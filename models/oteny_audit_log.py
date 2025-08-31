@@ -80,7 +80,7 @@ class OtenyAuditLog(models.Model):
     def install_for_all_models_action(self):
         """Create audit log actions for all models that don't already have them.
         This will be called automatically when modules are installed.
-        Creates two actions per model: display and technical (raw) versions.
+        Creates one action per model for the raw aggregated view.
         """
         # Get all non-transient models except ourselves
         all_models = self.env["ir.model"].search([("transient", "=", False), ("model", "!=", self._name)])
@@ -111,22 +111,11 @@ class OtenyAuditLog(models.Model):
             },
         }
 
-    def _get_action_codes(self):
-        """Get the action code templates for display and technical actions."""
-        DISPLAY_ACTION_CODE = """
+    def _get_action_code(self):
+        """Get the action code template for the audit log action."""
+        ACTION_CODE = """
 action = {
     "name": "Audit Log",
-    "type": "ir.actions.act_window",
-    "res_model": "oteny.audit.log.aggregated.display",
-    "view_mode": "list,form",
-    "domain": [("model_name", "=", records._name), ("record_id", "in", records.ids)],
-    "target": "current",
-}
-"""
-
-        TECHNICAL_ACTION_CODE = """
-action = {
-    "name": "Audit Log (Technical)",
     "type": "ir.actions.act_window",
     "res_model": "oteny.audit.log.aggregated",
     "view_mode": "list,form",
@@ -134,47 +123,30 @@ action = {
     "target": "current",
 }
 """
-        return DISPLAY_ACTION_CODE.strip(), TECHNICAL_ACTION_CODE.strip()
+        return ACTION_CODE.strip()
 
     def _batch_process_actions(self, models):
         """Process action creation/updates in batches for better performance."""
-        display_code, technical_code = self._get_action_codes()
+        action_code = self._get_action_code()
         module_name = "oteny_audit"
 
-        # Prepare batch data for both action types
-        display_actions_data = []
-        technical_actions_data = []
-        xml_ids_data = []
+        actions_data = []
 
         for model in models:
-            # Display action data
-            display_xml_id = f"{module_name}.action_audit_log_display_{model.model.replace('.', '_')}"
-            display_actions_data.append(
+            xml_id = f"{module_name}.action_audit_log_{model.model.replace('.', '_')}"
+            actions_data.append(
                 {
-                    "xml_id": display_xml_id,
+                    "xml_id": xml_id,
                     "name": f"Audit Log for {model.name}",
                     "model_id": model.id,
-                    "code": display_code,
+                    "code": action_code,
                 }
             )
 
-            # Technical action data
-            technical_xml_id = f"{module_name}.action_audit_log_technical_{model.model.replace('.', '_')}"
-            technical_actions_data.append(
-                {
-                    "xml_id": technical_xml_id,
-                    "name": f"Audit Log for {model.name} (Technical)",
-                    "model_id": model.id,
-                    "code": technical_code,
-                }
-            )
+        # Process actions
+        created, updated = self._process_action_batch(actions_data, "audit")
 
-        # Process display actions
-        display_created, display_updated = self._process_action_batch(display_actions_data, "display")
-        # Process technical actions
-        technical_created, technical_updated = self._process_action_batch(technical_actions_data, "technical")
-
-        return display_created + technical_created, display_updated + technical_updated
+        return created, updated
 
     def _process_action_batch(self, actions_data, action_type):
         """Process a batch of actions, creating new ones and updating existing ones."""
@@ -228,11 +200,13 @@ action = {
         module_name = "oteny_audit"
         actions_removed = 0
 
-        # Get all current eligible model names
-        current_model_names = {model.model for model in eligible_models}
+        # Build a set of expected XML IDs for all eligible models
+        expected_xml_ids = {
+            f"{module_name}.action_audit_log_{model.model.replace('.', '_')}" for model in eligible_models
+        }
 
         # Find all existing audit log actions for this module
-        existing_xml_ids = self.env["ir.model.data"].search(
+        existing_xml_id_records = self.env["ir.model.data"].search(
             [
                 ("module", "=", module_name),
                 ("name", "like", "action_audit_log_%"),
@@ -240,24 +214,13 @@ action = {
             ]
         )
 
-        for xml_id_record in existing_xml_ids:
-            # Extract model name from XML ID
-            xml_id_name = xml_id_record.name
-            if xml_id_name.startswith("action_audit_log_display_"):
-                model_name_from_xml = xml_id_name[len("action_audit_log_display_") :].replace("_", ".")
-            elif xml_id_name.startswith("action_audit_log_technical_"):
-                model_name_from_xml = xml_id_name[len("action_audit_log_technical_") :].replace("_", ".")
-            elif xml_id_name.startswith("action_audit_log_"):
-                # Handle legacy XML IDs without display/technical suffix
-                model_name_from_xml = xml_id_name[len("action_audit_log_") :].replace("_", ".")
-            else:
-                continue
-
-            # Remove action if model is no longer eligible
-            if model_name_from_xml not in current_model_names:
+        for xml_id_record in existing_xml_id_records:
+            full_xml_id = f"{xml_id_record.module}.{xml_id_record.name}"
+            if full_xml_id not in expected_xml_ids:
                 action_to_remove = self.env["ir.actions.server"].browse(xml_id_record.res_id)
                 if action_to_remove.exists():
-                    _logger.debug(f"Removing audit action for ignored model {model_name_from_xml}")
+                    _logger.debug(f"Removing obsolete audit action with XML ID {full_xml_id}")
+                    xml_id_record.unlink()
                     action_to_remove.unlink()
                     actions_removed += 1
 

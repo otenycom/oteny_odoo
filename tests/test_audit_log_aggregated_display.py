@@ -454,88 +454,62 @@ class TestAuditLogAggregatedDisplay(TransactionCase):
                 "Field changes should be ordered by create_date DESC",
             )
 
-    def test_install_for_all_models_action_creates_two_actions_per_model(self):
-        """Test that install_for_all_models_action creates two actions per model"""
-        # Count existing audit actions before running the method
-        existing_actions_before = self.env["ir.actions.server"].search_count(
-            [
-                ("name", "like", "Audit Log for%"),
-            ]
-        )
-
-        # Get the audit log model and run the method
+    def test_install_for_all_models_action_creates_one_action_per_model(self):
+        """Test that install_for_all_models_action creates one action per model"""
+        # Get the audit log model and run the method to clean up and create actions
         audit_log_model = self.env["oteny.audit.log"]
         result = audit_log_model.install_for_all_models_action()
 
-        # Count actions after running the method
-        existing_actions_after = self.env["ir.actions.server"].search_count(
+        # Verify that actions were created
+        actions_created = result.get("actions_created", 0)
+        self.assertGreaterEqual(actions_created, 0, "Should create at least some actions")
+
+        # Get all audit log actions
+        all_actions = self.env["ir.actions.server"].search(
             [
                 ("name", "like", "Audit Log for%"),
             ]
         )
+        self.assertTrue(all_actions, "Should have created audit log actions")
 
-        # Verify that actions were created (since we're running on a test database,
-        # we expect some actions to be created)
-        actions_created = result.get("actions_created", 0)
-        self.assertGreaterEqual(actions_created, 0, "Should create at least some actions")
+        # Verify that no technical/display actions exist anymore
+        raw_actions = all_actions.filtered(lambda a: "(Technical)" in a.name)
+        self.assertEqual(len(raw_actions), 0, "Should be no actions with '(Technical)' in the name")
 
-        # Get a sample of actions to verify they have the expected structure
-        sample_actions = self.env["ir.actions.server"].search(
-            [
-                ("name", "like", "Audit Log for%"),
-            ],
-            limit=10,
+        display_actions_with_old_model = all_actions.filtered(
+            lambda a: "oteny.audit.log.aggregated.display" in a.code
+        )
+        self.assertEqual(
+            len(display_actions_with_old_model),
+            0,
+            "No action should reference the old 'oteny.audit.log.aggregated.display' model",
         )
 
-        if sample_actions:
-            # Check that we have both display and raw actions
-            display_actions = sample_actions.filtered(lambda a: "(Technical)" not in a.name)
-            raw_actions = sample_actions.filtered(lambda a: "(Technical)" in a.name)
+        # Verify that actions have the correct structure
+        for action in all_actions:
+            # Check that actions reference the aggregated model
+            self.assertIn(
+                "oteny.audit.log.aggregated",
+                action.code,
+                f"Action should reference aggregated model: {action.name}",
+            )
+            self.assertNotIn(
+                "(Technical)",
+                action.name,
+                "Action name should not contain '(Technical)'",
+            )
 
-            self.assertTrue(display_actions or raw_actions, "Should have at least some audit log actions")
+        # Verify that we have only one action per model
+        model_names = [action.name.replace("Audit Log for ", "") for action in all_actions]
+        unique_models = set(model_names)
 
-            # Verify that the actions have the correct structure
-            for action in display_actions:
-                # Check that display actions reference the display model
-                self.assertIn(
-                    "oteny.audit.log.aggregated.display",
-                    action.code,
-                    f"Display action should reference display model: {action.name}",
-                )
-
-            for action in raw_actions:
-                # Check that raw actions reference the raw aggregated model
-                self.assertIn(
-                    "oteny.audit.log.aggregated",
-                    action.code,
-                    f"Raw action should reference aggregated model: {action.name}",
-                )
-                self.assertNotIn(
-                    "oteny.audit.log.aggregated.display",
-                    action.code,
-                    f"Raw action should not reference display model: {action.name}",
-                )
-
-            # Verify that we have pairs of actions (display + raw) for models
-            if len(sample_actions) >= 2:
-                # Check if we have both display and raw versions for the same model
-                model_names = [
-                    action.name.replace("Audit Log for ", "").replace(" (Technical)", "")
-                    for action in sample_actions
-                ]
-                unique_models = set(model_names)
-
-                # If we have multiple actions for the same model, we should have both display and raw
-                for model_name in unique_models:
-                    model_actions = sample_actions.filtered(
-                        lambda a: model_name
-                        in a.name.replace("Audit Log for ", "").replace(" (Technical)", "")
-                    )
-                    if len(model_actions) >= 2:
-                        has_display = any("(Technical)" not in a.name for a in model_actions)
-                        has_raw = any("(Technical)" in a.name for a in model_actions)
-                        if has_display and has_raw:
-                            break  # We found a complete pair, test passes
+        # The number of actions should be equal to the number of unique model display names
+        # This is a bit fragile if model names are not unique, but good enough for a test
+        self.assertEqual(
+            len(all_actions),
+            len(unique_models),
+            "Should have exactly one action per model display name",
+        )
 
     def test_display_view_insert_delete_operations(self):
         """Test display view formatting for insert and delete operations"""
