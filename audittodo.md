@@ -33,6 +33,7 @@
     Veld A van X naar Y
     Veld B van Z naar W
 - [x] highlight_row of grid based on transaction_id changing between rows, so each single transaction is easily recognized by the user
-- audit viewer should show record name als single row (header), with the field changes below; makes the list less wide and helps visual focus
+- [~] audit viewer should show record name als single row (header), with the field changes below; makes the list less wide and helps visual focus
+  - [ ] Instead of CTE query / "oteny.audit.log.aggregated.display", just list oteny.audit.log.aggregated and generate the caption in Python as a HTML field, in python, scan one row forward/backward in the self recordset to see if a new record_header needs to be generated, if so, just insert in the HTML of the Caption of the current row
 - Add support for translated fields
 - Add support for company-dependent fields  
