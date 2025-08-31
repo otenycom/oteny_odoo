@@ -80,10 +80,53 @@ class OtenyAuditLog(models.Model):
     def install_for_all_models_action(self):
         """Create audit log actions for all models that don't already have them.
         This will be called automatically when modules are installed.
+        Creates two actions per model: display and technical (raw) versions.
         """
-        ACTION_CODE = """
+        # Get all non-transient models except ourselves
+        all_models = self.env["ir.model"].search([("transient", "=", False), ("model", "!=", self._name)])
+        eligible_models = all_models.filtered(lambda m: not self._is_audit_ignored(m.model))
+
+        _logger.info(f"Starting audit log action setup for {len(eligible_models)} models")
+
+        # Process actions in batches for better performance and readability
+        actions_created, actions_updated = self._batch_process_actions(eligible_models)
+
+        # Clean up actions for models that are no longer eligible
+        actions_removed = self._cleanup_obsolete_actions(eligible_models)
+
+        # Log summary
+        total_models = len(eligible_models)
+        _logger.info(
+            f"Audit log action setup complete: {actions_created} created, {actions_updated} updated, {actions_removed} removed "
+            f"({total_models} models processed)"
+        )
+
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": "Audit Log Setup Complete",
+                "message": f"Created {actions_created} new audit actions ({total_models} models), updated {actions_updated} existing ones.",
+                "sticky": False,
+            },
+        }
+
+    def _get_action_codes(self):
+        """Get the action code templates for display and technical actions."""
+        DISPLAY_ACTION_CODE = """
 action = {
     "name": "Audit Log",
+    "type": "ir.actions.act_window",
+    "res_model": "oteny.audit.log.aggregated.display",
+    "view_mode": "list,form",
+    "domain": [("model_name", "=", records._name), ("record_id", "in", records.ids)],
+    "target": "current",
+}
+"""
+
+        TECHNICAL_ACTION_CODE = """
+action = {
+    "name": "Audit Log (Technical)",
     "type": "ir.actions.act_window",
     "res_model": "oteny.audit.log.aggregated",
     "view_mode": "list,form",
@@ -91,50 +134,85 @@ action = {
     "target": "current",
 }
 """
-        # Get all non-transient models except ourselves
-        all_models = self.env["ir.model"].search([("transient", "=", False), ("model", "!=", self._name)])
+        return DISPLAY_ACTION_CODE.strip(), TECHNICAL_ACTION_CODE.strip()
 
+    def _batch_process_actions(self, models):
+        """Process action creation/updates in batches for better performance."""
+        display_code, technical_code = self._get_action_codes()
+        module_name = "oteny_audit"
+
+        # Prepare batch data for both action types
+        display_actions_data = []
+        technical_actions_data = []
+        xml_ids_data = []
+
+        for model in models:
+            # Display action data
+            display_xml_id = f"{module_name}.action_audit_log_display_{model.model.replace('.', '_')}"
+            display_actions_data.append(
+                {
+                    "xml_id": display_xml_id,
+                    "name": f"Audit Log for {model.name}",
+                    "model_id": model.id,
+                    "code": display_code,
+                }
+            )
+
+            # Technical action data
+            technical_xml_id = f"{module_name}.action_audit_log_technical_{model.model.replace('.', '_')}"
+            technical_actions_data.append(
+                {
+                    "xml_id": technical_xml_id,
+                    "name": f"Audit Log for {model.name} (Technical)",
+                    "model_id": model.id,
+                    "code": technical_code,
+                }
+            )
+
+        # Process display actions
+        display_created, display_updated = self._process_action_batch(display_actions_data, "display")
+        # Process technical actions
+        technical_created, technical_updated = self._process_action_batch(technical_actions_data, "technical")
+
+        return display_created + technical_created, display_updated + technical_updated
+
+    def _process_action_batch(self, actions_data, action_type):
+        """Process a batch of actions, creating new ones and updating existing ones."""
         module_name = "oteny_audit"
         actions_created = 0
         actions_updated = 0
-        actions_removed = 0
 
-        _logger.info(f"Starting audit log action setup for {len(all_models)} models")
+        # Check which actions already exist
+        xml_ids = [data["xml_id"] for data in actions_data]
+        existing_refs = {}
+        for xml_id in xml_ids:
+            existing_ref = self.env.ref(xml_id, raise_if_not_found=False)
+            if existing_ref:
+                existing_refs[xml_id] = existing_ref
 
-        # Track which models should have audit actions
-        models_with_audit = set()
-
-        for model in all_models:
-            if self._is_audit_ignored(model.model):
-                continue
-
-            models_with_audit.add(model.model)
-            action_xml_id = f'{module_name}.action_audit_log_{model.model.replace(".", "_")}'
-
-            # Check if action already exists
-            existing_action = self.env.ref(action_xml_id, raise_if_not_found=False)
-
-            action_name = f"Audit Log for {model.name}"
+        # Process each action
+        for action_data in actions_data:
+            xml_id = action_data["xml_id"]
             action_vals = {
-                "name": action_name,
-                "model_id": model.id,
-                "binding_model_id": model.id,
+                "name": action_data["name"],
+                "model_id": action_data["model_id"],
+                "binding_model_id": action_data["model_id"],
                 "state": "code",
                 "binding_view_types": "list,form",
-                "code": ACTION_CODE.strip(),
+                "code": action_data["code"],
             }
 
-            if existing_action:
-                _logger.debug(f"Action already exists for model {model.model}, updating it.")
-                existing_action.write(action_vals)
+            if xml_id in existing_refs:
+                # Update existing action
+                _logger.debug(f"{action_type.title()} action already exists for model, updating it.")
+                existing_refs[xml_id].write(action_vals)
                 actions_updated += 1
             else:
+                # Create new action
                 new_action = self.env["ir.actions.server"].create(action_vals)
-
-                # Create XML ID for the action
                 self.env["ir.model.data"].create(
                     {
-                        "name": action_xml_id.split(".")[1],
+                        "name": xml_id.split(".")[1],
                         "module": module_name,
                         "res_id": new_action.id,
                         "model": "ir.actions.server",
@@ -143,7 +221,16 @@ action = {
                 )
                 actions_created += 1
 
-        # Remove actions for models that are now ignored
+        return actions_created, actions_updated
+
+    def _cleanup_obsolete_actions(self, eligible_models):
+        """Remove actions for models that are no longer eligible for auditing."""
+        module_name = "oteny_audit"
+        actions_removed = 0
+
+        # Get all current eligible model names
+        current_model_names = {model.model for model in eligible_models}
+
         # Find all existing audit log actions for this module
         existing_xml_ids = self.env["ir.model.data"].search(
             [
@@ -156,32 +243,25 @@ action = {
         for xml_id_record in existing_xml_ids:
             # Extract model name from XML ID
             xml_id_name = xml_id_record.name
-            if xml_id_name.startswith("action_audit_log_"):
+            if xml_id_name.startswith("action_audit_log_display_"):
+                model_name_from_xml = xml_id_name[len("action_audit_log_display_") :].replace("_", ".")
+            elif xml_id_name.startswith("action_audit_log_technical_"):
+                model_name_from_xml = xml_id_name[len("action_audit_log_technical_") :].replace("_", ".")
+            elif xml_id_name.startswith("action_audit_log_"):
+                # Handle legacy XML IDs without display/technical suffix
                 model_name_from_xml = xml_id_name[len("action_audit_log_") :].replace("_", ".")
+            else:
+                continue
 
-                # Check if this model should still have an audit action
-                if model_name_from_xml not in models_with_audit:
-                    # This model is now ignored, remove the action
-                    action_to_remove = self.env["ir.actions.server"].browse(xml_id_record.res_id)
-                    if action_to_remove.exists():
-                        _logger.debug(f"Removing audit action for ignored model {model_name_from_xml}")
-                        action_to_remove.unlink()
-                        actions_removed += 1
+            # Remove action if model is no longer eligible
+            if model_name_from_xml not in current_model_names:
+                action_to_remove = self.env["ir.actions.server"].browse(xml_id_record.res_id)
+                if action_to_remove.exists():
+                    _logger.debug(f"Removing audit action for ignored model {model_name_from_xml}")
+                    action_to_remove.unlink()
+                    actions_removed += 1
 
-        # Log all created, updated, and removed actions in a single message
-        _logger.info(
-            f"Audit log action setup complete: {actions_created} created, {actions_updated} updated, {actions_removed} removed"
-        )
-
-        return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": "Audit Log Setup Complete",
-                "message": f"Created {actions_created} new audit actions, updated {actions_updated} existing ones.",
-                "sticky": False,
-            },
-        }
+        return actions_removed
 
     def _get_cleanup_config(self):
         """Get cleanup configuration from system parameters."""
