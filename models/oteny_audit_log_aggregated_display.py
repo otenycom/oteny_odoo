@@ -31,11 +31,24 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
     child_model_name = fields.Char(string="Child Model Name", readonly=True)
     child_model_display_name = fields.Char(string="Child Model Display Name", readonly=True)
     child_record_id = fields.Integer(string="Child Record ID", readonly=True)
-    highlight_row_type = fields.Char(string="Highlight Row Type", readonly=True)
-    highlight_row = fields.Boolean(string="Highlight Row", readonly=True)
+    highlight_row_type = fields.Char(string="Highlight Row Type", compute="_compute_highlight")
+    highlight_row = fields.Boolean(string="Highlight Row", compute="_compute_highlight")
     row_type = fields.Char(string="Row Type", readonly=True)
     caption = fields.Text(string="Caption", readonly=True)
     display_sequence = fields.Integer(string="Display Sequence", readonly=True)
+
+    @api.depends("row_type")
+    def _compute_highlight(self):
+        for record in self:
+            if record.row_type == "transaction_header":
+                record.highlight_row = True
+                record.highlight_row_type = "info"
+            elif record.row_type == "record_header":
+                record.highlight_row = True
+                record.highlight_row_type = "muted"
+            else:  # field_change
+                record.highlight_row = False
+                record.highlight_row_type = None
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
@@ -91,8 +104,6 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     NULL::varchar AS child_model_name,
                     NULL::varchar AS child_model_display_name,
                     NULL::integer AS child_record_id,
-                    'muted'::varchar AS highlight_row_type,
-                    FALSE AS highlight_row,
                     'transaction_header'::varchar AS row_type,
                     CONCAT(
                         TO_CHAR(l.create_date, 'YYYY-MM-DD HH24:MI:SS'),
@@ -113,15 +124,13 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     l.create_uid,
                     l.transaction_id,
                     l.model_name,
-                    (SELECT name::text FROM ir_model WHERE model = l.model_name) AS model_display_name,
+                    (SELECT name::jsonb->>'en_US' FROM ir_model WHERE model = l.model_name) AS model_display_name,
                     l.record_id,
                     l.record_display_name::varchar,
                     NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::text, NULL::text, NULL::varchar, NULL::varchar, NULL::varchar,
                     FALSE, NULL::varchar, NULL::varchar, NULL::integer,
-                    'muted'::varchar,
-                    FALSE,
                     'record_header'::varchar AS row_type,
-                    CONCAT(COALESCE((SELECT name::text FROM ir_model WHERE model = l.model_name), l.model_name), ' ', COALESCE(l.record_display_name::text, '')),
+                    CONCAT(COALESCE((SELECT name::jsonb->>'en_US' FROM ir_model WHERE model = l.model_name), l.model_name), ' ', COALESCE(l.record_display_name::text, '')),
                     rs.record_display_seq
                 FROM ranked_logs l
                 JOIN record_sequencing rs ON l.transaction_id = rs.transaction_id AND l.model_name = rs.model_name AND l.record_id = rs.record_id
@@ -137,7 +146,7 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     l.create_uid,
                     l.transaction_id,
                     l.model_name,
-                    (SELECT name::text FROM ir_model WHERE model = l.model_name),
+                    (SELECT name::jsonb->>'en_US' FROM ir_model WHERE model = l.model_name),
                     l.record_id,
                     l.record_display_name::varchar,
                     NULL,
@@ -150,13 +159,11 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     l.new_value_display_name,
                     l.change_type,
                     FALSE, NULL, NULL, NULL,
-                    NULL,
-                    FALSE,
                     'field_change'::varchar AS row_type,
                     CASE
-                        WHEN l.change_type = 'i' THEN CONCAT('Insert ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
-                        WHEN l.change_type = 'd' THEN CONCAT('Delete ', COALESCE(l.field_display_name, l.field_name), ' (was: ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ')')
-                        ELSE CONCAT('Update ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ' -> ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
+                        WHEN l.change_type = 'i' THEN CONCAT('Inserted ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
+                        WHEN l.change_type = 'd' THEN CONCAT('Deleted ', COALESCE(l.field_display_name, l.field_name), ' (was: ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ')')
+                        ELSE CONCAT('Updated ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ' -> ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
                     END,
                     rs.record_display_seq + (ROW_NUMBER() OVER (PARTITION BY l.transaction_id, l.model_name, l.record_id ORDER BY l.id ASC))
                 FROM ranked_logs l
