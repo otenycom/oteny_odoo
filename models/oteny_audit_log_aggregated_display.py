@@ -16,6 +16,12 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
     model_name = fields.Char(string="Model Name", readonly=True)
     model_display_name = fields.Char(string="Model Display Name", readonly=True)
     record_id = fields.Integer(string="Record ID", readonly=True)
+    record_ref = fields.Reference(
+        string="Record Link",
+        selection="_selection_record_ref",
+        compute="_compute_record_ref",
+        readonly=True,
+    )
     record_display_name = fields.Char(string="Record Display Name", readonly=True)
     parent_record_display_name = fields.Char(string="Parent Record Display Name", readonly=True)
     field_name = fields.Char(string="Field Name", readonly=True)
@@ -31,6 +37,12 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
     child_model_name = fields.Char(string="Child Model Name", readonly=True)
     child_model_display_name = fields.Char(string="Child Model Display Name", readonly=True)
     child_record_id = fields.Integer(string="Child Record ID", readonly=True)
+    child_record_ref = fields.Reference(
+        string="Child Record Link",
+        selection="_selection_record_ref",
+        compute="_compute_child_record_ref",
+        readonly=True,
+    )
     highlight_row_type = fields.Char(string="Highlight Row Type", compute="_compute_highlight")
     highlight_row = fields.Boolean(string="Highlight Row", compute="_compute_highlight")
     row_type = fields.Char(string="Row Type", readonly=True)
@@ -46,6 +58,22 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
             else:  # field_change
                 record.highlight_row = False
                 record.highlight_row_type = None
+
+    def _selection_record_ref(self):
+        return self.env["oteny.audit.log"]._selection_record_ref()
+
+    def _compute_record_ref(self):
+        for log in self:
+            log.record_ref = (
+                f"{log.model_name},{log.record_id}" if log.model_name and log.record_id else False
+            )
+
+    def _compute_child_record_ref(self):
+        for log in self:
+            if log.is_child_log and log.child_model_name and log.child_record_id:
+                log.child_record_ref = f"{log.child_model_name},{log.child_record_id}"
+            else:
+                log.child_record_ref = False
 
     def init(self):
         tools.drop_view_if_exists(self.env.cr, self._table)
