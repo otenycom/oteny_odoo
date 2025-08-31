@@ -81,7 +81,7 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                         record_id,
                         (CASE WHEN is_child_log THEN child_model_name ELSE model_name END) AS subject_model_name,
                         (CASE WHEN is_child_log THEN child_record_id ELSE record_id END) AS subject_record_id,
-                        DENSE_RANK() OVER (PARTITION BY transaction_id, model_name, record_id ORDER BY MIN(create_date), MIN(id)) * 100 AS record_display_seq
+                        DENSE_RANK() OVER (PARTITION BY transaction_id ORDER BY model_name, record_id, MIN(create_date), MIN(id)) * 100 AS record_display_seq
                     FROM ranked_logs
                     GROUP BY
                         transaction_id,
