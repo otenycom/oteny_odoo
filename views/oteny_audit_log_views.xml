@@ -151,18 +151,19 @@
             <list string="Aggregated Audit Log">
                 <field name="highlight_row" column_invisible="1" />
                 <field name="highlight_row_type" column_invisible="1" />
-                <field name="create_date" string="Timestamp" optional="show" />
-                <field name="create_uid" string="User" optional="show" />
-                <field name="model_display_name" optional="show" />
-                <field name="parent_record_display_name" optional="show" />
-                <field name="record_display_name" optional="show" />
-                <field name="field_model_display_name" optional="show" />
-                <field name="field_display_name" optional="show" />
-                <field name="change_type" optional="show" />
-                <field name="old_value_display_name" optional="show" />
-                <field name="new_value_display_name" optional="show" />
-                <field name="transaction_id" optional="hide" />
-                <field name="audit_log_id" optional="hide" />
+                <field name="create_date" string="Timestamp" optional="show" width="100px" />
+                <field name="create_uid" string="User" optional="show" width="100px" />
+                <field name="model_display_name" optional="hide" width="150px" />
+                <field name="record_id" optional="show" width="100px" />
+                <field name="parent_record_display_name" optional="hide" width="400px" />
+                <field name="field_model_display_name" optional="show" width="150px" />
+                <field name="record_display_name" optional="show" width="400px" />
+                <field name="change_type" optional="show" width="30px" />
+                <field name="field_display_name" optional="show" width="200px" />
+                <field name="old_value_display_name" optional="show" width="250px" />
+                <field name="new_value_display_name" optional="show" width="250px" />
+                <field name="transaction_id" optional="hide" width="100px" />
+                <field name="audit_log_id" optional="hide" width="170px" />
             </list>
         </field>
     </record>
