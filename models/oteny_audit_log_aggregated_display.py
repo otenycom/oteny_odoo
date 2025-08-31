@@ -130,7 +130,7 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::varchar, NULL::text, NULL::text, NULL::varchar, NULL::varchar, NULL::varchar,
                     FALSE, NULL::varchar, NULL::varchar, NULL::integer,
                     'record_header'::varchar AS row_type,
-                    CONCAT(COALESCE((SELECT name::jsonb->>'en_US' FROM ir_model WHERE model = l.model_name), l.model_name), ' ', COALESCE(l.record_display_name::text, '')),
+                    CONCAT(COALESCE((SELECT name::jsonb->>'en_US' FROM ir_model WHERE model = l.model_name), l.model_name), ' ''', COALESCE(l.record_display_name::text, ''), ''''),
                     rs.record_display_seq
                 FROM ranked_logs l
                 JOIN record_sequencing rs ON l.transaction_id = rs.transaction_id AND l.model_name = rs.model_name AND l.record_id = rs.record_id
@@ -161,9 +161,9 @@ class OtenyAuditLogAggregatedDisplay(models.Model):
                     FALSE, NULL, NULL, NULL,
                     'field_change'::varchar AS row_type,
                     CASE
-                        WHEN l.change_type = 'i' THEN CONCAT('Inserted ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
-                        WHEN l.change_type = 'd' THEN CONCAT('Deleted ', COALESCE(l.field_display_name, l.field_name), ' (was: ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ')')
-                        ELSE CONCAT('Updated ', COALESCE(l.field_display_name, l.field_name), ': ', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ' -> ', COALESCE(l.new_value_display_name::text, l.new_value::text, ''))
+                        WHEN l.change_type = 'i' THEN CONCAT('Inserted ', COALESCE(l.field_display_name, l.field_name), ' ''', COALESCE(l.new_value_display_name::text, l.new_value::text, ''), '''')
+                        WHEN l.change_type = 'd' THEN CONCAT('Deleted ', COALESCE(l.field_display_name, l.field_name), ' ''', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), '''')
+                        ELSE CONCAT('Updated ', COALESCE(l.field_display_name, l.field_name), ' from ''', COALESCE(l.old_value_display_name::text, l.old_value::text, ''), ''' to ''', COALESCE(l.new_value_display_name::text, l.new_value::text, ''), '''')
                     END,
                     rs.record_display_seq + (ROW_NUMBER() OVER (PARTITION BY l.transaction_id, l.model_name, l.record_id ORDER BY l.id ASC))
                 FROM ranked_logs l
