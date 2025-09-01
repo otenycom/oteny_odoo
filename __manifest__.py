@@ -13,6 +13,13 @@
         "views/oteny_audit_log_views.xml",
         "data/ir_cron_data.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "oteny_audit/static/src/scss/oteny_audit.variables.scss",
+            "oteny_audit/static/src/scss/oteny_audit.scss",
+            "oteny_audit/static/src/scss/oteny_audit.dark.scss",
+        ],
+    },
     "demo": [],
     "application": True,
     "auto_install": False,

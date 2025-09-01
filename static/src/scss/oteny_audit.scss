@@ -1,0 +1,14 @@
+// ============================================================================
+// = Oteny Audit - Main Styles
+// ============================================================================
+
+// Define CSS custom property for light mode (fallback)
+:root {
+    --o-audit-record-header-color: #28a745; // Light mode: light green
+}
+
+// Apply the audit record header styling
+.oteny-audit-record-header {
+    color: var(--o-audit-record-header-color);
+    font-weight: bold;
+}

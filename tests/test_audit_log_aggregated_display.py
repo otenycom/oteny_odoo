@@ -1273,3 +1273,54 @@ class TestAuditLogAggregatedDisplay(TransactionCase):
             )
 
         print("\n✅ Header ordering and structure validation completed successfully!")
+
+    @tagged("oteny_audit", "post_install", "-at_install")
+    def test_record_header_color_styling(self):
+        """
+        Test that record headers in captions include color styling for better visual distinction.
+        This test verifies that the generated HTML contains appropriate CSS classes or inline styles
+        for coloring the record header text.
+        """
+        # Create a test partner
+        partner = self.env["res.partner"].create(
+            {"name": "Color Styling Test Partner", "email": "color_test@example.com"}
+        )
+
+        # Clear creation logs
+        self.env["oteny.audit.log"].search(
+            [("model_name", "=", "res.partner"), ("record_id", "=", partner.id)]
+        ).unlink()
+
+        # Update the partner to create an audit log
+        partner.write({"name": "Updated Color Styling Test Partner"})
+
+        # Get the aggregated display records
+        display_records = self.env["oteny.audit.log.aggregated.display"].search(
+            [("model_name", "=", "res.partner"), ("record_id", "=", partner.id)]
+        )
+
+        # Find the record header
+        record_headers = display_records.filtered(lambda r: r.row_type == "record_header")
+        self.assertTrue(record_headers, "Should have at least one record header")
+
+        record_header = record_headers[0]
+        caption = record_header.caption
+
+        # Verify that the caption contains CSS class for dark mode compliance
+        self.assertIn("oteny-audit-record-header", caption, "Record header caption should contain CSS class")
+        self.assertIn("class=", caption, "Record header caption should contain class attribute")
+
+        # Verify that it's a proper HTML structure with the class
+        self.assertIn("<div", caption, "Caption should contain styled div elements")
+        self.assertIn("<span", caption, "Caption should contain span element")
+        self.assertIn(
+            "Updated Color Styling Test Partner", caption, "Caption should contain the updated record name"
+        )
+
+        # Verify that the CSS class is applied to the record name specifically
+        self.assertIn('class="oteny-audit-record-header"', caption, "Record name should have the CSS class")
+
+        # Note: The actual color will be applied via CSS custom properties (--o-audit-record-header-color)
+        # which gets set to #0066cc in light mode and #4da6ff in dark mode via [data-bs-theme="dark"]
+
+        print(f"DEBUG: Record header caption with styling: {caption}")

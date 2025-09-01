@@ -113,7 +113,10 @@ class OtenyAuditLogAggregated(models.Model):
                 user_display = markupsafe.escape(log.create_uid.name if log.create_uid else "")
                 date_display = log.create_date.strftime("%d-%b-%Y %H:%M:%S") if log.create_date else ""
 
-                header_str = f"{verb} {model_display} <b>{record_display}</b> by <b>{user_display}</b> on {date_display}"
+                # Add color styling to the record name for better visual distinction
+                # Uses CSS classes for dark mode compliance
+                styled_record_display = f'<span class="oteny-audit-record-header">{record_display}</span>'
+                header_str = f"{verb} {model_display} {styled_record_display} by <b>{user_display}</b> on {date_display}"
                 caption_parts.append(f"<div>{header_str}</div>")
 
             # The second part of the caption describes the specific field change.
