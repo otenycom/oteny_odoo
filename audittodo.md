@@ -26,7 +26,8 @@
     - Top 3 External Messages: for services not logged, but Top 3 Internal messages is actually logged for Entries. why?
 
 - [x] Audit log cleaner cronjob with configurable settings (days-based retention)
-- ! Access rights check when viewing the audit log, hide or obfuscate values as '**No Access**', for models/records to which the user has no rights
+- [ ] ! Access rights check when viewing the audit log, hide or obfuscate values as '**No Access**', for models/records to which the user has no rights
+- [ ] Performance check: EXPLAIN ANALYZE and add index for sure on (model,record_id) -> the filter used by the form view action to show the log of a single record
 - Globally disable Odoo's Tracking mixin when oteny_audit is installed/active; cleans up the Chatter and saves performance and space
 - List view for parent+child audit log changes in a single list
     Log Entry ABC PIETJE PUG 10/10/25 10:00:11
@@ -34,6 +35,6 @@
     Veld B van Z naar W
 - [x] highlight_row of grid based on transaction_id changing between rows, so each single transaction is easily recognized by the user
 - [~] audit viewer should show record name als single row (header), with the field changes below; makes the list less wide and helps visual focus
-  - [ ] Instead of CTE query / "oteny.audit.log.aggregated.display", just list oteny.audit.log.aggregated and generate the caption in Python as a HTML field, in python, scan one row forward/backward in the self recordset to see if a new record_header needs to be generated, if so, just insert in the HTML of the Caption of the current row
+  - [x] Instead of CTE query / "oteny.audit.log.aggregated.display", just list oteny.audit.log.aggregated and generate the caption in Python as a HTML field, in python, scan one row forward/backward in the self recordset to see if a new record_header needs to be generated, if so, just insert in the HTML of the Caption of the current row
 - Add support for translated fields
 - Add support for company-dependent fields  
