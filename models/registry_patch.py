@@ -46,4 +46,5 @@ def _signal_changes_and_run_audit(self):
 
 
 # Apply the monkey-patch
-registry.Registry.signal_changes = _signal_changes_and_run_audit
+# Temporarily disable
+# registry.Registry.signal_changes = _signal_changes_and_run_audit
