@@ -1,6 +1,7 @@
 from odoo import api, fields, models, tools
 import markupsafe
 import logging
+from datetime import datetime
 
 _logger = logging.getLogger(__name__)
 
@@ -191,13 +192,51 @@ class OtenyAuditLogAggregated(models.Model):
         if not value:
             return ""
 
+        # Convert date/datetime values from UTC to local time
+        converted_value = self._convert_date_value_to_local(value)
+
         if is_html_field:
-            wrapped_value = f'<div class="oteny-audit-html-field">{value}</div>'
+            wrapped_value = f'<div class="oteny-audit-html-field">{converted_value}</div>'
             # Mark as safe to prevent double-escaping
             return markupsafe.Markup(wrapped_value)
         else:
             # For non-HTML fields, escape to prevent XSS
-            return markupsafe.escape(value)
+            return markupsafe.escape(converted_value)
+
+    def _convert_date_value_to_local(self, value):
+        """Convert date/datetime string values from UTC to local time."""
+        if not value or not isinstance(value, str):
+            return value
+
+        try:
+            # Try to parse as datetime first (with timezone info)
+            # Common Odoo datetime formats: "2023-12-01 10:30:00+00:00" or "2023-12-01 10:30:00"
+            if " " in value and ("+" in value or "-" in value and value.count("-") >= 2):
+                # Looks like a datetime string
+                try:
+                    # Parse with timezone info if available
+                    dt = fields.Datetime.to_datetime(value)
+                    # Convert to local time using the same approach as date_display
+                    local_dt = fields.Datetime.context_timestamp(self, dt)
+                    datetime_format = self.env["riverflow.service"].DATETIME_FORMAT
+                    return local_dt.strftime(datetime_format)
+                except (ValueError, TypeError):
+                    pass
+
+            if "-" in value and len(value.split("-")) == 3 and " " not in value:
+                try:
+                    date = fields.Date.to_date(value)
+                    date_format = self.env["riverflow.service"].DATE_FORMAT
+                    return date.strftime(date_format)
+                except (ValueError, TypeError):
+                    pass
+
+        except Exception:
+            # If conversion fails, return original value
+            pass
+
+        # Return original value if not a date/datetime or conversion failed
+        return value
 
     def _selection_record_ref(self):
         return self.env["oteny.audit.log"]._selection_record_ref()
