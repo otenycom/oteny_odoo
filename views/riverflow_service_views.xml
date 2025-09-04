@@ -130,12 +130,13 @@
                                     <field name="root_name" optional="hide" />
                                     <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
                                     <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
-                                    <field name="timing_json" widget="timing_widget" optional="show" />
-                                    <field name="deadline" optional="hide"
+                                    <field name="deadline" widget="timing_widget" optional="show" />
+                                    <field name="timing_json" column_invisible="1" />
+                                    <!-- <field name="deadline" optional="hide"
                                         decoration-muted="is_end_state"
                                         decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                         decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
-                                    />
+                                    /> -->
                                     <field name="daily_prio" optional="hide" />
 
                                     <field name="end_date" optional="hide" />

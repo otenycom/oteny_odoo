@@ -18,7 +18,8 @@ export class TimingWidget extends Component {
     }
 
     timingData() {
-        const value = this.props.record.data[this.props.name];
+        //const value = this.props.record.data[this.props.name];
+        const value = this.props.record.data["timing_json"];
 
         if (!value) {
             return {};

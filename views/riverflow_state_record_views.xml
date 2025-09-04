@@ -58,11 +58,11 @@
                 <field name="indented_name" optional="show" />
                 <field name="company_id" optional="hide" width="120px" />
                 <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
-                <field name="timing_json" widget="timing_widget" optional="show" />
-                <field name="deadline" optional="hide"
+                <field name="deadline" widget="timing_widget" optional="show" />
+                <field name="timing_json" column_invisible="1" />E <!-- <field name="deadline" optional="hide"
                     decoration-danger="(deadline &lt; context_today().strftime('%Y-%m-%d')) and not is_end_state"
                     decoration-warning="(deadline == context_today().strftime('%Y-%m-%d')) and not is_end_state"
-                    decoration-muted="is_end_state" />
+                    decoration-muted="is_end_state" /> -->
                 <field name="state_json" widget="transition_buttons" optional="show" width="140px" />
                 <field name="state_id" optional="hide" decoration-success="is_end_state" />
                 <field name="responsible_team_id" optional="show" string="Responsible" />
