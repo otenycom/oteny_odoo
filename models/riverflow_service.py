@@ -21,8 +21,8 @@ class Service(models.Model):
     # set the display_order field to all services on any service update, so the root services are not sorted
     # by display_order, but by name.
     _order = "res_sortable_name,res_model,res_id,root_name,root_id,display_order"
-
-    DATE_FORMAT = "%d-%b-%y"  # 01-Jan-21
+    DATE_FORMAT = "%-d-%b-%y"  # 1-Jan-21
+    DATETIME_FORMAT = "%-d-%b-%y %H:%M:%S"  # 1-Jan-21 12:00:00
 
     # auto calculated by Odoo in the form of parent_id/parent_id/self_id/
     # see def _get_domain_locations(self)
