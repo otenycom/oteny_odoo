@@ -201,6 +201,14 @@
                                 <field name="state_id" on_change="1" options="{'no_create': True}" />
                             </group>
                         </page>
+                        <page string="Audit" name="audit" groups="base.group_no_one">
+                            <field name="audit_log_ids">
+                                <list>
+                                    <field name="caption" />
+                                </list>
+                            </field>
+                        </page>
+
                     </notebook>
                 </sheet>
                 <chatter reload_on_post="True" />

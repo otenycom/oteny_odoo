@@ -11,6 +11,7 @@ class Service(models.Model):
         "riverflow.mail.thread.review.mixin",
         "riverflow.state.mixin",
         "riverflow.state.record.tracker.mixin",
+        "oteny.audit.mixin",
     ]
     _description = "Service"
     _parent_name = "parent_id"
