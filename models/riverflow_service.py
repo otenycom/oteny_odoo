@@ -1180,6 +1180,15 @@ class Service(models.Model):
         self.ensure_one()
         return self.name
 
+    def action_view_audit_log(self):
+        return {
+            "type": "ir.actions.act_window",
+            "name": f"Audit Log for {self.display_name}",
+            "res_model": "oteny.audit.log.aggregated",
+            "view_mode": "list,form",
+            "domain": [("record_id", "=", self.id), ("model_name", "=", self._name)],
+        }
+
 
 class ServiceLeg(models.Model):
     _name = "riverflow.service.leg"
