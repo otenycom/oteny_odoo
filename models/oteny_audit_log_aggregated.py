@@ -192,7 +192,6 @@ class OtenyAuditLogAggregated(models.Model):
             return ""
 
         if is_html_field:
-            # For HTML fields, wrap in a div with CSS class for styling
             wrapped_value = f'<div class="oteny-audit-html-field">{value}</div>'
             # Mark as safe to prevent double-escaping
             return markupsafe.Markup(wrapped_value)
