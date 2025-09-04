@@ -12,39 +12,36 @@ _original_signal_changes = registry.Registry.signal_changes
 
 def _signal_changes_and_run_audit(self):
     """
-    Monkey-patched version of Registry.signal_changes.
-    This method is called once the registry is fully loaded and ready, just
-    before other processes are notified of changes. This is the ideal moment
-    to run our synchronous, one-time setup.
+    Monkey-patched version of Registry.signal_changes to run the audit setup.
+
+    The setup is triggered only when the registry is invalidated, which happens
+    during module installation or updates. This prevents the setup from running
+    needlessly on every server restart or for every new worker process, a common
+    scenario on platforms like Odoo.sh.
     """
-    # The first time this is called during a server startup, `self.ready` is True.
-    # We add a guard to ensure our code runs only once per registry instantiation.
-    if not getattr(self, "_audit_actions_setup_done", False):
-        # Set a flag on the registry instance to prevent re-execution.
+    # A per-process flag to ensure the setup runs at most once per registry instance.
+    setup_done = getattr(self, "_audit_actions_setup_done", False)
+
+    # Only perform the setup if there's a genuine registry change.
+    if self.registry_invalidated and not setup_done:
         self._audit_actions_setup_done = True
         try:
-            _logger.info("Registry is ready. Running initial audit action setup just before signaling.")
-            # We must create a new cursor and environment with the current registry.
+            _logger.info("Registry is invalidated; running audit action setup before signaling.")
             with self.cursor() as cr:
                 env = Environment(cr, SUPERUSER_ID, {})
                 env["oteny.audit.log"].install_for_all_models_action()
-                _logger.info("Initial audit action setup completed successfully.")
-
-                # IMPORTANT: We have modified the registry by adding server actions,
-                # so we must mark it as invalidated. The original signal_changes
-                # will use this flag to notify other processes.
-                self.registry_invalidated = True
+                _logger.info("Audit action setup completed successfully.")
 
         except Exception:
             _logger.error(
-                "Failed to run initial audit action setup before signaling.",
+                "Failed to run audit action setup before signaling.",
                 exc_info=True,
             )
 
     # Always call the original method to perform the actual signaling.
+    # It will notify other processes if self.registry_invalidated is True.
     _original_signal_changes(self)
 
 
 # Apply the monkey-patch
-# Temporarily disable
-# registry.Registry.signal_changes = _signal_changes_and_run_audit
+registry.Registry.signal_changes = _signal_changes_and_run_audit
