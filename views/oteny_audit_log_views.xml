@@ -95,6 +95,7 @@
 
     <record id="action_oteny_audit_log" model="ir.actions.act_window">
         <field name="name">Audit Log</field>
+        <field name="path">audit-raw</field>
         <field name="res_model">oteny.audit.log</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'create': False, 'edit': False}</field>
@@ -221,6 +222,7 @@
     <!-- Action for Aggregated Audit Log -->
     <record id="action_oteny_audit_log_aggregated" model="ir.actions.act_window">
         <field name="name">Audit Log</field>
+        <field name="path">audit-log</field>
         <field name="res_model">oteny.audit.log.aggregated</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'create': False, 'edit': False}</field>
@@ -254,124 +256,6 @@
     />
 
 
-    <!-- Display View for Aggregated Audit Log -->
-    <record id="view_oteny_audit_log_aggregated_display_list" model="ir.ui.view">
-        <field name="name">oteny.audit.log.aggregated.display.list</field>
-        <field name="model">oteny.audit.log.aggregated.display</field>
-        <field name="arch" type="xml">
-            <list string="Audit Log Display" create="false" edit="false" decoration-bf="row_type == 'record_header' or row_type == 'transaction_header'">
-                <field name="highlight_row" column_invisible="1" />
-                <field name="highlight_row_type" column_invisible="1" />
-                <field name="caption" widget="text" />
-                <field name="row_type" widget="text" optional="show" />
-            </list>
-        </field>
-    </record>
-
-    <!-- Search View for Aggregated Audit Log Display -->
-    <record id="view_oteny_audit_log_aggregated_display_search" model="ir.ui.view">
-        <field name="name">oteny.audit.log.aggregated.display.search</field>
-        <field name="model">oteny.audit.log.aggregated.display</field>
-        <field name="arch" type="xml">
-            <search string="Search Aggregated Audit Log Display">
-                <field name="caption" />
-                <field name="model_name" />
-                <field name="model_display_name" />
-                <field name="parent_record_display_name" />
-                <field name="record_display_name" />
-                <field name="field_display_name" />
-                <field name="field_model_name" />
-                <field name="field_model_display_name" />
-                <field name="change_type" />
-                <field name="old_value_display_name" />
-                <field name="new_value_display_name" />
-                <field name="create_uid" />
-                <field name="is_child_log" />
-                <field name="child_model_name" />
-                <separator />
-                <filter string="Record Headers" name="record_headers" domain="[('row_type', '=', 'record_header')]" />
-                <filter string="Field Changes" name="field_changes" domain="[('row_type', '=', 'field_change')]" />
-                <separator />
-                <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'i')]" />
-                <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
-                <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'd')]" />
-                <filter string="Child Logs" name="child_logs" domain="[('is_child_log', '=', True)]" />
-                <filter string="Parent Logs" name="parent_logs" domain="[('is_child_log', '=', False)]" />
-                <separator />
-                <group expand="0" string="Group By">
-                    <filter string="Parent Model" name="group_by_parent_model" context="{'group_by': 'model_display_name'}" />
-                    <filter string="Parent Record" name="group_by_parent_record" context="{'group_by': 'parent_record_display_name'}" />
-                    <filter string="Record" name="group_by_record" context="{'group_by': 'record_display_name'}" />
-                    <filter string="Field" name="group_by_field" context="{'group_by': 'field_display_name'}" />
-                    <filter string="Field Model" name="group_by_field_model" context="{'group_by': 'field_model_display_name'}" />
-                    <filter string="Change Type" name="group_by_change_type" context="{'group_by': 'change_type'}" />
-                    <filter string="Row Type" name="group_by_row_type" context="{'group_by': 'row_type'}" />
-                    <filter string="User" name="group_by_user" context="{'group_by': 'create_uid'}" />
-                    <filter string="Date" name="group_by_date" context="{'group_by': 'create_date:day'}" />
-                    <filter string="Transaction ID" name="group_by_transaction_id" context="{'group_by': 'transaction_id'}" />
-                    <filter string="Child Model" name="group_by_child_model" context="{'group_by': 'child_model_display_name'}" />
-                </group>
-            </search>
-        </field>
-    </record>
-
-    <!-- Form View for Aggregated Audit Log Display -->
-    <record id="view_oteny_audit_log_aggregated_display_form" model="ir.ui.view">
-        <field name="name">oteny.audit.log.aggregated.display.form</field>
-        <field name="model">oteny.audit.log.aggregated.display</field>
-        <field name="arch" type="xml">
-            <form string="Audit Log Entry" create="false" edit="false">
-                <sheet>
-                    <group>
-                        <group>
-                            <field name="create_date" string="Timestamp" />
-                            <field name="transaction_id" groups="base.group_no_one" />
-                            <field name="audit_log_id" groups="base.group_no_one" />
-                            <field name="create_uid" string="User" />
-                            <field name="change_type" />
-                        </group>
-                        <group>
-                            <field name="model_display_name" string="Parent Model" invisible="not is_child_log" />
-                            <field name="parent_record_display_name" string="Parent Name" invisible="not is_child_log" />
-                            <field name="record_display_name" string="Record Name" />
-                            <field name="record_ref" string="Parent Link" />
-                        </group>
-                    </group>
-                    <group>
-                        <group string="Changed Field Values">
-                            <field name="is_child_log" invisible="1" />
-                            <field name="field_model_display_name" string="Model" />
-                            <field
-                                name="child_record_ref"
-                                string="Record Link"
-                                invisible="not is_child_log"
-                            />
-                            <field name="field_display_name" string="Field" />
-                            <field name="old_value_display_name" string="Old Value" />
-                            <field name="new_value_display_name" string="New Value" />
-                        </group>
-                        <group string="Raw Field Values" groups="base.group_no_one">
-                            <field name="record_id" />
-                            <field name="field_model_name" />
-                            <field name="field_name" />
-                            <field name="old_value" />
-                            <field name="new_value" />
-                        </group>
-                    </group>
-                </sheet>
-            </form>
-        </field>
-    </record>
-
-    <!-- Action for Display View -->
-    <record id="action_oteny_audit_log_aggregated_display" model="ir.actions.act_window">
-        <field name="name">Audit Log Display</field>
-        <field name="res_model">oteny.audit.log.aggregated.display</field>
-        <field name="view_mode">list,form</field>
-        <field name="context">{'create': False, 'edit': False}</field>
-        <field name="search_view_id" ref="view_oteny_audit_log_aggregated_display_search" />
-    </record>
-
     <menuitem
         id="oteny_audit_log_config_menu"
         name="Configuration"
@@ -397,13 +281,6 @@
             action="action_oteny_audit_log_install"
             groups="base.group_no_one"
             sequence="10"
-        />
-        <menuitem
-            id="oteny_audit_log_display_menu"
-            name="Audit Log Display (SQL test/old)"
-            action="action_oteny_audit_log_aggregated_display"
-            groups="base.group_no_one"
-            sequence="20"
         />
     </menuitem>
 

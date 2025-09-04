@@ -296,6 +296,8 @@ def patched_create(self, vals_list):
                     default_value_cached = field.convert_to_cache(default_value, record)
                     if new_val_cached == default_value_cached:
                         continue
+                elif new_val_cached == "":
+                    continue
 
                 new_val_display = _get_display_value(field, new_val_cached, record.env)
 
