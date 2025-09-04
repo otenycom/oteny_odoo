@@ -125,7 +125,7 @@ class RiverflowStateRecord(models.Model):
     indented_name = fields.Char("Record", compute="_compute_indented_name", store=False)
 
     deadline = fields.Date(
-        "Deadline Date",
+        "Deadline",
         help="Deadline based on the project-deadline and the relative day of this service",
         index=True,
         compute="_compute_deadline",
@@ -136,7 +136,7 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_end_date",
         store=True,
     )
-    deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
+    deadline_formatted = fields.Char("Deadline Formatted", compute="_compute_deadline_formatted", store=False)
 
     timing_json = fields.Json(
         "Timing",

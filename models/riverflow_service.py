@@ -172,7 +172,7 @@ class Service(models.Model):
         recursive=True,
     )
     deadline = fields.Date(
-        "Deadline Date",
+        "Deadline",
         compute="_compute_deadline",
         help="Deadline based on the project-deadline and the relative day of this service",
         store=True,
@@ -190,7 +190,7 @@ class Service(models.Model):
         store=True,
     )
 
-    deadline_formatted = fields.Char("Deadline", compute="_compute_deadline_formatted", store=False)
+    deadline_formatted = fields.Char("Deadline Formatted", compute="_compute_deadline_formatted", store=False)
     timing_json = fields.Json(
         "Timing",
         compute="_compute_timing_json",
