@@ -77,7 +77,7 @@ class OtenyAuditLogAggregated(models.Model):
         # self can be ordered by the user in the view. We need to respect that order to check the 'previous' record.
         log_list = list(self)
         change_type_verbs = {"i": "Insert", "u": "Update", "d": "Delete"}
-
+        date_format = self.env["riverflow.service"].DATETIME_FORMAT
         for i, log in enumerate(log_list):
             caption_parts = []
 
@@ -114,7 +114,8 @@ class OtenyAuditLogAggregated(models.Model):
                 record_display = markupsafe.escape(log.record_display_name or "")
                 verb = change_type_verbs.get(log.change_type, "changed")
                 user_display = markupsafe.escape(log.create_uid.name if log.create_uid else "")
-                date_display = log.create_date.strftime("%d-%b-%Y %H:%M:%S") if log.create_date else ""
+
+                date_display = fields.Datetime.context_timestamp(self, log.create_date).strftime(date_format)
 
                 # Add color styling to the record name for better visual distinction
                 # Uses CSS classes for dark mode compliance
