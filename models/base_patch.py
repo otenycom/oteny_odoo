@@ -283,6 +283,8 @@ def patched_create(self, vals_list):
                 record_display_name = record.display_name
             else:
                 record_display_name = f"ID: {record.id}"
+
+            record_logs = []
             for col in columns:
                 field = model_fields[col]
                 raw_val = new_values.get(record.id, {}).get(col)
@@ -301,7 +303,7 @@ def patched_create(self, vals_list):
 
                 new_val_display = _get_display_value(field, new_val_cached, record.env)
 
-                logs.append(
+                record_logs.append(
                     {
                         "model_name": self._name,
                         "record_id": record.id,
@@ -315,6 +317,34 @@ def patched_create(self, vals_list):
                         "change_type": "i",
                     }
                 )
+
+            # If no logs were created for this record (all fields filtered out),
+            # create a placeholder log entry to ensure the create operation is recorded
+            if not record_logs:
+                # Use 'id' field as placeholder if available, otherwise use first available field
+                placeholder_field_name = "id" if "id" in model_fields else columns[0] if columns else None
+                if placeholder_field_name:
+                    field = model_fields[placeholder_field_name]
+                    raw_val = new_values.get(record.id, {}).get(placeholder_field_name)
+                    new_val_cached = _safe_convert_to_cache(field, raw_val, record)
+                    new_val_display = _get_display_value(field, new_val_cached, record.env)
+
+                    record_logs.append(
+                        {
+                            "model_name": self._name,
+                            "record_id": record.id,
+                            "record_display_name": record_display_name,
+                            "field_name": placeholder_field_name,
+                            "field_display_name": f"{field.string} (placeholder)",
+                            "old_value": "",
+                            "new_value": str(new_val_cached) if new_val_cached is not None else "",
+                            "old_value_display_name": "",
+                            "new_value_display_name": new_val_display,
+                            "change_type": "i",
+                        }
+                    )
+
+            logs.extend(record_logs)
         if logs:
             _create_audit_logs(self.env, self, logs)
 
@@ -355,12 +385,18 @@ def patched_unlink(self):
             record_display_name = record.display_name
         except Exception:
             record_display_name = f"ID: {record.id}"
+
+        record_logs = []
         for col in columns:
             field = model_fields[col]
             raw_val = old_values.get(record.id, {}).get(col)
             old_val = _safe_convert_to_cache(field, raw_val, record)
+
+            if old_val is None or old_val == "":
+                continue
+
             old_val_display = _get_display_value(field, old_val, record.env)
-            logs.append(
+            record_logs.append(
                 {
                     "model_name": self._name,
                     "record_id": record.id,
@@ -374,6 +410,34 @@ def patched_unlink(self):
                     "change_type": "d",
                 }
             )
+
+        # If no logs were created for this record (all fields filtered out),
+        # create a placeholder log entry to ensure the delete operation is recorded
+        if not record_logs:
+            # Use 'id' field as placeholder if available, otherwise use first available field
+            placeholder_field_name = "id" if "id" in model_fields else columns[0] if columns else None
+            if placeholder_field_name:
+                field = model_fields[placeholder_field_name]
+                raw_val = old_values.get(record.id, {}).get(placeholder_field_name)
+                old_val = _safe_convert_to_cache(field, raw_val, record)
+                old_val_display = _get_display_value(field, old_val, record.env)
+
+                record_logs.append(
+                    {
+                        "model_name": self._name,
+                        "record_id": record.id,
+                        "record_display_name": record_display_name,
+                        "field_name": placeholder_field_name,
+                        "field_display_name": f"{field.string} (placeholder)",
+                        "old_value": str(old_val) if old_val is not None else "",
+                        "new_value": "",
+                        "old_value_display_name": old_val_display,
+                        "new_value_display_name": "",
+                        "change_type": "d",
+                    }
+                )
+
+        logs.extend(record_logs)
     if logs:
         _create_audit_logs(self.env, self, logs)
 

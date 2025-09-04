@@ -491,3 +491,179 @@ class TestAuditLog(TransactionCase):
             grandparent_partner.display_name,
             "Grandparent display name should match",
         )
+
+    def test_create_no_blank_values_logged(self):
+        """Test that creating records with blank values doesn't log those blank fields"""
+        # Create a test partner with some blank fields
+        partner = self.env["res.partner"].create(
+            {
+                "name": "Test Partner With Blanks",
+                "email": "",  # Explicitly blank
+                "phone": "",  # Explicitly blank
+                "street": "Some Street",  # Non-blank
+                # Don't provide other fields like mobile, city, etc. - they should be None/blank
+            }
+        )
+
+        # Get all logs for this partner creation
+        logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", partner.id),
+                ("change_type", "=", "i"),
+            ]
+        )
+
+        # Verify that only non-blank fields are logged
+        logged_fields = logs.mapped("field_name")
+
+        # Name and street should be logged (they have values)
+        self.assertIn("name", logged_fields, "Name field should be logged (has value)")
+        self.assertIn("street", logged_fields, "Street field should be logged (has value)")
+
+        # Blank fields should NOT be logged
+        self.assertNotIn("email", logged_fields, "Email field should not be logged (blank value)")
+        self.assertNotIn("phone", logged_fields, "Phone field should not be logged (blank value)")
+
+        # Fields that weren't provided (None values) should also not be logged
+        # Common partner fields that might be None
+        common_optional_fields = ["mobile", "city", "zip", "country_id", "state_id"]
+        for field_name in common_optional_fields:
+            if field_name in logged_fields:
+                # If it's logged, verify it has a non-blank value
+                log_entry = logs.filtered(lambda l: l.field_name == field_name)
+                self.assertNotEqual(
+                    log_entry.new_value, "", f"Field {field_name} should not be logged with blank value"
+                )
+
+        # Verify specific field values
+        name_log = logs.filtered(lambda l: l.field_name == "name")
+        self.assertTrue(name_log, "Name field should be logged")
+        self.assertEqual(name_log.new_value, "Test Partner With Blanks")
+
+        street_log = logs.filtered(lambda l: l.field_name == "street")
+        self.assertTrue(street_log, "Street field should be logged")
+        self.assertEqual(street_log.new_value, "Some Street")
+
+    def test_unlink_no_blank_values_logged(self):
+        """Test that unlinking records with blank values doesn't log those blank fields"""
+        # Create a test partner with some blank fields that will be deleted
+        partner = self.env["res.partner"].create(
+            {
+                "name": "Partner To Delete",
+                "email": "",  # Explicitly blank
+                "phone": "",  # Explicitly blank
+                "street": "Street Address",  # Non-blank
+                "city": "",  # Explicitly blank
+                # Don't provide other fields like mobile - they should be None/blank
+            }
+        )
+
+        partner_id = partner.id
+        partner_name = partner.name
+        partner_street = partner.street
+
+        # Delete the partner
+        partner.unlink()
+
+        # Get all logs for this partner deletion
+        logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "res.partner"),
+                ("record_id", "=", partner_id),
+                ("change_type", "=", "d"),
+            ]
+        )
+
+        # Verify that only non-blank fields are logged
+        logged_fields = logs.mapped("field_name")
+
+        # Name and street should be logged (they had values)
+        self.assertIn("name", logged_fields, "Name field should be logged (had value)")
+        self.assertIn("street", logged_fields, "Street field should be logged (had value)")
+
+        # Blank fields should NOT be logged
+        self.assertNotIn("email", logged_fields, "Email field should not be logged (was blank)")
+        self.assertNotIn("phone", logged_fields, "Phone field should not be logged (was blank)")
+        self.assertNotIn("city", logged_fields, "City field should not be logged (was blank)")
+
+        # Fields that weren't provided (None values) should also not be logged
+        # Common partner fields that might be None
+        common_optional_fields = ["mobile", "zip", "country_id", "state_id"]
+        for field_name in common_optional_fields:
+            if field_name in logged_fields:
+                # If it's logged, verify it had a non-blank value
+                log_entry = logs.filtered(lambda l: l.field_name == field_name)
+                self.assertNotEqual(
+                    log_entry.old_value, "", f"Field {field_name} should not be logged with blank value"
+                )
+
+        # Verify specific field values
+        name_log = logs.filtered(lambda l: l.field_name == "name")
+        self.assertTrue(name_log, "Name field should be logged")
+        self.assertEqual(name_log.old_value, partner_name)
+        self.assertEqual(name_log.new_value, "")  # Delete logs have empty new_value
+
+        street_log = logs.filtered(lambda l: l.field_name == "street")
+        self.assertTrue(street_log, "Street field should be logged")
+        self.assertEqual(street_log.old_value, partner_street)
+        self.assertEqual(street_log.new_value, "")  # Delete logs have empty new_value
+
+    def test_create_all_defaults_or_empty_logs_placeholder(self):
+        """Test that creating record with only defaults/empty values logs at least one placeholder"""
+        # Use test models that allow empty records
+        test_parent = self.env["oteny.audit.test.parent"].create({})
+
+        # Get all logs for this record creation
+        logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "oteny.audit.test.parent"),
+                ("record_id", "=", test_parent.id),
+                ("change_type", "=", "i"),
+            ]
+        )
+
+        # Should create at least one log entry as placeholder to ensure operation is recorded
+        self.assertGreater(
+            len(logs),
+            0,
+            "Should create at least one placeholder log for records with only defaults/empty values",
+        )
+
+        # The placeholder log should indicate it's a placeholder
+        placeholder_log = logs.filtered(lambda l: "(placeholder)" in l.field_display_name)
+        if placeholder_log:
+            self.assertTrue(placeholder_log, "Should have a placeholder log entry")
+            self.assertEqual(placeholder_log.change_type, "i", "Placeholder should be for insert operation")
+
+    def test_unlink_all_defaults_or_empty_logs_placeholder(self):
+        """Test that deleting record with only defaults/empty values logs at least one placeholder"""
+        # Use test models that allow empty records
+        test_parent = self.env["oteny.audit.test.parent"].create({})
+
+        test_parent_id = test_parent.id
+
+        # Delete the record
+        test_parent.unlink()
+
+        # Get all logs for this record deletion
+        logs = self.env["oteny.audit.log"].search(
+            [
+                ("model_name", "=", "oteny.audit.test.parent"),
+                ("record_id", "=", test_parent_id),
+                ("change_type", "=", "d"),
+            ]
+        )
+
+        # Should create at least one log entry as placeholder to ensure operation is recorded
+        self.assertGreater(
+            len(logs),
+            0,
+            "Should create at least one placeholder log for deletion of records with only defaults/empty values",
+        )
+
+        # The placeholder log should indicate it's a placeholder
+        placeholder_log = logs.filtered(lambda l: "(placeholder)" in l.field_display_name)
+        if placeholder_log:
+            self.assertTrue(placeholder_log, "Should have a placeholder log entry")
+            self.assertEqual(placeholder_log.change_type, "d", "Placeholder should be for delete operation")
