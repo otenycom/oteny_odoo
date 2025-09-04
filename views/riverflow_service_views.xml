@@ -43,6 +43,11 @@
                             <field name="supply_order_service_id" invisible="not supply_order_service_id" />
                             <field name="internal_notes_summary" invisible="not internal_notes_summary" readonly="1" />
                             <field name="external_messages_summary" invisible="not external_messages_summary" readonly="1" />
+                            <field name="unreviewed_message_count" string="Review Messages" invisible="not unreviewed_message_count" />
+                            <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
+                                invisible="not unreviewed_message_count"
+                                string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
+                                    and once done and followup is complete, mark them as Reviewed" />
                         </group>
                         <group colspan="1">
                             <field name="parent_id" on_change="1" can_create="False"
@@ -76,11 +81,6 @@
                                 decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                             />
 
-                            <field name="unreviewed_message_count" string="Unreviewed Messages" invisible="not unreviewed_message_count" />
-                            <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
-                                invisible="not unreviewed_message_count"
-                                string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
-                                    and once done and followup is complete, mark them as Reviewed" />
                         </group>
                     </group>
                     <notebook>
@@ -172,7 +172,7 @@
                         </page>
 
                         <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
-                            <field name="message_from_external_sender_ids" no_label="1" class="oe_inline">
+                            <field name="unreviewed_message_ids" no_label="1" class="oe_inline">
                                 <list>
                                     <field name="date" />
                                     <field name="author_id" />
