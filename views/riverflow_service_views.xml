@@ -21,7 +21,7 @@
                             <field name="parent_id" widget="statinfo" />
                         </button>
                         <button name="action_view_audit_log" type="object"
-                            class="oe_stat_button" icon="fa-history">
+                            class="oe_stat_button" icon="fa-book">
                             <field name="write_date" widget="statinfo" />
                         </button>
 
