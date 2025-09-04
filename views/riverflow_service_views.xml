@@ -52,10 +52,6 @@
 
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
-                            <!-- 
-                            This was previously in the use_project_deadline_from field, but it was giving errors on the client and since in 99% of cases it was invisible, we disabled it.
-                            options="{'whitelist_fname': 'use_project_deadline_from_options'}"  
-                            -->
                             <field name="daily_prio" />
                             <field name="use_project_deadline_from" widget="filterable_selection"
                                 options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
@@ -66,6 +62,9 @@
                                 string="Deadline"
                                 invisible="is_days_relative_to_project_applicable"
                                 on_change="1"
+                                decoration-muted="is_end_state"
+                                decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                             />
                             <field name="end_date" invisible="1" />
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
