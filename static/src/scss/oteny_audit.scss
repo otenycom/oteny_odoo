@@ -12,3 +12,10 @@
     color: var(--o-audit-record-header-color);
     font-weight: bold;
 }
+
+// HTML field styling for audit log display
+.oteny-audit-html-field {
+    background-color: rgba(40, 167, 69, 0.1);
+    padding: 4px;
+    border-radius: 3px;
+}

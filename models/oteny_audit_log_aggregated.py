@@ -1,5 +1,8 @@
 from odoo import api, fields, models, tools
 import markupsafe
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class OtenyAuditLogAggregated(models.Model):
@@ -123,17 +126,20 @@ class OtenyAuditLogAggregated(models.Model):
             change_type = log.change_type
             field_name = markupsafe.escape(log.field_display_name or "")
 
+            # Determine if the field contains HTML content
+            is_html_field = self._is_html_field(log)
+
             if change_type == "i":
-                new_val = markupsafe.escape(log.new_value_display_name or "")
+                new_val = self._format_field_value(log.new_value_display_name or "", is_html_field)
                 field_change_str = f"Set <b>{field_name}</b> to <b>{new_val}</b>"
             elif change_type == "u":
-                old_val = markupsafe.escape(log.old_value_display_name or "")
-                new_val = markupsafe.escape(log.new_value_display_name or "")
+                old_val = self._format_field_value(log.old_value_display_name or "", is_html_field)
+                new_val = self._format_field_value(log.new_value_display_name or "", is_html_field)
                 field_change_str = (
                     f"Updated <b>{field_name}</b> from '<b>{old_val}</b>' to '<b>{new_val}</b>'"
                 )
             elif change_type == "d":
-                old_val = markupsafe.escape(log.old_value_display_name or "")
+                old_val = self._format_field_value(log.old_value_display_name or "", is_html_field)
                 field_change_str = f"<b>{field_name}</b> was <b>{old_val}</b>"
             else:
                 field_change_str = ""
@@ -147,6 +153,51 @@ class OtenyAuditLogAggregated(models.Model):
         for log in self:
             if log.caption is False:
                 log.caption = ""
+
+    def _is_html_field(self, log):
+        """Check if the field being audited is an HTML field."""
+        try:
+            # Get the model where the field is defined
+            model_name = log.field_model_name
+            field_name = log.field_name
+
+            if not model_name or not field_name:
+                return False
+
+            # Get the model class
+            if model_name not in self.env:
+                return False
+            model_class = self.env[model_name]
+            field = model_class._fields.get(field_name, False)
+            if not field:
+                return False
+
+            # Check if it's an HTML field
+            return field.type == "html"
+
+        except Exception as e:
+            # If anything goes wrong, default to safe escaping
+            _logger.warning(
+                "Could not determine if field %s.%s is an HTML field. Error: %s",
+                log.field_model_name,
+                log.field_name,
+                e,
+            )
+            return False
+
+    def _format_field_value(self, value, is_html_field):
+        """Format field value for display, either as HTML or escaped text."""
+        if not value:
+            return ""
+
+        if is_html_field:
+            # For HTML fields, wrap in a div with CSS class for styling
+            wrapped_value = f'<div class="oteny-audit-html-field">{value}</div>'
+            # Mark as safe to prevent double-escaping
+            return markupsafe.Markup(wrapped_value)
+        else:
+            # For non-HTML fields, escape to prevent XSS
+            return markupsafe.escape(value)
 
     def _selection_record_ref(self):
         return self.env["oteny.audit.log"]._selection_record_ref()
