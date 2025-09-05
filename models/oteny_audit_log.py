@@ -36,6 +36,78 @@ class OtenyAuditLog(models.Model):
     new_value_display_name = fields.Char(string="New Value")
     change_type = fields.Selection([("i", "Insert"), ("u", "Update"), ("d", "Delete")], required=True)
 
+    @api.model
+    def init(self):
+        """Initialize the model and create necessary database indexes."""
+        super().init()
+
+        _logger.info("Initializing OtenyAuditLog indexes...")
+
+        # Create performance indexes for the audit log queries
+        cr = self.env.cr
+
+        # Index for model_name (used in JOINs with ir_model)
+        if not self._index_exists("oteny_audit_log_model_name_idx"):
+            _logger.info("Creating index oteny_audit_log_model_name_idx")
+            cr.execute(
+                """
+                CREATE INDEX oteny_audit_log_model_name_idx
+                ON oteny_audit_log (model_name)
+            """
+            )
+        else:
+            _logger.info("Index oteny_audit_log_model_name_idx already exists")
+
+        # Index for create_date (used in ORDER BY operations)
+        if not self._index_exists("oteny_audit_log_create_date_idx"):
+            _logger.info("Creating index oteny_audit_log_create_date_idx")
+            cr.execute(
+                """
+                CREATE INDEX oteny_audit_log_create_date_idx
+                ON oteny_audit_log (create_date DESC)
+            """
+            )
+        else:
+            _logger.info("Index oteny_audit_log_create_date_idx already exists")
+
+        # Index for transaction_id (used in window functions)
+        if not self._index_exists("oteny_audit_log_transaction_id_idx"):
+            _logger.info("Creating index oteny_audit_log_transaction_id_idx")
+            cr.execute(
+                """
+                CREATE INDEX oteny_audit_log_transaction_id_idx
+                ON oteny_audit_log (transaction_id)
+            """
+            )
+        else:
+            _logger.info("Index oteny_audit_log_transaction_id_idx already exists")
+
+        # Composite index for window function partitioning (model_name, record_id, create_date DESC, id DESC)
+        if not self._index_exists("oteny_audit_log_model_record_date_id_idx"):
+            _logger.info("Creating index oteny_audit_log_model_record_date_id_idx")
+            cr.execute(
+                """
+                CREATE INDEX oteny_audit_log_model_record_date_id_idx
+                ON oteny_audit_log (model_name, record_id, create_date DESC, id DESC)
+            """
+            )
+        else:
+            _logger.info("Index oteny_audit_log_model_record_date_id_idx already exists")
+
+        _logger.info("OtenyAuditLog indexes initialization completed")
+
+    def _index_exists(self, index_name):
+        """Check if a database index exists."""
+        cr = self.env.cr
+        cr.execute(
+            """
+            SELECT 1 FROM pg_indexes
+            WHERE tablename = %s AND indexname = %s
+        """,
+            (self._table, index_name),
+        )
+        return cr.fetchone() is not None
+
     def _selection_record_ref(self):
         models = self.env["ir.model"].search([])
         return [(model.model, model.name) for model in models]
