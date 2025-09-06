@@ -1,5 +1,5 @@
 from . import oteny_audit_log
-from . import oteny_audit_log_parent_ref
+from . import oteny_audit_log_ref
 from . import oteny_audit_log_aggregated
 from . import oteny_audit_mixin
 from . import base_patch

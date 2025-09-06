@@ -9,7 +9,7 @@ class TestAuditParentRef(TransactionCase):
         self.parent_model = self.env["oteny.audit.test.parent"]
         self.child_model = self.env["oteny.audit.test.child"]
         self.log_model = self.env["oteny.audit.log"]
-        self.parent_ref_model = self.env["oteny.audit.log.parent.ref"]
+        self.ref_model = self.env["oteny.audit.log.ref"]
         self.aggregated_log_model = self.env["oteny.audit.log.aggregated"]
 
         self.parent_record = self.parent_model.create({"name": "Test Parent"})
@@ -54,10 +54,16 @@ class TestAuditParentRef(TransactionCase):
         )
         self.assertEqual(len(log_entry), 1, "Should find one insert log for the child.")
 
-        parent_ref = self.parent_ref_model.search([("audit_log_id", "=", log_entry.id)])
-        self.assertEqual(len(parent_ref), 1, "Should find one parent reference for the log.")
-        self.assertEqual(parent_ref.parent_model_name, self.parent_model._name)
-        self.assertEqual(parent_ref.parent_record_id, self.parent_record.id)
+        # Should have both a direct ref and a parent ref for the child log
+        refs = self.ref_model.search([("audit_log_id", "=", log_entry.id)])
+        # Should have 2 refs: 1 direct (child to itself) and 1 parent (child to parent)
+        self.assertEqual(len(refs), 2, "Should find two references for the child log (direct + parent).")
+
+        # Check for parent reference (not direct)
+        parent_ref = refs.filtered(lambda r: not r.is_direct)
+        self.assertEqual(len(parent_ref), 1, "Should find one parent reference.")
+        self.assertEqual(parent_ref.target_model_name, self.parent_model._name)
+        self.assertEqual(parent_ref.target_record_id, self.parent_record.id)
 
         # 3. Update the child record
         child_record.write({"name": "Test Child 1 Updated"})
@@ -74,7 +80,12 @@ class TestAuditParentRef(TransactionCase):
         )
         self.assertEqual(len(update_log_entry), 1, "Should find one update log for the child.")
 
-        update_parent_ref = self.parent_ref_model.search([("audit_log_id", "=", update_log_entry.id)])
+        # Check refs for update log
+        update_refs = self.ref_model.search([("audit_log_id", "=", update_log_entry.id)])
+        # Should have 2 refs: 1 direct and 1 parent
+        self.assertEqual(len(update_refs), 2, "Should find two references for the update log.")
+
+        update_parent_ref = update_refs.filtered(lambda r: not r.is_direct)
         self.assertEqual(len(update_parent_ref), 1, "Should find parent ref for the update log.")
 
         aggregated_logs = self.aggregated_log_model.search(

@@ -385,16 +385,16 @@ action = {
 
         _logger.info(f"Audit log cleanup completed. Deleted {deleted_count} records")
 
-        # Also clean up parent references for deleted logs
-        _logger.info("Cleaning up orphaned parent references...")
+        # Also clean up references for deleted logs
+        _logger.info("Cleaning up orphaned references...")
         self.env.cr.execute(
             """
-            DELETE FROM oteny_audit_log_parent_ref
+            DELETE FROM oteny_audit_log_ref
             WHERE audit_log_id NOT IN (SELECT id FROM oteny_audit_log)
         """
         )
         orphaned_refs_count = self.env.cr.rowcount
-        _logger.info(f"Deleted {orphaned_refs_count} orphaned parent reference records")
+        _logger.info(f"Deleted {orphaned_refs_count} orphaned reference records")
 
         # Commit the final cleanup
         try:

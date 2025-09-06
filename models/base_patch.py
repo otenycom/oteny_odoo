@@ -9,73 +9,84 @@ original_write = models.BaseModel.write
 original_flush = models.BaseModel._flush
 
 
-def _create_parent_log_references_unified(env, model, log_records):
+def _create_audit_log_references(env, model, log_records):
     """
-    Unified function to create parent references for audit log records.
-    Handles both model-defined _oteny_audit_parent_field and predefined _model_parent_keys.
-
-    Priority order:
-    1. _oteny_audit_parent_field (model-specific, takes precedence)
-    2. _model_parent_keys (global predefined mappings)
-
-    Both support:
-    - Single field references: "parent_id"
-    - Tuple format: "model,res_id"
+    Create reference entries for all audit logs.
+    Creates both direct references (log points to itself) and parent references (child logs point to parents).
 
     Args:
         env: The Odoo environment.
         model: The model class being audited.
         log_records: A recordset of `oteny.audit.log`.
     """
-    parent_refs = []
+    if not log_records:
+        return
 
+    refs = []
+
+    # First, create direct references for ALL logs (each log points to itself)
+    for log in log_records:
+        refs.append(
+            {
+                "audit_log_id": log.id,
+                "target_model_name": log.model_name,
+                "target_record_id": log.record_id,
+                "target_display_name": log.record_display_name,
+                "is_direct": True,
+                "create_date": log.create_date,
+                "transaction_id": log.transaction_id,
+            }
+        )
+
+    # Now create parent references (for child logs that have parent relationships)
     # Group log records by their source record id to minimize queries
     logs_by_record_id = defaultdict(list)
     for log in log_records:
-        logs_by_record_id[log.record_id].append(log.id)
+        logs_by_record_id[log.record_id].append(log)
 
-    if not logs_by_record_id:
-        return
+    if logs_by_record_id:
+        # Browse all source records at once
+        records_with_logs = env[model._name].sudo().browse(list(logs_by_record_id.keys()))
 
-    # Browse all source records at once
-    records_with_logs = env[model._name].sudo().browse(list(logs_by_record_id.keys()))
+        for record in records_with_logs:
+            # Check if the record still exists before trying to access its fields
+            if not record.exists():
+                continue
 
-    for record in records_with_logs:
-        # Check if the record still exists before trying to access its fields
-        if not record.exists():
-            continue
+            try:
+                # Use unified parent resolution with recursion support
+                # The function will determine the appropriate config for each record individually
+                # and return all parent references found through recursion (ordered: immediate -> top-most)
+                all_parent_refs = _resolve_parent_reference_unified(env, record, max_depth=3)
 
-        try:
-            # Use unified parent resolution with recursion support
-            # The function will determine the appropriate config for each record individually
-            # and return all parent references found through recursion (ordered: immediate -> top-most)
-            all_parent_refs = _resolve_parent_reference_unified(env, record, max_depth=3)
+                # Create parent reference records for each level of recursion
+                # List order: [immediate_parent, grandparent, great-grandparent, ...]
+                if all_parent_refs:
+                    for parent_ref_data in all_parent_refs:
+                        parent_model_name = parent_ref_data["parent_model_name"]
+                        parent_record_id = parent_ref_data["parent_record_id"]
+                        parent_display_name = parent_ref_data["parent_display_name"]
 
-            # Create parent reference records for each level of recursion
-            # List order: [immediate_parent, grandparent, great-grandparent, ...]
-            # We create one set of parent references per record, then associate them with all audit logs for that record
-            if all_parent_refs:
-                for parent_ref_data in all_parent_refs:
-                    parent_model_name = parent_ref_data["parent_model_name"]
-                    parent_record_id = parent_ref_data["parent_record_id"]
-                    parent_display_name = parent_ref_data["parent_display_name"]
+                        # Create parent reference for each audit log of this record
+                        for log in logs_by_record_id[record.id]:
+                            refs.append(
+                                {
+                                    "audit_log_id": log.id,
+                                    "target_model_name": parent_model_name,
+                                    "target_record_id": parent_record_id,
+                                    "target_display_name": parent_display_name,
+                                    "is_direct": False,
+                                    "create_date": log.create_date,
+                                    "transaction_id": log.transaction_id,
+                                }
+                            )
+            except Exception:
+                # Failsafe for cases where parent record might be deleted or access rights issues.
+                continue
 
-                    # Create parent reference for each audit log of this record
-                    for log_id in logs_by_record_id[record.id]:
-                        parent_refs.append(
-                            {
-                                "audit_log_id": log_id,
-                                "parent_model_name": parent_model_name,
-                                "parent_record_id": parent_record_id,
-                                "parent_record_display_name": parent_display_name,
-                            }
-                        )
-        except Exception:
-            # Failsafe for cases where parent record might be deleted or access rights issues.
-            continue
-
-    if parent_refs:
-        env["oteny.audit.log.parent.ref"].sudo().create(parent_refs)
+    # Bulk create all references
+    if refs:
+        env["oteny.audit.log.ref"].sudo().create(refs)
 
 
 def _resolve_parent_reference_unified(env, record, max_depth=3, current_depth=0):
@@ -177,7 +188,7 @@ def _resolve_parent_reference_unified(env, record, max_depth=3, current_depth=0)
 
 
 def _create_audit_logs(env, model, logs):
-    """Helper to create audit log records and their parent references."""
+    """Helper to create audit log records and their references."""
     if not logs or not env.registry.loaded:
         return
 
@@ -187,7 +198,7 @@ def _create_audit_logs(env, model, logs):
         log["transaction_id"] = txid
 
     log_records = env["oteny.audit.log"].sudo().create(logs)
-    _create_parent_log_references_unified(env, model, log_records)
+    _create_audit_log_references(env, model, log_records)
 
 
 def _safe_convert_to_cache(field, raw_value, record):

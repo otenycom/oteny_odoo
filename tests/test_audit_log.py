@@ -246,22 +246,25 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(message_logs, "Audit logs should be created for mail.message")
 
-        # Check that parent references were created using predefined keys
-        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+        # Check that references were created using predefined keys
+        refs = self.env["oteny.audit.log.ref"].search(
             [
                 ("audit_log_id", "in", message_logs.ids),
             ]
         )
 
-        self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
+        # Each log should have refs (at least a direct ref)
+        self.assertTrue(refs, "References should be created for mail.message logs")
 
-        # Verify that at least one parent reference points to the expected parent partner
-        partner_parent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        # Verify parent references (not direct) pointing to the expected parent partner
+        partner_parent_refs = refs.filtered(
+            lambda r: not r.is_direct
+            and r.target_model_name == "res.partner"
+            and r.target_record_id == parent_partner.id
         )
         self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
         self.assertEqual(
-            partner_parent_refs[0].parent_record_display_name,
+            partner_parent_refs[0].target_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -306,22 +309,24 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(child_logs, "Audit logs should be created for child res.partner")
 
-        # Check that parent references were created using predefined keys
-        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+        # Check that references were created using predefined keys
+        refs = self.env["oteny.audit.log.ref"].search(
             [
                 ("audit_log_id", "in", child_logs.ids),
             ]
         )
 
-        self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
+        self.assertTrue(refs, "References should be created for child partner logs")
 
-        # Verify that at least one parent reference points to the expected parent partner
-        partner_parent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+        # Verify parent references (not direct) pointing to the expected parent partner
+        partner_parent_refs = refs.filtered(
+            lambda r: not r.is_direct
+            and r.target_model_name == "res.partner"
+            and r.target_record_id == parent_partner.id
         )
         self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
         self.assertEqual(
-            partner_parent_refs[0].parent_record_display_name,
+            partner_parent_refs[0].target_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -375,21 +380,24 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(child_logs, "Audit logs should be created for child res.partner")
 
-        # Check that parent references were created and point to GRANDPARENT (not immediate parent)
-        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+        # Check that references were created and point to GRANDPARENT (not just immediate parent)
+        refs = self.env["oteny.audit.log.ref"].search(
             [
                 ("audit_log_id", "in", child_logs.ids),
             ]
         )
 
-        self.assertTrue(parent_refs, "Parent references should be created for child partner logs")
+        self.assertTrue(refs, "References should be created for child partner logs")
+
+        # Filter for parent references (not direct)
+        parent_refs = refs.filtered(lambda r: not r.is_direct)
 
         # Verify that we have parent references pointing to both immediate parent and grandparent
         immediate_parent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+            lambda r: r.target_model_name == "res.partner" and r.target_record_id == parent_partner.id
         )
         grandparent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == grandparent_partner.id
+            lambda r: r.target_model_name == "res.partner" and r.target_record_id == grandparent_partner.id
         )
 
         self.assertTrue(
@@ -398,12 +406,12 @@ class TestAuditLog(TransactionCase):
         self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent")
 
         self.assertEqual(
-            immediate_parent_refs[0].parent_record_display_name,
+            immediate_parent_refs[0].target_display_name,
             parent_partner.display_name,
             "Immediate parent display name should match",
         )
         self.assertEqual(
-            grandparent_refs[0].parent_record_display_name,
+            grandparent_refs[0].target_display_name,
             grandparent_partner.display_name,
             "Grandparent display name should match",
         )
@@ -459,21 +467,24 @@ class TestAuditLog(TransactionCase):
 
         self.assertTrue(message_logs, "Audit logs should be created for mail.message")
 
-        # Check that parent references point to GRANDPARENT (not immediate parent)
-        parent_refs = self.env["oteny.audit.log.parent.ref"].search(
+        # Check that references point to GRANDPARENT (not just immediate parent)
+        refs = self.env["oteny.audit.log.ref"].search(
             [
                 ("audit_log_id", "in", message_logs.ids),
             ]
         )
 
-        self.assertTrue(parent_refs, "Parent references should be created for mail.message logs")
+        self.assertTrue(refs, "References should be created for mail.message logs")
+
+        # Filter for parent references (not direct)
+        parent_refs = refs.filtered(lambda r: not r.is_direct)
 
         # Verify that we have parent references pointing to both immediate parent and grandparent
         immediate_parent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == parent_partner.id
+            lambda r: r.target_model_name == "res.partner" and r.target_record_id == parent_partner.id
         )
         grandparent_refs = parent_refs.filtered(
-            lambda r: r.parent_model_name == "res.partner" and r.parent_record_id == grandparent_partner.id
+            lambda r: r.target_model_name == "res.partner" and r.target_record_id == grandparent_partner.id
         )
 
         self.assertTrue(
@@ -482,12 +493,12 @@ class TestAuditLog(TransactionCase):
         self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent partner")
 
         self.assertEqual(
-            immediate_parent_refs[0].parent_record_display_name,
+            immediate_parent_refs[0].target_display_name,
             parent_partner.display_name,
             "Immediate parent display name should match",
         )
         self.assertEqual(
-            grandparent_refs[0].parent_record_display_name,
+            grandparent_refs[0].target_display_name,
             grandparent_partner.display_name,
             "Grandparent display name should match",
         )
