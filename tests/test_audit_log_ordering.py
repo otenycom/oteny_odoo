@@ -226,3 +226,79 @@ class TestAuditLogOrdering(TransactionCase):
 
         print(f"\nLog IDs in order: {log_ids}")
         print(f"Each flush creates a separate log: Create -> Update1 -> Update2 -> Update3")
+
+    def test_computed_field_during_create_ordering(self):
+        """Test that computed fields during creation should log as inserts, not updates appearing before inserts.
+
+        This test reproduces the issue where computed fields (like company_id computed from employee_id)
+        trigger write operations during record creation, causing 'u' (update) logs to appear before 'i' (insert) logs.
+        """
+        # Create a parent record with a name that triggers the computed field
+        parent = self.parent_model.create({"name": "Test Name"})
+
+        # Flush to ensure all operations are complete
+        parent.flush_recordset()
+
+        # Get all audit logs for this parent record
+        logs = self.log_model.search(
+            [
+                ("model_name", "=", self.parent_model._name),
+                ("record_id", "=", parent.id),
+            ],
+            order="id ASC",  # Order by ID ascending to see chronological order
+        )
+
+        print(f"\nDebug: Found {len(logs)} logs for parent record {parent.id}")
+        print(f"Debug: Parent record values: name={parent.name}, computed_field={parent.computed_field}")
+        for i, log in enumerate(logs):
+            print(
+                f"Debug: Log {i} - field: {log.field_name}, type: {log.change_type}, "
+                f"old: '{log.old_value}', new: '{log.new_value}', id: {log.id}"
+            )
+
+        # Should have at least 2 logs (name insert and computed_field)
+        self.assertGreaterEqual(len(logs), 2, "Should have at least 2 audit logs")
+
+        # Find the first update and last insert
+        first_update_index = -1
+        last_insert_index = -1
+
+        for i, log in enumerate(logs):
+            if log.change_type == "u" and first_update_index == -1:
+                first_update_index = i
+            if log.change_type == "i":
+                last_insert_index = i
+
+        # Key assertion: No update should come before any insert during creation
+        # This test SHOULD FAIL with current implementation where computed fields
+        # trigger updates that get logged before the inserts
+        if first_update_index != -1:
+            self.assertGreater(
+                first_update_index,
+                last_insert_index,
+                f"During creation, all inserts should be logged before any updates. "
+                f"Found update at index {first_update_index} but last insert at index {last_insert_index}. "
+                f"Log details: {[(log.field_name, log.change_type, log.id) for log in logs]}",
+            )
+
+        # Check that computed_field was set
+        computed_field_logs = logs.filtered(lambda l: l.field_name == "computed_field")
+        self.assertTrue(computed_field_logs, "Should have log for computed_field")
+
+        # The computed field should ideally be logged as an insert, not an update
+        # This assertion will also fail with current implementation
+        self.assertEqual(
+            computed_field_logs[0].change_type,
+            "i",
+            f"Computed field during creation should be logged as insert, not '{computed_field_logs[0].change_type}'",
+        )
+
+        # Verify the specific case: computed_field (if logged as 'u') should not have lower ID than name ('i')
+        name_log = logs.filtered(lambda l: l.field_name == "name" and l.change_type == "i")
+        if name_log and computed_field_logs:
+            self.assertLess(
+                name_log[0].id,
+                computed_field_logs[0].id,
+                f"Name insert (ID {name_log[0].id}) should have lower ID than computed_field "
+                f"(ID {computed_field_logs[0].id}, type {computed_field_logs[0].change_type})",
+            )
