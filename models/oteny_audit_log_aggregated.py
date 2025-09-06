@@ -10,12 +10,9 @@ class OtenyAuditLogAggregated(models.Model):
     _name = "oteny.audit.log.aggregated"
     _description = "Aggregated Audit Log (including children)"
     _auto = False
-    _order = "audit_log_id_numeric DESC, create_date DESC, id DESC"
+    _order = "id DESC"
 
     audit_log_id = fields.Many2one("oteny.audit.log", string="Audit Log", readonly=True)
-    audit_log_id_numeric = fields.Integer(
-        readonly=True, string="Audit Log ID Numeric", related="audit_log_id.id"
-    )
     parent_record_display_name = fields.Char(string="Parent Record", readonly=True)
 
     # --- Fields from oteny.audit.log ---
