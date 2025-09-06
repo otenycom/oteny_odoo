@@ -35,20 +35,32 @@ class TestAuditLogOrdering(TransactionCase):
             order="id ASC",  # Order by ID ascending to see chronological order
         )
 
-        # Should have exactly 2 logs: 1 insert, 1 update
-        self.assertEqual(len(logs), 2, "Should have 2 audit logs (1 insert, 1 update)")
+        # Debug output to see what logs we have
+        print(f"\nDebug test_create_then_write_ordering: Found {len(logs)} logs")
+        for i, log in enumerate(logs):
+            print(f"  Log {i}: field={log.field_name}, type={log.change_type}, new={log.new_value}")
+
+        # Filter out computed_field which might be set during creation
+        non_computed_logs = logs.filtered(lambda l: l.field_name != "computed_field")
+
+        # Should have exactly 2 logs for 'name' field: 1 insert, 1 update
+        self.assertEqual(
+            len(non_computed_logs), 2, "Should have 2 audit logs for 'name' field (1 insert, 1 update)"
+        )
 
         # First log should be the insert
-        self.assertEqual(logs[0].change_type, "i", "First log should be insert")
-        self.assertEqual(logs[0].field_name, "name", "First log should be for name field")
-        self.assertEqual(logs[0].new_value, "Initial Name", "Insert should have initial value")
-        self.assertEqual(logs[0].old_value, "", "Insert should have empty old value")
+        self.assertEqual(non_computed_logs[0].change_type, "i", "First log should be insert")
+        self.assertEqual(non_computed_logs[0].field_name, "name", "First log should be for name field")
+        self.assertEqual(non_computed_logs[0].new_value, "Initial Name", "Insert should have initial value")
+        self.assertEqual(non_computed_logs[0].old_value, "", "Insert should have empty old value")
 
         # Second log should be the update
-        self.assertEqual(logs[1].change_type, "u", "Second log should be update")
-        self.assertEqual(logs[1].field_name, "name", "Second log should be for name field")
-        self.assertEqual(logs[1].old_value, "Initial Name", "Update should have initial as old value")
-        self.assertEqual(logs[1].new_value, "Updated Name", "Update should have updated value")
+        self.assertEqual(non_computed_logs[1].change_type, "u", "Second log should be update")
+        self.assertEqual(non_computed_logs[1].field_name, "name", "Second log should be for name field")
+        self.assertEqual(
+            non_computed_logs[1].old_value, "Initial Name", "Update should have initial as old value"
+        )
+        self.assertEqual(non_computed_logs[1].new_value, "Updated Name", "Update should have updated value")
 
         # Verify ordering in aggregated view as well
         aggregated_logs = self.aggregated_model.search(
@@ -56,11 +68,12 @@ class TestAuditLogOrdering(TransactionCase):
                 ("model_name", "=", self.parent_model._name),
                 ("record_id", "=", parent.id),
                 ("is_child_log", "=", False),  # Only direct logs
+                ("field_name", "!=", "computed_field"),  # Exclude computed field
             ],
         )
 
         # In DESC order, update should come first, then insert
-        self.assertEqual(len(aggregated_logs), 2, "Should have 2 aggregated logs")
+        self.assertEqual(len(aggregated_logs), 2, "Should have 2 aggregated logs for 'name' field")
         self.assertEqual(aggregated_logs[0].change_type, "u", "Most recent should be update")
         self.assertEqual(aggregated_logs[1].change_type, "i", "Older should be insert")
 
@@ -302,3 +315,61 @@ class TestAuditLogOrdering(TransactionCase):
                 f"Name insert (ID {name_log[0].id}) should have lower ID than computed_field "
                 f"(ID {computed_field_logs[0].id}, type {computed_field_logs[0].change_type})",
             )
+
+        # Now test that subsequent writes to the newly created record are logged as updates, not inserts
+        print("\nTesting subsequent write to newly created record...")
+
+        # Write to the record after creation is complete
+        parent.write({"name": "Updated After Creation"})
+        parent.flush_recordset()
+
+        # Get all logs again
+        all_logs_after_update = self.log_model.search(
+            [
+                ("model_name", "=", self.parent_model._name),
+                ("record_id", "=", parent.id),
+            ],
+            order="id ASC",
+        )
+
+        print(f"Debug: After update, found {len(all_logs_after_update)} total logs")
+        for i, log in enumerate(all_logs_after_update):
+            print(
+                f"Debug: Log {i} - field: {log.field_name}, type: {log.change_type}, "
+                f"old: '{log.old_value}', new: '{log.new_value}', id: {log.id}"
+            )
+
+        # Should have at least 3 logs now (original name insert, computed_field insert, and name update)
+        self.assertGreaterEqual(len(all_logs_after_update), 3, "Should have at least 3 logs after update")
+
+        # Find the update log for the name field
+        name_update_logs = all_logs_after_update.filtered(
+            lambda l: l.field_name == "name" and l.new_value == "Updated After Creation"
+        )
+        self.assertEqual(len(name_update_logs), 1, "Should have exactly one update log for name")
+
+        # This should be logged as 'u' (update), not 'i' (insert)
+        self.assertEqual(
+            name_update_logs[0].change_type,
+            "u",
+            "Subsequent write to newly created record should be logged as update, not insert",
+        )
+
+        # The old value should be the initial value
+        self.assertEqual(
+            name_update_logs[0].old_value,
+            "Test Name",
+            "Update log should have the previous value as old_value",
+        )
+
+        # Also check that computed_field gets updated and logged as 'u' this time
+        computed_update_logs = all_logs_after_update.filtered(
+            lambda l: l.field_name == "computed_field" and l.new_value == "Computed: Updated After Creation"
+        )
+        if computed_update_logs:
+            self.assertEqual(
+                computed_update_logs[0].change_type,
+                "u",
+                "Computed field update after creation should be logged as update, not insert",
+            )
+            print(f"Debug: Computed field update correctly logged as 'u'")

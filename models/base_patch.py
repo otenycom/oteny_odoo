@@ -265,6 +265,16 @@ def patched_create(self, vals_list):
 
     records = original_create(self, vals_list)
 
+    # Track newly created records in transaction scope
+    # Also track which fields have been initially logged for each record
+    audit_data = self.env.cr.precommit.data.setdefault("oteny_audit", {})
+    if "newly_created_records" not in audit_data:
+        audit_data["newly_created_records"] = defaultdict(set)
+    if "initially_logged_fields" not in audit_data:
+        audit_data["initially_logged_fields"] = defaultdict(lambda: defaultdict(set))
+    newly_created = audit_data["newly_created_records"]
+    newly_created[self._name].update(records.ids)
+
     # Skip if no records were created
     if not records:
         return records
@@ -358,6 +368,12 @@ def patched_create(self, vals_list):
             logs.extend(record_logs)
         if logs:
             _create_audit_logs(self.env, self, logs)
+
+            # Mark these fields as initially logged for newly created records
+            initially_logged = audit_data["initially_logged_fields"]
+            for log in logs:
+                if log["record_id"] in newly_created[self._name]:
+                    initially_logged[self._name][log["record_id"]].add(log["field_name"])
 
     return records
 
@@ -652,14 +668,21 @@ def patched_flush(self, fnames=None):
     old_values = {}
     missing_queries = defaultdict(list)  # field: [ids needing DB query]
     audit_old_values = audit_data.get("old_values", {})
+    # Track all record IDs that need to be checked for existence
+    all_record_ids_to_check = set()
 
     for name, field in loggable_fields_dict.items():
         field_old_values = audit_old_values.get(field, {})
         for rid in batches.get(name, []):
+            all_record_ids_to_check.add(rid)
             if rid in field_old_values:
                 old_values.setdefault(rid, {})[name] = field_old_values[rid]
             else:
                 missing_queries[field].append(rid)
+
+    # Check which records are newly created in this transaction
+    newly_created = audit_data.get("newly_created_records", {}).get(self._name, set())
+    initially_logged = audit_data.get("initially_logged_fields", {}).get(self._name, {})
 
     # Query database for missing old values in a single batch
     if missing_queries:
@@ -667,24 +690,28 @@ def patched_flush(self, fnames=None):
         all_missing_fields = list(missing_queries.keys())
         if all_missing_ids:
             field_names = [field.name for field in all_missing_fields if field.column_type]
-            query = SQL(
-                "SELECT id, %s FROM %s WHERE id IN %s",
-                SQL(", ").join(SQL.identifier(col) for col in field_names),
-                SQL.identifier(self._table),
-                tuple(all_missing_ids),
-            )
-            self.env.cr.execute(query)
-            db_data_map = {row["id"]: row for row in self.env.cr.dictfetchall()}
+            if field_names:
+                query = SQL(
+                    "SELECT id, %s FROM %s WHERE id IN %s",
+                    SQL(", ").join(SQL.identifier(col) for col in field_names),
+                    SQL.identifier(self._table),
+                    tuple(all_missing_ids),
+                )
+                self.env.cr.execute(query)
+                db_data_map = {row["id"]: row for row in self.env.cr.dictfetchall()}
 
-            for field in all_missing_fields:
-                if field.name not in field_names:
-                    continue
-                for rid in missing_queries[field]:
-                    row = db_data_map.get(rid)
-                    if row:
-                        record = self.sudo().browse(rid)
-                        val = _safe_convert_to_cache(field, row[field.name], record)
-                        old_values.setdefault(rid, {})[field.name] = val
+                for field in all_missing_fields:
+                    if field.name not in field_names:
+                        continue
+                    for rid in missing_queries[field]:
+                        row = db_data_map.get(rid)
+                        if row:
+                            record = self.sudo().browse(rid)
+                            val = _safe_convert_to_cache(field, row[field.name], record)
+                            old_values.setdefault(rid, {})[field.name] = val
+                        elif rid in newly_created:
+                            # For new records, set old value as None/empty
+                            old_values.setdefault(rid, {})[field.name] = None
 
     # Perform original flush
     original_flush(self, fnames)
@@ -725,6 +752,13 @@ def patched_flush(self, fnames=None):
                 ):
                     continue
 
+                # Determine change type: 'i' for new record fields not yet logged, 'u' otherwise
+                # A field should be logged as 'i' if:
+                # 1. The record was created in this transaction AND
+                # 2. This specific field hasn't been initially logged yet
+                is_new_field = rid in newly_created and name not in initially_logged.get(rid, set())
+                change_type = "i" if is_new_field else "u"
+
                 old_val_display = _get_display_value(field, old_val, record.env)
                 new_val_display = _get_display_value(field, new_val, record.env)
                 logs.append(
@@ -738,7 +772,7 @@ def patched_flush(self, fnames=None):
                         "new_value": str(new_val) if new_val is not None else "",
                         "old_value_display_name": old_val_display,
                         "new_value_display_name": new_val_display,
-                        "change_type": "u",
+                        "change_type": change_type,
                     }
                 )
                 most_recent_logs[field][rid] = {"old_value": old_val, "new_value": new_val}
@@ -750,6 +784,10 @@ def patched_flush(self, fnames=None):
             field = self._fields.get(log["field_name"])
             if field:
                 logged_changes[field].add(log["record_id"])
+
+            # If this was an insert for a newly created record, mark the field as initially logged
+            if log["change_type"] == "i" and log["record_id"] in newly_created:
+                initially_logged.setdefault(log["record_id"], set()).add(log["field_name"])
 
     # Clear old_values after flush
     if "old_values" in audit_data:
