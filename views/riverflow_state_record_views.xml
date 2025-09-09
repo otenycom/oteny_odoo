@@ -50,7 +50,7 @@
                 <field name="is_subject" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
                 <field name="res_model" optional="hide" />
-                <field name="res_name" optional="hide" />
+                <field name="res_name" optional="show" />
                 <field name="res_sortable_name" optional="hide" />
                 <field name="master_model" optional="hide" />
                 <field name="name" optional="hide" />
