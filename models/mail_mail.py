@@ -91,9 +91,34 @@ class MailMailExtended(models.Model):
                                 sorted(list(allowed_domains))
                             ),  # Use sorted list for consistent error messages
                         )
-                        _logger.error(error_msg)
-                        # Raise UserError to stop the process and inform the user
-                        raise UserError(error_msg)
+
+                        # Handle based on raise_exception parameter
+                        if raise_exception:
+                            _logger.error(error_msg)
+                            # Raise UserError to stop the process and inform the user
+                            raise UserError(error_msg)
+                        else:
+                            # In cron job context, mark email as failed and log the issue
+                            failure_reason = _(
+                                "Email blocked due to disallowed recipient domain '%s'. " "Recipient: %s"
+                            ) % (domain_part, r_email)
+                            _logger.warning(
+                                "Marking email (ID: %s, Subject: '%s') as failed due to disallowed domain '%s' in recipient '%s'",
+                                mail_record.id,
+                                mail_record.subject,
+                                domain_part,
+                                r_email,
+                            )
+                            # Mark as exception to remove from queue
+                            mail_record.write(
+                                {
+                                    "state": "exception",
+                                    "failure_reason": failure_reason,
+                                    "failure_type": "mail_email_invalid",
+                                }
+                            )
+                            # Skip this mail record and continue with others
+                            continue
                 except IndexError:
                     # This case should ideally not be reached if _extract_all_recipient_emails works correctly,
                     # as it's supposed to return only valid-looking emails with '@'.
@@ -102,11 +127,36 @@ class MailMailExtended(models.Model):
                         "Email sending blocked for mail (ID: %s, Subject: '%s'). "
                         "Recipient email '%s' is malformed and its domain could not be checked."
                     ) % (mail_record.id, mail_record.subject, r_email)
-                    _logger.warning(
-                        error_msg
-                    )  # Log as warning, as it might indicate an issue in email extraction
-                    # Raise UserError to halt on problematic data.
-                    raise UserError(error_msg)
+
+                    # Handle based on raise_exception parameter
+                    if raise_exception:
+                        _logger.error(error_msg)
+                        # Raise UserError to halt on problematic data.
+                        raise UserError(error_msg)
+                    else:
+                        # In cron job context, mark email as failed and log the issue
+                        failure_reason = (
+                            _(
+                                "Email blocked due to malformed recipient email '%s' - domain could not be checked."
+                            )
+                            % r_email
+                        )
+                        _logger.warning(
+                            "Marking email (ID: %s, Subject: '%s') as failed due to malformed recipient email '%s'",
+                            mail_record.id,
+                            mail_record.subject,
+                            r_email,
+                        )
+                        # Mark as exception to remove from queue
+                        mail_record.write(
+                            {
+                                "state": "exception",
+                                "failure_reason": failure_reason,
+                                "failure_type": "mail_email_invalid",
+                            }
+                        )
+                        # Skip this mail record and continue with others
+                        continue
 
         # If all mails in the batch have passed the domain check, proceed with the original send method
         return super().send(
