@@ -259,29 +259,29 @@
                 <field name="highlight_row_type" column_invisible="1" />
                 <field name="active" column_invisible="True" />
                 <field name="is_end_state" column_invisible="1" />
-                <field name="res_name" optional="show" />
-                <field name="root_name" optional="hide" />
-                <field name='indented_name' optional="show" width="260px" />
-                <field name="display_name" optional="hide" />
+                <field name="res_name" optional="show" width="260px" />
+                <field name="root_name" optional="hide" width="260px" />
+                <field name='indented_name' optional="show" width="300px" />
+                <field name="display_name" optional="hide" width="300px" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" width="140px" />
+                <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
-                <field name="state_id" width="140px" optional="hide" decoration-success="is_end_state" />
-                <field name="timing_json" widget="timing_widget" optional="show" />
+                <field name="state_id" optional="hide" decoration-success="is_end_state" width="140px" />
+                <field name="timing_json" widget="timing_widget" optional="show" width="150px" />
                 <field name="deadline" optional="hide"
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-muted="is_end_state" />
                 <field name="daily_prio" optional="hide" />
                 <field name="end_date" optional="hide" />
-                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
-                <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                 <field name="write_uid" string="Updated By" optional="hide" />
                 <field name="write_date" string="Updated On" optional="hide" />
                 <field name="front_office_workflow_id" optional="hide" />
                 <field name="supply_unit_price" optional="hide" />
                 <field name="supply_unit_price_currency_id" column_invisible="1" />
                 <field name="company_id" width="100px" optional="hide" />
-                <field name='internal_notes_summary' width="200px" optional="show" />
-                <field name="external_messages_summary" width="200px" optional="show" />
+                <field name='internal_notes_summary' optional="show" />
+                <field name="external_messages_summary" optional="show" />
                 <field name="unreviewed_message_count" width="40px" optional="show" />
             </list>
         </field>
