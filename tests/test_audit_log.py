@@ -263,8 +263,15 @@ class TestAuditLog(TransactionCase):
             and r.target_record_id == parent_partner.id
         )
         self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
+        # For parent references from child logs (mail.message), target_display_name should be the child's display name
         self.assertEqual(
             partner_parent_refs[0].target_display_name,
+            message.display_name,
+            "Target display name should be the message's display name for child logs",
+        )
+        # And parent_display_name should be the parent's display name
+        self.assertEqual(
+            partner_parent_refs[0].parent_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -325,8 +332,15 @@ class TestAuditLog(TransactionCase):
             and r.target_record_id == parent_partner.id
         )
         self.assertTrue(partner_parent_refs, "Should have parent references pointing to the parent partner")
+        # For parent references from child logs, target_display_name should be the child's display name
         self.assertEqual(
             partner_parent_refs[0].target_display_name,
+            child_partner.display_name,
+            "Target display name should be the child's display name for child logs",
+        )
+        # And parent_display_name should be the parent's display name
+        self.assertEqual(
+            partner_parent_refs[0].parent_display_name,
             parent_partner.display_name,
             "Parent display name should match",
         )
@@ -405,13 +419,27 @@ class TestAuditLog(TransactionCase):
         )
         self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent")
 
+        # For parent references from child logs, target_display_name should be the child's display name
         self.assertEqual(
             immediate_parent_refs[0].target_display_name,
-            parent_partner.display_name,
-            "Immediate parent display name should match",
+            child_partner.display_name,
+            "Target display name should be the child's display name for child logs",
         )
+        # And parent_display_name should be the parent's display name
+        self.assertEqual(
+            immediate_parent_refs[0].parent_display_name,
+            parent_partner.display_name,
+            "Parent display name should match",
+        )
+        # For grandparent references, target_display_name should also be the child's display name
         self.assertEqual(
             grandparent_refs[0].target_display_name,
+            child_partner.display_name,
+            "Target display name should be the child's display name for child logs",
+        )
+        # And parent_display_name should be the grandparent's display name
+        self.assertEqual(
+            grandparent_refs[0].parent_display_name,
             grandparent_partner.display_name,
             "Grandparent display name should match",
         )
@@ -492,13 +520,27 @@ class TestAuditLog(TransactionCase):
         )
         self.assertTrue(grandparent_refs, "Should have parent references pointing to the grandparent partner")
 
+        # For parent references from child logs (mail.message), target_display_name should be the child's display name
         self.assertEqual(
             immediate_parent_refs[0].target_display_name,
-            parent_partner.display_name,
-            "Immediate parent display name should match",
+            message.display_name,
+            "Target display name should be the message's display name for child logs",
         )
+        # And parent_display_name should be the parent's display name
+        self.assertEqual(
+            immediate_parent_refs[0].parent_display_name,
+            parent_partner.display_name,
+            "Parent display name should match",
+        )
+        # For grandparent references, target_display_name should also be the child's display name
         self.assertEqual(
             grandparent_refs[0].target_display_name,
+            message.display_name,
+            "Target display name should be the message's display name for child logs",
+        )
+        # And parent_display_name should be the grandparent's display name
+        self.assertEqual(
+            grandparent_refs[0].parent_display_name,
             grandparent_partner.display_name,
             "Grandparent display name should match",
         )

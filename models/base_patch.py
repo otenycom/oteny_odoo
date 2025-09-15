@@ -32,6 +32,7 @@ def _create_audit_log_references(env, model, log_records):
                 "target_model_name": log.model_name,
                 "target_record_id": log.record_id,
                 "target_display_name": log.record_display_name,
+                "parent_display_name": False,  # For direct refs, no parent
                 "is_direct": True,
                 "create_date": log.create_date,
                 "transaction_id": log.transaction_id,
@@ -74,7 +75,8 @@ def _create_audit_log_references(env, model, log_records):
                                     "audit_log_id": log.id,
                                     "target_model_name": parent_model_name,
                                     "target_record_id": parent_record_id,
-                                    "target_display_name": parent_display_name,
+                                    "target_display_name": log.record_display_name,  # Use child's display name for child logs
+                                    "parent_display_name": parent_display_name,  # Store parent display name separately
                                     "is_direct": False,
                                     "create_date": log.create_date,
                                     "transaction_id": log.transaction_id,

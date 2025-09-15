@@ -266,10 +266,7 @@ class OtenyAuditLogAggregated(models.Model):
                     ref.target_display_name as record_display_name,
                     
                     -- Parent record info (for child logs)
-                    CASE WHEN NOT ref.is_direct 
-                         THEN ref.target_display_name 
-                         ELSE log.record_display_name 
-                    END as parent_record_display_name,
+                    COALESCE(ref.parent_display_name, log.record_display_name) as parent_record_display_name,
                     
                     -- Field change details
                     log.field_name,

@@ -20,6 +20,7 @@ class OtenyAuditLogRef(models.Model):
     target_model_name = fields.Char(required=True, index=True, string="Target Model")
     target_record_id = fields.Integer(required=True, index=True, string="Target Record ID")
     target_display_name = fields.Char(string="Target Record Name")
+    parent_display_name = fields.Char(string="Parent Record Name")
     is_direct = fields.Boolean(default=True, string="Is Direct Reference")
     create_date = fields.Datetime(string="Create Date", readonly=True)
     transaction_id = fields.Integer(string="Transaction ID")
