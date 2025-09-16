@@ -136,9 +136,10 @@ class AutoAddService(models.Model):
                         f"Error applying domain for rule {auto_add_rule.name} to record {subject}: {e}"
                     )
 
-        # Sync the generated services with the existing services
-        current_services = (
-            self.with_context(active_test=False)
+        # Get existing auto-added services to avoid duplicates
+        current_services_dict = {
+            (s.created_by_auto_add_service_id.id, s.res_id): s
+            for s in self.with_context(active_test=False)
             .env["riverflow.service"]
             .search(
                 [
@@ -147,37 +148,15 @@ class AutoAddService(models.Model):
                     ("created_by_auto_add_service_id", "!=", False),
                 ]
             )
-        )
-
-        # Create sets for easy comparison using template_id instead of the created service
-        new_services_set = {(ns["created_by_auto_add_service_id"], ns["res_id"]) for ns in new_services}
-        current_services_dict = {(s.created_by_auto_add_service_id.id, s.res_id): s for s in current_services}
-
-        # Services to activate (in new_services_set and currently inactive)
-        to_activate = current_services.filtered(
-            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) in new_services_set and not s.active
-        )
-
-        # Services to deactivate (not in new_services_set and currently active)
-        to_deactivate = current_services.filtered(
-            lambda s: (s.created_by_auto_add_service_id.id, s.res_id) not in new_services_set
-            and s.active
-            # only de-active an auto-added service if it unmodified since it was auto-added.
-            and s.create_date == s.write_date
-        )
+        }
 
         # Services to create (in new_services_set but not in current_services_dict)
+        # Only create services that don't already exist - no deactivation or reactivation
         to_create = [
             ns
             for ns in new_services
             if (ns["created_by_auto_add_service_id"], ns["res_id"]) not in current_services_dict
         ]
-
-        if to_activate:
-            to_activate.write({"active": True})
-
-        if to_deactivate:
-            to_deactivate.write({"active": False})
 
         if to_create:
             for service_vals in to_create:
