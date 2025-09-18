@@ -1,5 +1,6 @@
 from odoo import api, fields, models, tools
-from odoo.osv import expression
+
+# from odoo.fields import expression
 from odoo.tools.safe_eval import safe_eval
 import logging
 from odoo.exceptions import ValidationError
@@ -114,7 +115,7 @@ class AutoAddService(models.Model):
         for auto_add_rule in auto_add_rules:
             try:
                 domain = safe_eval(auto_add_rule.domain, eval_context)
-                rule_domains[auto_add_rule] = expression.normalize_domain(domain)
+                # rule_domains[auto_add_rule] = expression.normalize_domain(domain)
             except Exception as e:
                 raise ValidationError(f"Error evaluating domain for rule {auto_add_rule.name}: {e}")
 
