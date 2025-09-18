@@ -9,7 +9,7 @@ import os
 from collections import defaultdict
 
 # Add Odoo to path (adjust if needed)
-sys.path.insert(0, "/Users/ries/odoo/odoo18")
+sys.path.insert(0, "/Users/ries/odoo/odoo19")
 
 # Import Odoo
 import odoo
