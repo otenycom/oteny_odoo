@@ -674,7 +674,7 @@ class Service(models.Model):
         "daily_prio",
     )
     def _compute_display_order(self):
-        if any(isinstance(record.id, models.NewId) for record in self):
+        if any(isinstance(record.id, api.NewId) for record in self):
             return
 
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()

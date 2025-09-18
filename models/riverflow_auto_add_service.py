@@ -83,7 +83,7 @@ class AutoAddService(models.Model):
     # @log_execution_time
     @api.model
     def auto_add_services(self, subjects):
-        if subjects and isinstance(subjects[0].id, models.NewId):
+        if subjects and isinstance(subjects[0].id, api.NewId):
             """Because of the fake id in form view, we need to return
             todo: review if we can use .add() and .new() on the many2one fields in the sync below to also make this work in form view
             """

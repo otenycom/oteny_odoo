@@ -49,9 +49,7 @@ class StartWizard(RiverflowTransitionMixin):
         offset = len(transition_buttons["buttons"])
 
         for index, transition in enumerate(wizard.start_transition_ids):
-            transition_id = (
-                transition.id.origin if isinstance(wizard.id, models.NewId) else int(transition.id)
-            )
+            transition_id = transition.id.origin if isinstance(wizard.id, api.NewId) else int(transition.id)
 
             button_context = defaults_context.copy()
             button_context["transition_id"] = transition_id

@@ -160,7 +160,7 @@
                     domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
                 <filter string="Has External Messages" name="has_external_messages"
                     domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
                     <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
                     <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />

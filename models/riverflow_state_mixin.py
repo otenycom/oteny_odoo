@@ -163,7 +163,7 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 for transition in transition_ids:
                     # workaround, sometimes transition is a clone? in lookup tables or so
                     transition_id = (
-                        transition.id.origin if isinstance(record.id, models.NewId) else int(transition.id)
+                        transition.id.origin if isinstance(record.id, api.NewId) else int(transition.id)
                     )
 
                     if not record.state_id:

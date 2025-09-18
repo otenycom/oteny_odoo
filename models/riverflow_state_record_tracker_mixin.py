@@ -28,7 +28,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
 
     @api.depends("create_date")
     def _compute_state_record_id(self):
-        if any(isinstance(record.id, models.NewId) for record in self):
+        if any(isinstance(record.id, api.NewId) for record in self):
             return
 
         needing_state_record = self.filtered(lambda r: not r.state_record_id)
