@@ -26,7 +26,11 @@ class RiverflowTransitionAction(models.Model):
 
     odoo_view = fields.Text("Odoo View", help="Odoo wizard form-view")
 
-    _sql_constraints = [("name_uniq", "unique (name)", "Workflow name already exists!")]
+    # Upgrade to Odoo 19 constraint style
+    _name_uniq = models.Constraint(
+        "unique (name)",
+        "Workflow name already exists!",
+    )
 
     @api.depends("icon", "name")
     def _compute_icon_name_html(self):

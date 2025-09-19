@@ -13,7 +13,6 @@ class RiverflowTeam(models.Model):
         "res.partner",
         required=True,
         ondelete="restrict",
-        auto_join=True,
         string="Related Partner",
         help="Partner record storing the team's contact information",
     )

@@ -9,4 +9,8 @@ class RiverflowServiceTag(models.Model):
     name = fields.Char("Tag Name", required=True, translate=True)
     color = fields.Integer("Color")
 
-    _sql_constraints = [("name_uniq", "unique (name)", "Tag name already exists!")]
+    # Upgrade to Odoo 19 constraint style
+    _name_uniq = models.Constraint(
+        "unique (name)",
+        "Tag name already exists!",
+    )

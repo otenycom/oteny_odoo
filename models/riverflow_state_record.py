@@ -261,7 +261,6 @@ class RiverflowStateRecord(models.Model):
         comodel_name="riverflow.check.result",
         inverse_name="state_record_id",
         string="Issues",
-        auto_join=True,
     )
 
     @api.depends("master_model", "master_res_id")
