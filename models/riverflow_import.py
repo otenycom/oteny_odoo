@@ -30,6 +30,10 @@ class RiverflowImport(models.AbstractModel):
         Returns:
             dict: Results of the operation with counts and details
         """
+
+        if model_name == "res.partner":
+            pass
+
         if not records:
             return {
                 "status": "error",
