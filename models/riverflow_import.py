@@ -126,7 +126,7 @@ class RiverflowImport(models.AbstractModel):
         if create_vals_list:
             try:
                 # Use tracking_disable for potentially better performance on mass create
-                created_records = Model.with_context(tracking_disable=True).create(create_vals_list)
+                created_records = Model.sudo().with_context(tracking_disable=True).create(create_vals_list)
                 if len(created_records) != len(create_vals_list):
                     # This indicates a potential issue, maybe partial creation?
                     # Accurate error reporting becomes difficult here. Logging a general warning.
