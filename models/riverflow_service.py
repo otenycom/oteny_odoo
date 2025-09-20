@@ -69,7 +69,7 @@ class Service(models.Model):
         "Templates can be created in Odoo's Email Templates module.",
     )
 
-    # todo: add to rivermen module
+    # todo: add to crewradar module
     add_operator_as_recipient = fields.Boolean(
         string="Send to operator",
         default=False,

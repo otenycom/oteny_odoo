@@ -496,7 +496,7 @@
             action = {
             'name': 'Move Services to Log Entry',
             'type': 'ir.actions.act_window',
-            'res_model': 'rivermen.move.services.wizard',
+            'res_model': 'crewradar.move.services.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {

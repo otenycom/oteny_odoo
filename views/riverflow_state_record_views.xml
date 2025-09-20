@@ -138,9 +138,7 @@
                 <field name="responsible_team_id" />
                 <field name="company_id" />
                 <separator />
-                <!-- <filter string="Credentials" name="credentials" domain="[('res_model', '=', 'rivercreds.credential')]" /> -->
-                <!-- <filter string="Log entries &amp; services" name="logbook" domain="['|', ('res_model', '=', 'rivermen.log.entry'), ('master_model', '=', 'rivermen.log.entry')]" /> -->
-                <filter string="Log entries" name="log_entries" domain="[('master_model', '=', 'rivermen.log.entry')]" />
+                <filter string="Log entries" name="log_entries" domain="[('master_model', '=', 'crewradar.log.entry')]" />
                 <filter string="Services" name="services" domain="[('master_model', '=', 'riverflow.service')]" />
                 <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />

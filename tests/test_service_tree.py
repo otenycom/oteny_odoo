@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 # Testcases generated with the help of Cursor AI
 
 
-@tagged("rivermen", "post_install", "-at_install", "riverflow", "test_services")
+@tagged("post_install", "-at_install", "riverflow", "test_services")
 class ServiceDeadlineTestCase(TransactionCase):
 
     TEST_PREFIX = "TestRun "

@@ -8,7 +8,7 @@ ecosystem.
 
 Service Name                 | State       | Timing           | Transitions
 -----------------------------|-------------|------------------|-------------------------------
-Deploy Field Engineer        | Not Started | 01 Sep 24        | 
+Deploy Field Engineer        | Not Started | 01 Sep 24        |
 ├─ Send Request Confirmation | Not Started | 26 Aug 24 (-5d)  | Send Confirmation, Not Needed
 ├─ Book Flight               | Not Started | 30 Aug 24 (-2d)  | Check Doc Needs, Cancel
 └─ Log Phone Call            | Completed   | 10 Aug 24        | Back to Not Started
@@ -74,7 +74,7 @@ to model and execute their operational processes within Odoo.
 
 ## Example Use Case
 
-The Rivermen module demonstrates how Riverflow can be used to manage complex processes such as crew
+The Crewradar module demonstrates how Riverflow can be used to manage complex processes such as crew
 onboarding and offboarding in the maritime industry. This showcases the versatility and power of the
 Riverflow system in handling real-world business scenarios.
 

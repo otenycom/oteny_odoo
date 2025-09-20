@@ -207,8 +207,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     def _render_recipients_from_template(self, service):
         if not self.mail_template_id:
             return self.env["res.partner"]
+
+        service_id = service.id.origin if isinstance(service.id, api.NewId) else service.id
+
         partner_ids_map = self.mail_template_id._generate_template_recipients(
-            res_ids=[service.id],
+            res_ids=[service_id],
             render_fields=["partner_to", "email_cc", "email_to"],
             find_or_create_partners=True,
         )
@@ -241,8 +244,8 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
         if res_id:
-            """TODO: move this to rivermen module"""
-            log_entry_id = self.env["rivermen.log.entry"].browse(res_id)
+            """TODO: move this to crewradar module"""
+            log_entry_id = self.env["crewradar.log.entry"].browse(res_id)
         else:
             log_entry_id = None
 
