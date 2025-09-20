@@ -18,7 +18,7 @@
     - [x] the aggregated view does not show the primary record name; this is an issue if you view the log for multiple records from the list
     - [ ] Add more parent_field_names to other models, currently:
         [x] service.log_entry_id (later: via res_model,res_id)
-        [x] rivercreds to employee; state/trans to wf; all employee models in rivermen to employee (timesheet,etc)
+        [x] rivercreds to employee; state/trans to wf; all employee models in crewradar to employee (timesheet,etc)
         [x] mail.message via res_model,res_id
         [~] service travel leg (to service, which should recursively log to entry)
     - [x] Computed fields seem to be logged for services when we change the state/date for a parent log entry (end_date_for_calendar,project_deadline)
