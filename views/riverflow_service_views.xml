@@ -20,10 +20,11 @@
                             invisible="not parent_id" class="oe_stat_button" icon="fa-bell">
                             <field name="parent_id" widget="statinfo" />
                         </button>
-                        <button name="action_view_audit_log" type="object"
+                        <!-- <button name="action_view_audit_log" type="object"
                             class="oe_stat_button" icon="fa-book">
+                            Widget field must be char, cannot be date
                             <field name="write_date" widget="statinfo" />
-                        </button>
+                        </button> -->
 
                     </div>
                     <widget name="web_ribbon" title="Template" bg_color="text-bg-info"

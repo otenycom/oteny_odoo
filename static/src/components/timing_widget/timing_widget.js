@@ -58,7 +58,7 @@ export class TimingWidget extends Component {
 
 export const timingWidget = {
     component: TimingWidget,
-    supportedTypes: ["json"],
+    supportedTypes: ["json", "date"],
 };
 
 registry.category("fields").add("timing_widget", timingWidget);
