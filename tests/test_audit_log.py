@@ -134,7 +134,7 @@ class TestAuditLog(TransactionCase):
 
         # ensure the user doesn't have the group_sanitize_override
         group_html = self.env.ref("base.group_sanitize_override")
-        self.assertNotIn(group_html, user.groups_id)
+        self.assertNotIn(group_html, user.group_ids)
 
         # Clear any logs from creation
         self.env["oteny.audit.log"].search(
@@ -144,10 +144,10 @@ class TestAuditLog(TransactionCase):
             ]
         ).unlink()
 
-        initial_groups = user.groups_id
+        initial_groups = user.group_ids
 
         # Add the user to the system group
-        user.write({"groups_id": [(4, group_html.id, 0)]})
+        user.write({"group_ids": [(4, group_html.id, 0)]})
         user.flush_recordset()
 
         # Check that update logs were created
@@ -156,15 +156,15 @@ class TestAuditLog(TransactionCase):
                 ("model_name", "=", "res.users"),
                 ("record_id", "=", user.id),
                 ("change_type", "=", "u"),
-                ("field_name", "=", "groups_id"),
+                ("field_name", "=", "group_ids"),
             ]
         )
 
-        self.assertEqual(len(update_logs), 1, "One update log for groups_id should be created")
+        self.assertEqual(len(update_logs), 1, "One update log for group_ids should be created")
 
         log = update_logs
 
-        final_groups = user.groups_id
+        final_groups = user.group_ids
         # Compare display names directly - they contain group names like 'Technical / Access to export feature'
         expected_prev_display = ", ".join(sorted(g.display_name for g in initial_groups))
         expected_new_display = ", ".join(sorted(g.display_name for g in final_groups))
