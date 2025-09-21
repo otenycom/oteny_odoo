@@ -1,11 +1,8 @@
 from odoo import api, fields, models, tools
-
-# from odoo.fields import expression
 from odoo.fields import Domain
 from odoo.tools.safe_eval import safe_eval
 import logging
 from odoo.exceptions import ValidationError
-from ..util import log_execution_time
 
 
 _logger = logging.getLogger(__name__)
@@ -81,7 +78,6 @@ class AutoAddService(models.Model):
             "ref": self.env.ref,
         }
 
-    # @log_execution_time
     @api.model
     def auto_add_services(self, subjects):
         if subjects and isinstance(subjects[0].id, api.NewId):
