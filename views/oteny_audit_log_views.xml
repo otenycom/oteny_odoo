@@ -80,7 +80,7 @@
                 <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
                 <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'd')]" />
                 <separator />
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Model" name="group_by_model" context="{'group_by': 'model_name'}" />
                     <filter string="Record" name="group_by_record" context="{'group_by': 'record_display_name'}" />
                     <filter string="Field" name="group_by_field" context="{'group_by': 'field_display_name'}" />
@@ -128,7 +128,7 @@
                 <filter string="Child Logs" name="child_logs" domain="[('is_child_log', '=', True)]" />
                 <filter string="Parent Logs" name="parent_logs" domain="[('is_child_log', '=', False)]" />
                 <separator />
-                <group expand="0" string="Group By">
+                <group>
                     <filter string="Parent Model" name="group_by_parent_model" context="{'group_by': 'model_display_name'}" />
                     <filter string="Parent Record" name="group_by_parent_record" context="{'group_by': 'parent_record_display_name'}" />
                     <filter string="Record" name="group_by_record" context="{'group_by': 'record_display_name'}" />

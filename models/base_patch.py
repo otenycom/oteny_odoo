@@ -518,7 +518,7 @@ def patched_write(self, vals):
                     # Remove the records being written from the set of logged changes for this field.
                     logged_changes[field] -= set(self.ids)
 
-        dirty_fields = self.env.cache._dirty
+        dirty_fields = self.env._field_dirty
         # Pre-fetch scalar fields not in cache to get their old values
         records_to_read_ids = {
             rec.id
@@ -603,7 +603,7 @@ def patched_flush(self, fnames=None):
     """
     # Bypass if model is not yet fully loaded, or for the audit log model itself
     if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
-        return original_flush(self, fnames)
+        return original_flush(self)
 
     # Use transaction-scoped storage to prevent duplicate logging within the same transaction.
     audit_data = self.env.cr.precommit.data.setdefault("oteny_audit", {})
@@ -614,7 +614,7 @@ def patched_flush(self, fnames=None):
     records = self
 
     # Get dirty fields from cache
-    dirty_fields_dict = self.env.cache._dirty
+    dirty_fields_dict = self.env._field_dirty
 
     # Determine all fields of the current model that are dirty, regardless of `fnames`.
     # The original_flush will clear all of them from the cache, so we must audit all of them.
@@ -626,13 +626,13 @@ def patched_flush(self, fnames=None):
 
     if not all_dirty_model_fields:
         # No dirty fields for this model to worry about.
-        return original_flush(self, fnames)
+        return original_flush(self)
 
     # Filter for fields that we can and should log (not readonly).
     loggable_fields_dict = {field.name: field for field in all_dirty_model_fields if not field.readonly}
 
     if not loggable_fields_dict:
-        return original_flush(self, fnames)
+        return original_flush(self)
 
     # Collect all dirty record IDs for the fields we're flushing, skipping already logged ones.
     all_ids = set()
@@ -656,7 +656,7 @@ def patched_flush(self, fnames=None):
 
     if not all_ids:
         # All dirty fields have already been logged in this transaction.
-        return original_flush(self, fnames)
+        return original_flush(self)
 
     # Get display names for all affected records
     display_names = {}
@@ -716,7 +716,7 @@ def patched_flush(self, fnames=None):
                             old_values.setdefault(rid, {})[field.name] = None
 
     # Perform original flush
-    original_flush(self, fnames)
+    original_flush(self)
 
     # After flush, re-read all flushed fields to get their new values
     # Use oteny_audit_ignore context to prevent infinite recursion
