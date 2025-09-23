@@ -269,8 +269,8 @@
                 <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
                 <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
                 <field name="state_id" optional="hide" decoration-success="is_end_state" width="140px" />
-                <field name="timing_json" widget="timing_widget" optional="show" width="150px" />
-                <field name="deadline" optional="hide"
+                <field name="timing_json" widget="timing_widget" optional="hide" width="150px" />
+                <field name="deadline" optional="show"
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-muted="is_end_state" />
