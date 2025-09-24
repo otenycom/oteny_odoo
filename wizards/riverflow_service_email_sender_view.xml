@@ -23,18 +23,16 @@
                             <field name="transition_id" invisible="1" />
                         </group>
                     </group>
-                    <group>
-                        <group string="Recipients" colspan="2">
+                    <group string="Recipients">
+                        <group colspan="1">
                             <field name="supplier_email_formatted" invisible="not is_supply_order" />
-                            <field name="recipient_partner_ids" nolabel="1">
-                                <list>
-                                    <field name="name" string="Recipient" />
-                                    <field name="email" />
-                                </list>
-                            </field>
                         </group>
-                        <!-- <group string="Sender">
-                        </group> -->
+                        <field name="recipient_partner_ids" nolabel="1">
+                            <list>
+                                <field name="name" string="Recipients" />
+                                <field name="email" />
+                            </list>
+                        </field>
                     </group>
                     <group colspan="2">
                         <field name="subject_updatable" required="1" />
