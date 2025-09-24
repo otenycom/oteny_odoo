@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { standardFieldProps } from "@web/views/fields/standard_field_props";
-import { Component, onMounted, onWillRender, useRef, useState } from "@odoo/owl";
+import { Component, onWillRender, useRef, useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { DateTimeInput } from "@web/core/datetime/datetime_input";
 
@@ -24,6 +24,7 @@ export class TransitionButtons extends Component {
         this.expandedTemplates = new Set();
         this.state = useState({
             projectDeadline: null,
+            searchQuery: "",
         });
 
 
@@ -181,6 +182,18 @@ export class TransitionButtons extends Component {
             }
         }
         return true;
+    }
+
+    filteredByQuery(button) {
+        const query = (this.state.searchQuery || "").trim().toLowerCase();
+        if (!query) return true;
+        const caption = (button.caption || "").toLowerCase();
+        const icon = (button.icon || "").toLowerCase();
+        return caption.includes(query) || icon.includes(query);
+    }
+
+    onSearchInput(value) {
+        this.state.searchQuery = value || "";
     }
 
     toggleTemplateExpansion(index) {

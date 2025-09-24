@@ -42,6 +42,16 @@
 }
 
 .full-list-layout {
+
+    .template-list-scroll {
+        height: calc(100vh - 400px);
+        overflow: auto;
+    }
+
+    .transition-search-input {
+        width: 100%;
+    }
+
     h3 {
         margin-top: 1rem;
         margin-bottom: 0.5rem;
