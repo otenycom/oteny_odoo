@@ -33,17 +33,18 @@
                                             t-att-style="this.filteredByQuery(button) and this.shouldShowButton(button) ? '' : 'display: none;'">
                                             <t t-if="button.indent_level === 0">
                                                 <input type="checkbox"
+                                                    t-att-id="button.index"
                                                     t-att-checked="button.checked"
                                                     t-on-click="() => this.toggleCheckbox(button.index)" />
                                             </t>
-                                            <span>
+                                            <label t-att-for="button.index">
                                                 <span t-att-class="this.buttonIconClass(button)" />
                                                 <span t-esc="button.caption" t-att-title="button.caption" />
                                                 <t t-if="button.indent_level === 0 and this.hasChildren(button)">
                                                     <i t-attf-class="fa fa-chevron-#{this.isTemplateExpanded(button.index) ? 'down' : 'right'}"
                                                         t-on-click.stop="() => this.toggleTemplateExpansion(button.index)" />
                                                 </t>
-                                            </span>
+                                            </label>
                                         </div>
                                     </t>
                                 </t>
