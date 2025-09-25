@@ -6,9 +6,16 @@
         <field name="company_id" ref="base.main_company" />
     </record>
 
+    <!-- Discuss channel for Operations NL -->
+    <record id="discuss_channel_team_logistics" model="discuss.channel">
+        <field name="name">Operations NL</field>
+        <field name="description">Team channel for Operations NL</field>
+        <!-- Keep it a standard channel; access controlled by invited members/groups if configured later -->
+    </record>
+
     <record id="team_logistics" model="riverflow.team">
         <field name="partner_id" ref="partner_team_logistics" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
+        <field name="discuss_channel_id" ref="discuss_channel_team_logistics" />
     </record>
 
     <record id="partner_team_hr" model="res.partner">
@@ -17,9 +24,15 @@
         <field name="company_id" ref="base.main_company" />
     </record>
 
+    <!-- Discuss channel for Human Resources -->
+    <record id="discuss_channel_team_hr" model="discuss.channel">
+        <field name="name">Human Resources</field>
+        <field name="description">Team channel for Human Resources</field>
+    </record>
+
     <record id="team_hr" model="riverflow.team">
         <field name="partner_id" ref="partner_team_hr" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
+        <field name="discuss_channel_id" ref="discuss_channel_team_hr" />
     </record>
 
     <record id="partner_team_planning" model="res.partner">
@@ -27,9 +40,15 @@
         <field name="phone">+31 181 712 314</field>
     </record>
 
+    <!-- Discuss channel for Planning Team -->
+    <record id="discuss_channel_team_planning" model="discuss.channel">
+        <field name="name">Planning Team</field>
+        <field name="description">Team channel for Planning Team</field>
+    </record>
+
     <record id="team_planning" model="riverflow.team">
         <field name="partner_id" ref="partner_team_planning" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
+        <field name="discuss_channel_id" ref="discuss_channel_team_planning" />
     </record>
 
     <record id="partner_team_finance" model="res.partner">
@@ -39,9 +58,15 @@
         <field name="phone">+49 203 443310</field>
     </record>
 
+    <!-- Discuss channel for Finance Team -->
+    <record id="discuss_channel_team_finance" model="discuss.channel">
+        <field name="name">Finance Team</field>
+        <field name="description">Team channel for Finance Team</field>
+    </record>
+
     <record id="team_finance" model="riverflow.team">
         <field name="partner_id" ref="partner_team_finance" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
+        <field name="discuss_channel_id" ref="discuss_channel_team_finance" />
     </record>
 
     <record id="partner_team_sales" model="res.partner">
@@ -50,9 +75,15 @@
         <field name="company_id" ref="base.main_company" />
     </record>
 
+    <!-- Discuss channel for Sales Team -->
+    <record id="discuss_channel_team_sales" model="discuss.channel">
+        <field name="name">Sales Team</field>
+        <field name="description">Team channel for Sales Team</field>
+    </record>
+
     <record id="team_sales" model="riverflow.team">
         <field name="partner_id" ref="partner_team_sales" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
+        <field name="discuss_channel_id" ref="discuss_channel_team_sales" />
     </record>
 
     <record id="team_cuneus_yangon" model="riverflow.team">
