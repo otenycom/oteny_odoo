@@ -137,6 +137,8 @@ class TransitionWizard(models.AbstractModel):
                     "res_id": record.id,
                     "message_type": "comment",
                     "subtype_id": self.env.ref("mail.mt_note").id,
+                    "child_ids": [],
+                    "parent_id": [],
                 }
             )
 
