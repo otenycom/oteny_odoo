@@ -215,7 +215,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             render_fields=["partner_to", "email_cc", "email_to"],
             find_or_create_partners=True,
         )
-        partner_ids = partner_ids_map.get(service.id, {}).get("partner_ids", [])
+        partner_ids = partner_ids_map.get(service_id, {}).get("partner_ids", [])
         return self.env["res.partner"].browse(partner_ids)
 
     @api.onchange("mail_template_id")
@@ -302,6 +302,19 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
         if not recipient_ids:
             raise UserError(_("Please select at least one recipient."))
+
+        # Check that all recipients have email addresses
+        recipients_without_email = recipient_ids.filtered(
+            lambda partner: not partner.email or not partner.email.strip()
+        )
+        if recipients_without_email:
+            partner_names = ", ".join(recipients_without_email.mapped("name"))
+            raise UserError(
+                _(
+                    "The following recipients do not have email addresses: %s. Please enter email addresses for these contacts."
+                )
+                % partner_names
+            )
 
         # Use updatable content for sending
         safe_body = tools.html_sanitize(self.body_updatable)
