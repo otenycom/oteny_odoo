@@ -51,9 +51,10 @@ class RiverflowEnterAirlineTicketWizard(models.TransientModel):
             # If using existing, don't process new attachments and don't raise error if none are attached
             pass
         elif self.attachment_ids:
-            if len(self.attachment_ids) > 1:
-                raise UserError("Please attach only one file.")
-            # Post the single new attachment
+            # https://3.basecamp.com/5527227/buckets/38887735/todos/9117347114 - Flight need multiple attachments
+            # if len(self.attachment_ids) > 1:
+            #     raise UserError("Please attach only one file.")
+            # Post the new attachment(s)
             service.message_post(
                 attachment_ids=self.attachment_ids.ids,
             )
