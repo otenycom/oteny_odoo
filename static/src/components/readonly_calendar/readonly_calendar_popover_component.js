@@ -9,7 +9,7 @@ export class ReadOnlyCalendarPopover extends CalendarCommonPopover {
      * Override to always hide the footer with Edit/Delete buttons
      * @override
      */
-    get isEventEditable() {
-        return false;
-    }
+    // get isEventEditable() {
+    //     return false;
+    // }
 } 

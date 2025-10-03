@@ -129,13 +129,53 @@ class RiverflowStateRecord(models.Model):
         help="Deadline based on the project-deadline and the relative day of this service",
         index=True,
         compute="_compute_deadline",
+        inverse="_inverse_deadline",
         store=True,
     )
+
+    def _inverse_deadline(self):
+        """Allow manual override of computed deadline field
+
+        When a deadline is written on a state record:
+        - If service_id is set: propagate the deadline change to the service
+        - If service_id is False: revert to computed value (no manual override allowed)
+        """
+        for record in self:
+            if record.service_id:
+                # Write the new deadline to the related service
+                record.service_id.deadline = record.deadline
+            else:
+                # No service_id: revert to computed value by recomputing the field
+                # Since there's no service, the computed value will be False
+                computed_deadline = self._compute_deadline_for_record(record)
+                if record.deadline != computed_deadline:
+                    record.deadline = computed_deadline
+
     end_date = fields.Date(
         "End Date",
         compute="_compute_end_date",
+        inverse="_inverse_end_date",
         store=True,
     )
+
+    def _inverse_end_date(self):
+        """Allow manual override of computed end_date field
+
+        When an end_date is written on a state record:
+        - If service_id is set: propagate the end_date change to the service
+        - If service_id is False: revert to computed value (no manual override allowed)
+        """
+        for record in self:
+            if record.service_id:
+                # Write the new end_date to the related service
+                record.service_id.end_date_for_calendar = record.end_date
+            else:
+                # No service_id: revert to computed value by recomputing the field
+                # Without a service, the computed value falls back to the deadline
+                computed_end_date = self._compute_end_date_for_record(record)
+                if record.end_date != computed_end_date:
+                    record.end_date = computed_end_date
+
     deadline_formatted = fields.Char("Deadline Formatted", compute="_compute_deadline_formatted", store=False)
 
     timing_json = fields.Json(
