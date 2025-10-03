@@ -150,10 +150,12 @@ class OtenyAuditLogAggregated(models.Model):
     def _is_html_field(self, log):
         """Check if the field being audited is an HTML field."""
         try:
-            # Get the model where the field is defined
-            model_name = log.field_model_name
             field_name = log.field_name
 
+            if field_name == "body_html":
+                return True
+
+            model_name = log.field_model_name
             if not model_name or not field_name:
                 return False
 
