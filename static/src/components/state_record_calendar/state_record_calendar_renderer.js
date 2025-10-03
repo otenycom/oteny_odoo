@@ -4,13 +4,13 @@ import { calendarView } from "@web/views/calendar/calendar_view";
 import { registry } from "@web/core/registry";
 import { CalendarRenderer } from "@web/views/calendar/calendar_renderer";
 import { CalendarCommonRenderer } from "@web/views/calendar/calendar_common/calendar_common_renderer";
-import { ReadOnlyCalendarPopover } from "./readonly_calendar_popover_component";
+import { StateRecordCalendarPopover } from "./state_record_calendar_popover_component";
 
 // Custom common renderer that uses our read-only popover and custom sorting
-class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
+class StateRecordCalendarCommonRenderer extends CalendarCommonRenderer {
     static components = {
         ...CalendarCommonRenderer.components,
-        Popover: ReadOnlyCalendarPopover,
+        Popover: StateRecordCalendarPopover,
     };
 
     /**
@@ -98,11 +98,11 @@ class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
 }
 
 // Main renderer that uses our custom common renderer for day/week/month views
-export class ReadOnlyCalendarRenderer extends CalendarRenderer {
+export class StateRecordCalendarRenderer extends CalendarRenderer {
     static components = {
         ...CalendarRenderer.components,
-        day: ReadOnlyCalendarCommonRenderer,
-        week: ReadOnlyCalendarCommonRenderer,
-        month: ReadOnlyCalendarCommonRenderer,
+        day: StateRecordCalendarCommonRenderer,
+        week: StateRecordCalendarCommonRenderer,
+        month: StateRecordCalendarCommonRenderer,
     };
 }

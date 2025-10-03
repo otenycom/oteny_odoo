@@ -82,7 +82,7 @@
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
             <calendar string="State Records"
-                js_class="readonly_calendar"
+                js_class="state_record_calendar"
                 date_start="deadline"
                 date_stop="end_date"
                 color="color_int"

@@ -679,6 +679,7 @@ class RiverflowStateRecord(models.Model):
             "res_id": self.master_res_id,
             "target": "current",
             "view_mode": "form",
+            "views": [[False, "form"]],
         }
         return action
 
