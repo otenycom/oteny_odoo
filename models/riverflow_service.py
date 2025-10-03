@@ -508,10 +508,6 @@ class Service(models.Model):
             if service.parent_id:
                 display_name = f"{service.parent_id.name} | {service.name}"
 
-            # Removed, its not nice when the service display_name is used as the subject of chatter email messages
-            # if service.state_name:
-            #     display_name = f"{display_name} | {service.state_name}"
-
             service.display_name = display_name
 
     @api.depends("display_name")

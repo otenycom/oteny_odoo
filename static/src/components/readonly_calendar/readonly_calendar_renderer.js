@@ -72,7 +72,7 @@ class ReadOnlyCalendarCommonRenderer extends CalendarCommonRenderer {
                 };
 
                 const sortCriteria = [
-                    { name: "res_date" },
+                    // { name: "res_date" },
                     { name: "res_model" },
                     { name: "res_sortable_name" },
                     { name: "res_id" },

@@ -90,9 +90,9 @@
                 mode="month"
                 scales="day,week,month,quarter,year"
                 hide_time="true"
-                event_limit="35">
+                event_limit="50">
                 <!-- Fields needed for sorting: res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,display_order,deadline -->
-                <field name="res_date" invisible="1" />
+                <field name="res_date" invisible="1" /> <!-- obsolete: not used for sorting -->
                 <field name="res_model" invisible="1" />
                 <field name="res_sortable_name" invisible="1" />
                 <field name="res_id" invisible="1" />
