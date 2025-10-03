@@ -353,7 +353,7 @@
                 mode="month"
                 scales="day,week,month,quarter,year"
                 hide_time="true"
-                event_limit="50"
+                event_limit="75"
             >
 
                 <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
