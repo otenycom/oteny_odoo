@@ -603,3 +603,146 @@ class ServiceDeadlineTestCase(TransactionCase):
 
         # check order within root_1's children
         self.assertEqual(root_1.child_ids.mapped("name"), [child_1_1.name, child_1_2.name, child_1_3.name])
+
+    def test_deadline_drag_and_drop_switches_to_self_mode(self):
+        """Test that dragging a service in the calendar automatically switches to 'self' mode.
+
+        This test simulates the calendar drag-and-drop behavior where a user drags a service
+        to a new date. The system should automatically:
+        1. Switch use_project_deadline_from to 'self'
+        2. Update project_deadline to the new date
+        3. Reset days_relative_to_project to 0
+
+        This applies regardless of the original deadline source (root, log_entry_start, log_entry_end, etc)
+        """
+        self.cleanup_test_services()
+
+        # Create a root service with a specific deadline
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root Service",
+                "project_deadline": date(2024, 6, 15),
+            }
+        )
+
+        # Create a child service that uses the root's deadline with a relative offset
+        child = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child Service",
+                "parent_id": root.id,
+                "use_project_deadline_from": "root",
+                "days_relative_to_project": -3,  # 3 days before root
+            }
+        )
+
+        # Verify initial state
+        self.assertEqual(child.use_project_deadline_from, "root")
+        self.assertEqual(child.days_relative_to_project, -3)
+        self.assertEqual(child.deadline, date(2024, 6, 12))  # 3 days before root
+        self.assertEqual(child.project_deadline, date(2024, 6, 15))  # Root's deadline
+
+        # Simulate calendar drag-and-drop by writing to the deadline field
+        # This is what Odoo's calendar view does when a user drags an event
+        new_deadline = date(2024, 6, 20)
+        child.write({"deadline": new_deadline})
+
+        # Verify the service automatically switched to 'self' mode
+        self.assertEqual(
+            child.use_project_deadline_from,
+            "self",
+            "Service should automatically switch to 'self' mode when deadline is changed via drag-and-drop",
+        )
+        self.assertEqual(
+            child.project_deadline,
+            new_deadline,
+            "project_deadline should be updated to match the new deadline",
+        )
+        self.assertEqual(
+            child.days_relative_to_project,
+            0,
+            "days_relative_to_project should be reset to 0 when switching to 'self' mode",
+        )
+        self.assertEqual(
+            child.deadline,
+            new_deadline,
+            "deadline should reflect the new date set by the user",
+        )
+
+        # Verify that changing the root's deadline no longer affects the child
+        root.write({"project_deadline": date(2024, 7, 1)})
+        self.assertEqual(
+            child.deadline,
+            new_deadline,
+            "Child deadline should remain unchanged after switching to 'self' mode",
+        )
+
+    def test_deadline_drag_and_drop_with_self_mode(self):
+        """Test that dragging a service that's already in 'self' mode just updates the date."""
+        self.cleanup_test_services()
+
+        # Create a service that already uses 'self' mode
+        service = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Self Mode Service",
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 15),
+                "days_relative_to_project": 5,  # This should be ignored in 'self' mode
+            }
+        )
+
+        # Verify initial state
+        self.assertEqual(service.use_project_deadline_from, "self")
+        self.assertEqual(service.deadline, date(2024, 6, 15))
+        self.assertEqual(service.project_deadline, date(2024, 6, 15))
+
+        # Simulate calendar drag-and-drop to a new date
+        new_deadline = date(2024, 6, 25)
+        service.write({"deadline": new_deadline})
+
+        # Verify the service remains in 'self' mode with updated dates
+        self.assertEqual(service.use_project_deadline_from, "self")
+        self.assertEqual(service.project_deadline, new_deadline)
+        self.assertEqual(service.deadline, new_deadline)
+        self.assertEqual(
+            service.days_relative_to_project,
+            0,
+            "days_relative_to_project should be reset to 0",
+        )
+
+    def test_deadline_no_change_preserves_mode(self):
+        """Test that setting the deadline to the same value preserves the current mode."""
+        self.cleanup_test_services()
+
+        # Create a root and child with relative timing
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root",
+                "project_deadline": date(2024, 6, 15),
+            }
+        )
+
+        child = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child",
+                "parent_id": root.id,
+                "use_project_deadline_from": "root",
+                "days_relative_to_project": -2,
+            }
+        )
+
+        # Verify initial state
+        initial_deadline = child.deadline
+        self.assertEqual(child.use_project_deadline_from, "root")
+        self.assertEqual(child.days_relative_to_project, -2)
+
+        # Write the same deadline value (simulating a drag-and-drop that returns to original position)
+        # In this case the deadline equals project_deadline, so no change should occur
+        child.write({"deadline": child.project_deadline})
+
+        # Verify mode is preserved (no change because deadline == project_deadline)
+        self.assertEqual(
+            child.use_project_deadline_from,
+            "root",
+            "Mode should be preserved when deadline equals project_deadline",
+        )
+        self.assertEqual(child.days_relative_to_project, -2)

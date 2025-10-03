@@ -175,6 +175,7 @@ class Service(models.Model):
     deadline = fields.Date(
         "Deadline",
         compute="_compute_deadline",
+        inverse="_inverse_deadline",
         help="Deadline based on the project-deadline and the relative day of this service",
         store=True,
         index=True,
@@ -568,6 +569,22 @@ class Service(models.Model):
     def _inverse_project_deadline(self):
         # this is a flag method specifying the user is allowed to store the project_deadline
         pass
+
+    def _inverse_deadline(self):
+        """Handle deadline changes from calendar drag-and-drop or manual edits.
+
+        When a user drags a service to a new date in the calendar view, or manually
+        changes the deadline, we automatically switch to 'self' mode and update the
+        project_deadline accordingly. This ensures the service maintains its new deadline
+        even if it was previously computed from another source (like log_entry_start/end or root).
+        """
+        for service in self:
+            if service.deadline and service.deadline != service.project_deadline:
+                # User has changed the deadline to a different value
+                # Switch to 'self' mode and update project_deadline
+                service.use_project_deadline_from = "self"
+                service.project_deadline = service.deadline
+                service.days_relative_to_project = 0
 
     @api.depends("use_project_deadline_from", "root_id")
     def _compute_is_days_relative_to_project_applicable(self):

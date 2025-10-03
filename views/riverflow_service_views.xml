@@ -81,7 +81,7 @@
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
                                 on_change="1" />
-                            <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable"
+                            <field name="deadline" readonly="0" invisible="not is_days_relative_to_project_applicable"
                                 decoration-muted="is_end_state"
                                 decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                 decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
@@ -343,7 +343,7 @@
         <field name="model">riverflow.service</field>
         <field name="arch" type="xml">
             <calendar string="Services"
-                date_start="project_deadline"
+                date_start="deadline"
                 date_stop="end_date_for_calendar"
                 color="color_int"
                 create="1" edit="1" delete="0"
@@ -360,7 +360,6 @@
                 <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
                 <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
                 <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
-                <!-- <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" /> -->
 
             </calendar>
         </field>
