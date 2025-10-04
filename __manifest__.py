@@ -1,6 +1,6 @@
 {
     "name": "oteny_audit",
-    "version": "19.0.1.36",
+    "version": "19.0.1.37",
     "depends": ["base", "mail"],
     "author": "Oteny.com",
     "category": "Extra Tools",
