@@ -86,7 +86,7 @@
                 date_start="deadline"
                 date_stop="end_date"
                 color="color_int"
-                create="0" edit="1" delete="0"
+                create="1" quick_create="0" edit="1" delete="0"
                 mode="month"
                 scales="day,week,month,quarter,year"
                 hide_time="true"
