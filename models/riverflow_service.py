@@ -1207,6 +1207,7 @@ class ServiceLeg(models.Model):
     _name = "riverflow.service.leg"
     _description = "Supply Order Leg"
     _order = "sequence,id"
+    _oteny_audit_parent_field = "service_id"
 
     name = fields.Char(
         string="Name",
