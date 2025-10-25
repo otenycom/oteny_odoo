@@ -64,7 +64,9 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
     def unlink(self):
         # we first unlink the master record, as during its unlink, it will flush writes to the state record
         # for computed values. These flushes fail if we remove the state record from under the feet of the master record
-        state_records = self.mapped("state_record_id")
+        # Filter out any records that don't exist (have been deleted) before trying to access their fields
+        existing_records = self.filtered(lambda r: r.exists())
+        state_records = existing_records.mapped("state_record_id")
         result = super().unlink()
         state_records.sudo().unlink()
         return result
