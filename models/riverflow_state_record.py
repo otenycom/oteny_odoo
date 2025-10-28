@@ -26,6 +26,17 @@ class RiverflowStateRecord(models.Model):
         compute="_compute_is_subject",
         store=True,
     )
+    record_type = fields.Selection(
+        [
+            ("single", "Single"),
+            ("start", "Start"),
+            ("end", "End"),
+        ],
+        string="Record Type",
+        default="single",
+        required=True,
+        help="Indicates whether this is a single state record or part of a start/end pair for subjects with date ranges",
+    )
 
     @api.depends("root_id")
     def _compute_is_subject(self):
@@ -57,12 +68,29 @@ class RiverflowStateRecord(models.Model):
     )
     master_model = fields.Char(string="Master Model", required=True, index=True)
     master_res_id = fields.Integer(string="Master Record ID", required=True, index=True)
+    master_record_id_computed = fields.Integer(
+        string="Master Record ID Computed",
+        compute="_compute_master_record_id_computed",
+        store=True,
+        index=True,
+        help="Computed field used as inverse for One2many relationship from master records",
+    )
     master_record_reference = fields.Reference(
         string="Master Record Reference",
         selection="_selection_target_model",
         compute="_compute_master_record_reference",
         readonly=True,
     )
+
+    @api.depends("master_res_id")
+    def _compute_master_record_id_computed(self):
+        """Compute master_record_id_computed field for One2many inverse relationship.
+
+        This field is used as the inverse_name for the One2many field state_record_ids
+        in the tracker mixin, enabling efficient queries from master records to their state records.
+        """
+        for record in self:
+            record.master_record_id_computed = record.master_res_id
 
     @api.depends("master_model", "master_res_id")
     def _compute_master_record_reference(self):
