@@ -19,30 +19,137 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
 
     state_record_id = fields.Many2one(
         "riverflow.state.record",
-        string="State Record",
+        string="Primary State Record",
         compute="_compute_state_record_id",
         store=True,
         readonly=True,
         ondelete="set null",
+        help="Primary state record for this master record (used for backwards compatibility)",
+    )
+
+    state_record_ids = fields.One2many(
+        "riverflow.state.record",
+        compute="_compute_state_record_ids",
+        string="All State Records",
+        help="All state records for this master record",
     )
 
     @api.depends("create_date")
     def _compute_state_record_id(self):
+        """Compute the primary state record for backwards compatibility.
+
+        For records with multiple state records (like log entries with start/end),
+        this points to the first (start) record.
+
+        Optimized for batch performance: queries all state records in one go,
+        creates missing ones in batch, then assigns to each record.
+        """
         if any(isinstance(record.id, api.NewId) for record in self):
             return
 
-        needing_state_record = self.filtered(lambda r: not r.state_record_id)
-        if not needing_state_record:
+        StateRecord = self.env["riverflow.state.record"]
+
+        # Batch query: find all state records for all records in self
+        all_state_records = StateRecord.search(
+            [
+                ("master_model", "=", self._name),
+                ("master_res_id", "in", self.ids),
+            ],
+            order="master_res_id, record_type, id",
+        )
+
+        # Group state records by master_res_id for quick lookup
+        state_records_by_master = {}
+        for state_record in all_state_records:
+            master_id = state_record.master_res_id
+            if master_id not in state_records_by_master:
+                state_records_by_master[master_id] = []
+            state_records_by_master[master_id].append(state_record)
+
+        # Identify records that need state record creation
+        records_needing_creation = self.env[self._name]
+        for record in self:
+            if record.id not in state_records_by_master and self._add_state_record(record):
+                records_needing_creation |= record
+
+        # Batch create missing state records
+        if records_needing_creation:
+            self._create_state_records(records_needing_creation)
+
+            # Re-query the newly created state records in batch
+            new_state_records = StateRecord.search(
+                [
+                    ("master_model", "=", self._name),
+                    ("master_res_id", "in", records_needing_creation.ids),
+                ],
+                order="master_res_id, record_type, id",
+            )
+
+            # Add newly created state records to lookup dict
+            for state_record in new_state_records:
+                master_id = state_record.master_res_id
+                if master_id not in state_records_by_master:
+                    state_records_by_master[master_id] = []
+                state_records_by_master[master_id].append(state_record)
+
+        # Assign primary state record to each record (first one in sorted order)
+        for record in self:
+            state_records = state_records_by_master.get(record.id, [])
+            record.state_record_id = state_records[0] if state_records else False
+
+    @api.depends("state_record_id")
+    def _compute_state_record_ids(self):
+        """Compute all state records for this master record.
+
+        Optimized for batch performance: queries all state records in one go,
+        then assigns to each record.
+        """
+        StateRecord = self.env["riverflow.state.record"]
+
+        # Filter out NewId records
+        records_to_process = self.filtered(lambda r: not isinstance(r.id, api.NewId))
+        newid_records = self - records_to_process
+
+        # Set empty recordset for NewId records
+        for record in newid_records:
+            record.state_record_ids = StateRecord
+
+        if not records_to_process:
             return
 
-        state_records = self._create_state_records(needing_state_record)
-        for record in self:
-            state_record = state_records.filtered(
-                lambda r: r.master_res_id == record.id and r.master_model == record._name
-            )
-            record.state_record_id = state_record.id
+        # Batch query: find all state records for all real records
+        all_state_records = StateRecord.search(
+            [
+                ("master_model", "=", self._name),
+                ("master_res_id", "in", records_to_process.ids),
+            ]
+        )
+
+        # Group state records by master_res_id for quick lookup
+        state_records_by_master = {}
+        for state_record in all_state_records:
+            master_id = state_record.master_res_id
+            if master_id not in state_records_by_master:
+                state_records_by_master[master_id] = StateRecord
+            state_records_by_master[master_id] |= state_record
+
+        # Assign state records to each record
+        for record in records_to_process:
+            record.state_record_ids = state_records_by_master.get(record.id, StateRecord)
 
     def _create_state_records(self, records):
+        """Create state records for the given master records.
+
+        By default, creates one state record per master record with record_type='single'.
+        Inheriting models can override this to create multiple state records per master record
+        (e.g., separate records for start and end dates with different record_types).
+
+        Args:
+            records: Recordset of master records that need state records
+
+        Returns:
+            Recordset of created state records
+        """
         state_record_vals = []
         for record in records:
             if self._add_state_record(record):
@@ -51,6 +158,7 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
                 vals = {
                     "master_model": record._name,
                     "master_res_id": record.id,
+                    "record_type": "single",
                 }
                 state_record_vals.append(vals)
         if len(state_record_vals) > 0:
@@ -62,12 +170,22 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
         return True
 
     def unlink(self):
-        # Filter out any records that don't exist (have been deleted) before trying to access their fields
-        # (needed for generated log entries that may have been deleted in a recursive unlink)
-        existing_records = self.exists()
-        state_records = existing_records.mapped("state_record_id")
-        # we first unlink the master record, as during its unlink, it will flush writes to the state record
-        # for computed values. These flushes fail if we remove the state record from under the feet of the master record
+        """Delete master records and their associated state records.
+
+        We first unlink the master record, as during its unlink, it will flush writes to the state records
+        for computed values. These flushes fail if we remove the state records from under the feet of the master record.
+
+        Optimized for batch performance: queries all state records in one batch operation.
+        """
+        # Batch query: find all state records for all records being deleted
+        StateRecord = self.env["riverflow.state.record"]
+        state_records_to_delete = StateRecord.search(
+            [
+                ("master_model", "=", self._name),
+                ("master_res_id", "in", self.ids),
+            ]
+        )
+
         result = super().unlink()
-        state_records.sudo().unlink()
+        state_records_to_delete.sudo().unlink()
         return result
