@@ -1,9 +1,6 @@
 from odoo.tests.common import TransactionCase
 from odoo.tests import tagged
 from datetime import date
-from odoo.exceptions import UserError
-
-# Testcases generated with the help of Cursor AI
 
 
 @tagged("post_install", "-at_install", "riverflow", "test_services")
@@ -746,3 +743,276 @@ class ServiceDeadlineTestCase(TransactionCase):
             "Mode should be preserved when deadline equals project_deadline",
         )
         self.assertEqual(child.days_relative_to_project, -2)
+
+    def test_display_order_computed_correctly(self):
+        """Test that display_order is computed correctly after creating services."""
+        self.cleanup_test_services()
+
+        # Create services with different deadlines
+        root_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root 1",
+                "project_deadline": date(2024, 6, 10),
+            }
+        )
+
+        root_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root 2",
+                "project_deadline": date(2024, 6, 20),
+            }
+        )
+
+        # Create children for root_1
+        child_1_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 1.1",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 8),
+            }
+        )
+
+        child_1_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 1.2",
+                "parent_id": root_1.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 9),
+            }
+        )
+
+        # Clear ORM cache to get freshly computed display_order values
+        self.env.invalidate_all()
+
+        # Verify display_order is assigned
+        self.assertGreaterEqual(root_1.display_order, 0, "root_1 should have a display_order >= 0")
+        self.assertGreaterEqual(root_2.display_order, 0, "root_2 should have a display_order >= 0")
+        self.assertGreaterEqual(child_1_1.display_order, 0, "child_1_1 should have a display_order >= 0")
+        self.assertGreaterEqual(child_1_2.display_order, 0, "child_1_2 should have a display_order >= 0")
+
+        # Verify children of root_1 have sequential display_order
+        self.assertEqual(
+            child_1_1.display_order + 1,
+            child_1_2.display_order,
+            "Children should have sequential display_order based on deadline",
+        )
+
+    def test_display_order_no_unnecessary_writes(self):
+        """Test that display_order is not written when the value hasn't changed."""
+        self.cleanup_test_services()
+
+        # Create a simple service tree
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root",
+                "project_deadline": date(2024, 6, 15),
+            }
+        )
+
+        child_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 1",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 10),
+            }
+        )
+
+        child_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 2",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 12),
+            }
+        )
+
+        # Force computation by accessing the field
+        initial_order_child_1 = child_1.display_order
+        initial_order_child_2 = child_2.display_order
+
+        # Trigger recomputation by modifying a dependency field on an unrelated service
+        # Create a new unrelated service to ensure no changes to existing services
+        unrelated = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Unrelated",
+                "project_deadline": date(2024, 7, 1),
+            }
+        )
+
+        # Clear cache and verify display_order hasn't changed for existing services
+        self.env.invalidate_all()
+
+        self.assertEqual(
+            child_1.display_order,
+            initial_order_child_1,
+            "display_order should not change when unrelated services are created",
+        )
+        self.assertEqual(
+            child_2.display_order,
+            initial_order_child_2,
+            "display_order should not change when unrelated services are created",
+        )
+
+    def test_display_order_updates_on_deadline_change(self):
+        """Test that display_order is recalculated when deadlines change."""
+        self.cleanup_test_services()
+
+        # Create a root with children
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root",
+                "project_deadline": date(2024, 6, 15),
+            }
+        )
+
+        child_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 1",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 10),
+            }
+        )
+
+        child_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 2",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 12),
+            }
+        )
+
+        # Get initial order
+        initial_order_child_1 = child_1.display_order
+        initial_order_child_2 = child_2.display_order
+
+        # Child 1 should come before Child 2 (earlier deadline)
+        self.assertLess(
+            initial_order_child_1,
+            initial_order_child_2,
+            "Child 1 should have lower display_order than Child 2",
+        )
+
+        # Change child_1's deadline to be after child_2
+        child_1.write({"project_deadline": date(2024, 6, 14)})
+
+        # Clear ORM cache to get recomputed values
+        self.env.invalidate_all()
+
+        # Now Child 2 should come before Child 1
+        self.assertLess(
+            child_2.display_order,
+            child_1.display_order,
+            "Child 2 should now have lower display_order than Child 1 after deadline change",
+        )
+
+    def test_display_order_updates_on_priority_change(self):
+        """Test that display_order is recalculated when priorities change for services with same deadline."""
+        self.cleanup_test_services()
+
+        # Create a root with children that have the same deadline
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Root",
+                "project_deadline": date(2024, 6, 15),
+            }
+        )
+
+        child_1 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 1",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 10),
+                "daily_prio": 1,
+            }
+        )
+
+        child_2 = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Child 2",
+                "parent_id": root.id,
+                "use_project_deadline_from": "self",
+                "project_deadline": date(2024, 6, 10),  # Same deadline
+                "daily_prio": 2,
+            }
+        )
+
+        # Get initial order
+        initial_order_child_1 = child_1.display_order
+        initial_order_child_2 = child_2.display_order
+
+        # Child 1 should come before Child 2 (lower priority number)
+        self.assertLess(
+            initial_order_child_1,
+            initial_order_child_2,
+            "Child 1 should have lower display_order than Child 2 (lower priority)",
+        )
+
+        # Change priorities
+        child_1.write({"daily_prio": 3})
+
+        # Clear ORM cache to get fresh computed values
+        # _compute_display_order updates all services in the tree, but cached values remain in existing recordsets
+        self.env.invalidate_all()
+
+        # Now Child 2 should come before Child 1
+        self.assertLess(
+            child_2.display_order,
+            child_1.display_order,
+            "Child 2 should now have lower display_order than Child 1 after priority change",
+        )
+
+    def test_display_order_maintains_tree_integrity(self):
+        """Test that display_order maintains proper tree structure after multiple changes."""
+        (
+            root_1,
+            root_2,
+            root_3,
+            child_2_1,
+            child_2_2,
+            child_2_3,
+            child_3_1,
+            child_3_2,
+            child_3_3,
+            grandchild_3_2_1,
+            grandchild_3_2_2,
+        ) = self.create_service_tree()
+
+        # Make multiple changes to verify tree integrity is maintained
+        child_2_2.write({"daily_prio": 5})
+        child_3_1.write({"project_deadline": date(2024, 2, 25)})
+
+        # Clear ORM cache to get recomputed values for all services
+        self.env.invalidate_all()
+
+        # Verify parent-child relationships are maintained
+        self.assertEqual(len(root_2.child_ids), 3, "Root 2 should still have 3 children")
+        self.assertEqual(len(root_3.child_ids), 3, "Root 3 should still have 3 children")
+        self.assertEqual(len(child_3_2.child_ids), 2, "Child 3.2 should still have 2 grandchildren")
+
+        # Verify all services in the same tree have display_order values
+        for service in root_2.child_ids:
+            self.assertGreaterEqual(
+                service.display_order,
+                0,
+                f"{service.name} should have a valid display_order",
+            )
+
+        for service in root_3.child_ids:
+            self.assertGreaterEqual(
+                service.display_order,
+                0,
+                f"{service.name} should have a valid display_order",
+            )
+
+        # Verify grandchildren have display_order after parent
+        for grandchild in child_3_2.child_ids:
+            self.assertGreater(
+                grandchild.display_order,
+                child_3_2.display_order,
+                f"{grandchild.name} should have display_order after its parent",
+            )

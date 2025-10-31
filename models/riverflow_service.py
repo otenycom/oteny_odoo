@@ -759,8 +759,10 @@ class Service(models.Model):
                 # Retrieve the service object using its ID
                 service = service_dict[service_id]
 
-                # Assign the current display_order number to the service
-                service.display_order = display_order
+                # Only write display_order if the value is different from the current value
+                # This optimization avoids unnecessary database writes and ORM overhead
+                if service.display_order != display_order:
+                    service.display_order = display_order
 
                 # Increment the display_order number for the next service
                 display_order += 1
