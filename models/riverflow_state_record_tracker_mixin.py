@@ -97,12 +97,15 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
             state_records = state_records_by_master.get(record.id, [])
             record.state_record_id = state_records[0] if state_records else False
 
-    @api.depends("state_record_id")
+    @api.depends("create_date")
     def _compute_state_record_ids(self):
         """Compute all state records for this master record.
 
         Optimized for batch performance: queries all state records in one go,
         then assigns to each record.
+
+        Note: Depends on create_date to trigger on record creation. State records
+        are created once and persist, so this mainly runs during initial setup.
         """
         StateRecord = self.env["riverflow.state.record"]
 
@@ -118,6 +121,8 @@ class RiverflowWorkflowStateRecordTrackerMixin(models.AbstractModel):
             return
 
         # Batch query: find all state records for all real records
+        # This search is only expensive on first access; afterwards, state records
+        # exist and are just being retrieved
         all_state_records = StateRecord.search(
             [
                 ("master_model", "=", self._name),
