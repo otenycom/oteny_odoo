@@ -57,14 +57,15 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
             vals["project_deadline"] = self.date
 
         if self.use_existing_attachment:
+            # Using existing attachment from the service
             pass
-        elif self.attachment_ids and len(self.attachment_ids) < 2:
+        elif self.attachment_ids:
+            # Attach new files (one or more)
             service.message_post(
                 attachment_ids=self.attachment_ids.ids,
             )
-        elif self.attachment_ids and len(self.attachment_ids) > 1:
-            raise UserError("Please attach only one file.")
         elif service.message_attachment_count == 0:
+            # No attachments at all - require at least one
             raise UserError("Please attach at least one file.")
 
         service.write(
