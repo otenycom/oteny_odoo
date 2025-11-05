@@ -150,6 +150,9 @@
                 <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
                 <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
+                <!-- Show items with a deadline today or within the last 7 days -->
+                <filter string="7 Days Ago and Later" name="last_seven_days_and_later"
+                    domain="[('deadline', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Issues" name="has_issues" domain="[('check_result_ids.severity', '!=', False)]" />
