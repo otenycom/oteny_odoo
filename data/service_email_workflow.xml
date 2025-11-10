@@ -40,7 +40,7 @@
     <!-- Transitions -->
     <!-- Transitions from no state -->
     <record id="trans_se_1" model="riverflow.transition">
-        <field name="name">Later</field>
+        <field name="name">Start</field>
         <field name="from_state_id" ref="" />
         <field name="to_state_id" ref="state_service_se_not_started" />
         <field name="action_id" ref="riverflow.transition_action_default" />
