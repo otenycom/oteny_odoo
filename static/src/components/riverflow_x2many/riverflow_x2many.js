@@ -10,9 +10,27 @@ const fieldRegistry = registry.category("fields");
 const viewRegistry = registry.category("views");
 
 
+/**
+ * Extended ListRenderer that supports storage_key_suffix for independent column visibility settings.
+ * @extends ListRenderer
+ */
 export class RiverflowListRenderer extends ListRenderer {
     setup() {
         super.setup();
+    }
+
+    /**
+     * Override to include storage_key_suffix from nestedKeyOptionalFieldsData.
+     * This allows multiple instances of the same field to have independent column settings.
+     */
+    createViewKey() {
+        const baseKey = super.createViewKey();
+        // @ts-ignore - props is available from parent Component class
+        const suffix = this.props.nestedKeyOptionalFieldsData?.storage_key_suffix;
+        if (suffix) {
+            return `${baseKey},${suffix}`;
+        }
+        return baseKey;
     }
 
 }
@@ -44,6 +62,23 @@ export class RiverflowOne2many extends X2ManyField {
             await this.actionService.doAction(action);
         };
         this.canOpenRecord = true;
+    }
+
+    /**
+     * Override to include storage_key_suffix from context.
+     * This allows multiple instances of the same field to have independent column settings.
+     */
+    get nestedKeyOptionalFieldsData() {
+        const baseData = super.nestedKeyOptionalFieldsData;
+        const storageKeySuffix = this.props.context?.storage_key_suffix;
+
+        if (storageKeySuffix) {
+            return {
+                ...baseData,
+                storage_key_suffix: storageKeySuffix,
+            };
+        }
+        return baseData;
     }
 }
 
