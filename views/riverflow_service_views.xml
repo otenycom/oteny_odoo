@@ -107,15 +107,21 @@
                                     <field name="supply_order_instructions" />
                                 </group>
                             </group>
+                            <group>
+                                <field name="supply_actual_date" />
+                                <field name="supply_date" />
+                            </group>
                             <group invisible="not has_legs">
                                 <field name="leg_ids" nolabel="1">
                                     <list>
                                         <field name="sequence" widget="handle" />
                                         <field name="supply_from" />
                                         <field name="supply_to" />
-                                        <field name="supply_instructions" />
+                                        <field name="supply_instructions" optional="hide" />
+                                        <field name="supply_distance_km" optional="show" />
                                         <field name="supply_cost_currency_id" column_invisible="1" />
-                                        <field name="supply_cost_amount" sum="Total Cost" currency_field="supply_cost_currency_id" />
+                                        <field name="supply_cost_amount" sum="Total Cost"
+                                            currency_field="supply_cost_currency_id" optional="show" />
                                     </list>
                                 </field>
                             </group>
@@ -238,11 +244,11 @@
                             <field name="supply_from" />
                             <field name="supply_to" />
                             <field name="supply_instructions" />
-                            <field name="service_id" readonly="1" string="Supply Order" options="{'no_create': True, 'no_open': False}" />
-                        </group>
-                        <group>
+                            <field name="supply_distance_km" />
+
                             <field name="supply_cost_amount" string="Cost" />
                             <field name="supply_cost_currency_id" invisible="1" />
+                            <field name="service_id" readonly="1" string="Supply Order" options="{'no_create': True, 'no_open': False}" />
                         </group>
                     </group>
                     <group colspan="2">

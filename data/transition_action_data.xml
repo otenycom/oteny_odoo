@@ -41,4 +41,25 @@
         <field name="odoo_view">view_enter_airline_ticket_form</field>
         <field name="model_id" ref="riverflow.model_riverflow_service" />
     </record>
+
+    <record id="transition_action_enter_distance" model="riverflow.transition.action">
+        <field name="name">Enter Distance</field>
+        <field name="description">Enter the distance for each leg of the trip</field>
+        <field name="odoo_view">view_enter_distance_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_set_deadline_tomorrow" model="riverflow.transition.action">
+        <field name="name">Set Deadline Tomorrow</field>
+        <field name="description">Set the service deadline to tomorrow</field>
+        <field name="odoo_view">view_set_deadline_tomorrow_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_verify_trip_locations" model="riverflow.transition.action">
+        <field name="name">Verify Trip Locations</field>
+        <field name="description">Verify trip locations and capture actual trip date</field>
+        <field name="odoo_view">view_verify_trip_locations_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
 </odoo>

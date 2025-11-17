@@ -348,6 +348,22 @@ class Service(models.Model):
         tracking=True,
     )
 
+    supply_actual_date = fields.Date(
+        string="Actual Supply Date",
+        tracking=True,
+        help="The actual date when this supply order was executed/completed. "
+        "Set when trip is marked as completed. Used for billing/invoicing. "
+        "If not set, the service deadline is used as fallback.",
+    )
+
+    supply_date = fields.Date(
+        string="Supply Date",
+        compute="_compute_supply_date",
+        store=True,
+        index=True,
+        help="Supply date for billing. Uses actual supply date if set, otherwise falls back to deadline.",
+    )
+
     leg_ids = fields.One2many(
         "riverflow.service.leg",
         "service_id",
@@ -370,6 +386,16 @@ class Service(models.Model):
         recursive=True,
         help="Links back to the 'taxi booking' that generated this leg-info service",
     )
+
+    @api.depends("supply_actual_date", "deadline")
+    def _compute_supply_date(self):
+        """Compute effective supply date for billing purposes.
+
+        Uses supply_actual_date if available (set when trip completed),
+        otherwise falls back to deadline (planned/scheduled date).
+        """
+        for service in self:
+            service.supply_date = service.supply_actual_date or service.deadline
 
     @api.depends("deadline", "end_date")
     def _compute_end_date_for_calendar(self):
@@ -1234,6 +1260,10 @@ class ServiceLeg(models.Model):
         string="Cost Currency",
         related="service_id.company_id.currency_id",
         store=True,
+    )
+    supply_distance_km = fields.Float(
+        string="Distance (km)",
+        help="Distance in kilometers for this leg (used for billing calculations)",
     )
     supply_instructions = fields.Text(
         "Instructions",
