@@ -5,6 +5,11 @@
         <field name="model">riverflow.enter.distance.wizard</field>
         <field name="inherit_id" ref="riverflow.view_service_transition_action_default_form" />
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='responsible_team_id']" position="after">
+                <field name="total_leg_distance_km" string="Km's from Legs" force_save="1" />
+                <field name="billing_distance_km" force_save="1"
+                    help="Override total distance for billing. If set, per-leg distances are optional." />
+            </xpath>
             <xpath expr="//group" position="after">
                 <group colspan="2">
                     <field name="leg_ids" nolabel="1" force_save="1">
@@ -13,6 +18,9 @@
                             <field name="supply_from" force_save="1" />
                             <field name="supply_to" force_save="1" />
                             <field name="supply_distance_km" sum="Total Distance" force_save="1" />
+                            <field name="supply_cost_currency_id" column_invisible="1" force_save="1" />
+                            <field name="supply_cost_amount" sum="Total Cost"
+                                currency_field="supply_cost_currency_id" force_save="1" optional="show" />
                             <field name="service_leg_id" column_invisible="1" force_save="1" />
                             <field name="wizard_id" column_invisible="1" force_save="1" />
                         </list>

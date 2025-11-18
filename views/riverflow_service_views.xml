@@ -100,16 +100,16 @@
                                 <field name="supply_unit_price_currency_id" invisible="1" />
                             </group>
                             <group invisible="not has_supplier">
-                                <group>
+                                <group colspan="2">
                                     <field name="supplier_partner_id" />
-                                </group>
-                                <group>
                                     <field name="supply_order_instructions" />
                                 </group>
                             </group>
                             <group>
-                                <field name="supply_actual_date" />
                                 <field name="supply_date" />
+                                <field name="supply_actual_date" />
+                                <field name="total_leg_distance_km" string="Km's from Legs" invisible="not has_legs" />
+                                <field name="billing_distance_km" string="Km's for Billing" />
                             </group>
                             <group invisible="not has_legs">
                                 <field name="leg_ids" nolabel="1">
@@ -118,7 +118,7 @@
                                         <field name="supply_from" />
                                         <field name="supply_to" />
                                         <field name="supply_instructions" optional="hide" />
-                                        <field name="supply_distance_km" optional="show" />
+                                        <field name="supply_distance_km" sum="Total" optional="show" />
                                         <field name="supply_cost_currency_id" column_invisible="1" />
                                         <field name="supply_cost_amount" sum="Total Cost"
                                             currency_field="supply_cost_currency_id" optional="show" />

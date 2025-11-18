@@ -364,6 +364,19 @@ class Service(models.Model):
         help="Supply date for billing. Uses actual supply date if set, otherwise falls back to deadline.",
     )
 
+    billing_distance_km = fields.Float(
+        string="Billing Distance (km)",
+        help="Distance used for billing. If not set, the sum of leg distances is used. "
+        "Override this to exclude inhouse detours or apply shortest route calculations.",
+    )
+
+    total_leg_distance_km = fields.Float(
+        string="Total Leg Distance (km)",
+        compute="_compute_total_leg_distance_km",
+        store=True,
+        help="Auto-calculated sum of all leg distances. This is used for billing if Billing Distance is not set.",
+    )
+
     leg_ids = fields.One2many(
         "riverflow.service.leg",
         "service_id",
@@ -396,6 +409,12 @@ class Service(models.Model):
         """
         for service in self:
             service.supply_date = service.supply_actual_date or service.deadline
+
+    @api.depends("leg_ids.supply_distance_km")
+    def _compute_total_leg_distance_km(self):
+        """Compute total distance from all legs"""
+        for service in self:
+            service.total_leg_distance_km = sum(leg.supply_distance_km for leg in service.leg_ids)
 
     @api.depends("deadline", "end_date")
     def _compute_end_date_for_calendar(self):
@@ -1275,7 +1294,7 @@ class ServiceLeg(models.Model):
         help="If True, the leg is considered for invoicing",
     )
 
-    @api.depends("supply_from", "supply_to", "service_id.deadline", "service_id.name")
+    @api.depends("supply_from", "supply_to", "service_id.supply_date", "service_id.name")
     def _compute_name(self):
         for leg in self:
             name_parts = []
@@ -1288,6 +1307,6 @@ class ServiceLeg(models.Model):
                 name_parts.append(leg.supply_to)
 
             if leg.service_id.deadline:
-                name_parts.append(leg.service_id.deadline.strftime(Service.DATE_FORMAT))
+                name_parts.append(leg.service_id.supply_date.strftime(Service.DATE_FORMAT))
 
             leg.name = " | ".join(name_parts)

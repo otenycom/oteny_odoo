@@ -16,11 +16,28 @@ class VerifyTripLocationsWizard(models.TransientModel):
         string="Tags",
     )
 
+    billing_distance_km = fields.Float(
+        string="Billing Distance (km)",
+        help="Distance used for billing. Leave empty to use sum of leg distances.",
+    )
+
+    total_leg_distance_km = fields.Float(
+        string="Total Leg Distance (km)",
+        compute="_compute_total_leg_distance_km",
+        help="Auto-calculated sum of all leg distances",
+    )
+
     leg_ids = fields.One2many(
         "riverflow.verify.trip.locations.wizard.leg",
         "wizard_id",
         string="Legs",
     )
+
+    @api.depends("leg_ids.supply_distance_km")
+    def _compute_total_leg_distance_km(self):
+        """Compute total distance from wizard legs"""
+        for wizard in self:
+            wizard.total_leg_distance_km = sum(leg.supply_distance_km for leg in wizard.leg_ids)
 
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
@@ -29,6 +46,9 @@ class VerifyTripLocationsWizard(models.TransientModel):
 
         if len(records_to_transition) == 1:
             service = records_to_transition[0]
+
+            # Set billing distance override if present
+            defaultValues["billing_distance_km"] = service.billing_distance_km or 0
 
             # Create wizard leg records for display and optional distance entry
             leg_vals = []
@@ -59,6 +79,9 @@ class VerifyTripLocationsWizard(models.TransientModel):
                     "Please add legs to the service before verifying locations."
                 )
             )
+
+        # Save billing distance override
+        vals["billing_distance_km"] = self.billing_distance_km
 
         # Update service legs with verified locations and distances
         for wizard_leg in self.leg_ids:
