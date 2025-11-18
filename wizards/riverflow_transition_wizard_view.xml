@@ -13,6 +13,9 @@
                         <field name="responsible_team_id" required="1" invisible="responsible_team_id_invisible" />
                         <field name="responsible_team_id_invisible" invisible="1" />
 
+                        <field name="internal_notes_summary" readonly="1" invisible="internal_notes_summary_invisible or not internal_notes_summary" />
+                        <field name="internal_notes_summary_invisible" invisible="1" />
+
                         <field name="new_note" required="0" invisible="new_note_invisible" widget="html" />
                         <field name="new_note_invisible" invisible="1" />
                     </group>

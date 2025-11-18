@@ -30,6 +30,12 @@ class RiverflowEnterDistanceWizard(models.TransientModel):
         for wizard in self:
             wizard.total_leg_distance_km = sum(leg.supply_distance_km for leg in wizard.leg_ids)
 
+    def get_visibility_defaults(self, transition_id):
+        """Override to show internal notes summary in the enter distance wizard"""
+        visibility_defaults = super().get_visibility_defaults(transition_id)
+        visibility_defaults["internal_notes_summary_invisible"] = False
+        return visibility_defaults
+
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
         """Populate legs from the service"""

@@ -27,6 +27,9 @@
                             <field name="supply_from" force_save="1" />
                             <field name="supply_to" force_save="1" />
                             <field name="supply_distance_km" sum="Total Distance" force_save="1" />
+                            <field name="supply_cost_currency_id" column_invisible="1" force_save="1" />
+                            <field name="supply_cost_amount" sum="Total Cost"
+                                currency_field="supply_cost_currency_id" force_save="1" optional="show" />
                             <field name="service_leg_id" column_invisible="1" force_save="1" />
                             <field name="wizard_id" column_invisible="1" force_save="1" />
                         </list>

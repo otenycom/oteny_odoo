@@ -23,6 +23,15 @@ class TransitionWizard(models.AbstractModel):
     )
 
     responsible_team_id_invisible = fields.Boolean()
+
+    internal_notes_summary = fields.Text(
+        string="Top 3 Internal Notes",
+        help="Recent internal notes from the record being transitioned",
+        compute="_compute_internal_notes_summary",
+        store=False,
+    )
+    internal_notes_summary_invisible = fields.Boolean()
+
     new_note = fields.Text(string="Internal Note")
     new_note_invisible = fields.Boolean()
 
@@ -64,6 +73,7 @@ class TransitionWizard(models.AbstractModel):
     def get_visibility_defaults(self, transition_id):
         return {
             "responsible_team_id_invisible": transition_id.to_state_id.is_end_state,
+            "internal_notes_summary_invisible": True,
         }
 
     def action_save(self):
@@ -150,6 +160,20 @@ class TransitionWizard(models.AbstractModel):
                 description = wizard.transition_id.description
 
             wizard.transition_description = description
+
+    @api.depends("records_to_transition_ids")
+    def _compute_internal_notes_summary(self):
+        for wizard in self:
+            # Get internal notes from the first record being transitioned
+            if wizard.records_to_transition_ids and len(wizard.records_to_transition_ids) == 1:
+                record = wizard.records_to_transition_ids[0]
+                # Check if the record has internal_notes_summary field (from mail.thread.review.mixin)
+                if hasattr(record, "internal_notes_summary"):
+                    wizard.internal_notes_summary = record.internal_notes_summary
+                else:
+                    wizard.internal_notes_summary = False
+            else:
+                wizard.internal_notes_summary = False
 
     def default_get_using_records(self, defaultValues, records_to_transition):
         pass

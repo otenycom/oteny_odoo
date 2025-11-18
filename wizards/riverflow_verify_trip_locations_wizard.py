@@ -39,6 +39,12 @@ class VerifyTripLocationsWizard(models.TransientModel):
         for wizard in self:
             wizard.total_leg_distance_km = sum(leg.supply_distance_km for leg in wizard.leg_ids)
 
+    def get_visibility_defaults(self, transition_id):
+        """Override to show internal notes summary in the verify trip locations wizard"""
+        visibility_defaults = super().get_visibility_defaults(transition_id)
+        visibility_defaults["internal_notes_summary_invisible"] = False
+        return visibility_defaults
+
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
         """Populate wizard with current trip details for verification"""
@@ -60,6 +66,7 @@ class VerifyTripLocationsWizard(models.TransientModel):
                             "supply_from": leg.supply_from,
                             "supply_to": leg.supply_to,
                             "supply_distance_km": leg.supply_distance_km or 0,
+                            "supply_cost_amount": leg.supply_cost_amount or 0,
                         }
                     )
                 )
@@ -93,6 +100,8 @@ class VerifyTripLocationsWizard(models.TransientModel):
                     leg_vals["supply_to"] = wizard_leg.supply_to
                 if wizard_leg.supply_distance_km:
                     leg_vals["supply_distance_km"] = wizard_leg.supply_distance_km
+                # Always update cost (even if 0, user might be clearing it)
+                leg_vals["supply_cost_amount"] = wizard_leg.supply_cost_amount
 
                 if leg_vals:
                     wizard_leg.service_leg_id.write(leg_vals)
@@ -121,4 +130,10 @@ class VerifyTripLocationsWizardLeg(models.TransientModel):
     supply_to = fields.Char(string="To")
     supply_distance_km = fields.Float(
         string="Distance (km)", help="Optional: Enter distance now or later in 'Distance Entered' step"
+    )
+    supply_cost_amount = fields.Monetary(string="Cost", currency_field="supply_cost_currency_id")
+    supply_cost_currency_id = fields.Many2one(
+        comodel_name="res.currency",
+        related="service_leg_id.service_id.company_id.currency_id",
+        store=False,
     )
