@@ -108,8 +108,6 @@
                             <group>
                                 <field name="supply_date" />
                                 <field name="supply_actual_date" />
-                                <field name="total_leg_distance_km" string="Km's from Legs" invisible="not has_legs" />
-                                <field name="billing_distance_km" string="Km's for Billing" />
                             </group>
                             <group invisible="not has_legs">
                                 <field name="leg_ids" nolabel="1">

@@ -7,17 +7,6 @@ class RiverflowEnterDistanceWizard(models.TransientModel):
     _inherit = "riverflow.service.wizard"
     _description = "Enter Distance Wizard"
 
-    billing_distance_km = fields.Float(
-        string="Billing Distance (km)",
-        help="Distance used for billing. Leave empty to use sum of leg distances.",
-    )
-
-    total_leg_distance_km = fields.Float(
-        string="Total Leg Distance (km)",
-        compute="_compute_total_leg_distance_km",
-        help="Auto-calculated sum of all leg distances",
-    )
-
     leg_ids = fields.One2many(
         "riverflow.enter.distance.wizard.leg",
         "wizard_id",
@@ -45,9 +34,6 @@ class RiverflowEnterDistanceWizard(models.TransientModel):
             return
 
         service = records_to_transition[0]
-
-        # Set billing distance override if present
-        defaultValues["billing_distance_km"] = service.billing_distance_km or 0
 
         # Create wizard leg records for each service leg
         leg_vals = []
@@ -80,21 +66,13 @@ class RiverflowEnterDistanceWizard(models.TransientModel):
                 )
             )
 
-        # Validate that all legs have distance entered, unless billing_distance_km is set
-        # (If user sets billing_distance_km, they can skip per-leg distances for simple services)
-        if not self.billing_distance_km or self.billing_distance_km <= 0:
-            for wizard_leg in self.leg_ids:
-                if not wizard_leg.supply_distance_km or wizard_leg.supply_distance_km <= 0:
-                    raise ValidationError(
-                        _(
-                            "Please enter distances for all legs OR set Billing Distance. "
-                            "Leg %s → %s has no distance entered."
-                        )
-                        % (wizard_leg.supply_from, wizard_leg.supply_to)
-                    )
-
-        # Save billing distance override
-        vals["billing_distance_km"] = self.billing_distance_km
+        # Validate that all legs have distance entered
+        for wizard_leg in self.leg_ids:
+            if not wizard_leg.supply_distance_km or wizard_leg.supply_distance_km <= 0:
+                raise ValidationError(
+                    _("Please enter a valid distance for all legs. " "Leg %s → %s has no distance entered.")
+                    % (wizard_leg.supply_from, wizard_leg.supply_to)
+                )
 
         # Update the actual service legs with distances and locations
         for wizard_leg in self.leg_ids:
