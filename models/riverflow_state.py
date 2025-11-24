@@ -90,6 +90,13 @@ class RiverflowWorkflowState(models.Model):
         default=False,
     )
     is_cancelled_state = fields.Boolean("Is Cancelled State", default=False)
+    is_supply_order_delivered = fields.Boolean(
+        "Supply Order Delivered",
+        help="If true, this state indicates the supply/service has been delivered to the customer, "
+        "even if administrative tasks (verification, billing) remain. Used by info services to track "
+        "when the actual service completion occurred.",
+        default=False,
+    )
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",

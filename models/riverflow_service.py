@@ -908,6 +908,16 @@ class Service(models.Model):
                     )
                     record.parent_id.invalidate_recordset(["child_ids"])
 
+        # When a supply order service changes state, trigger recomputation of related info services
+        # Info services (leg pax services) track the delivery status of their parent supply order
+        if "state_id" in vals:
+            for record in self:
+                # Find all leg pax records that reference this service's legs
+                pax_records = self.env["crewradar.leg.pax"].search([("leg_id.service_id", "=", record.id)])
+                if pax_records:
+                    # Trigger recomputation of info_service_id which updates info service states
+                    pax_records._compute_info_service()
+
         return result
 
     @api.depends("root_id.is_this_a_template", "is_this_a_template")

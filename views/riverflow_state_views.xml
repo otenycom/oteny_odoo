@@ -25,6 +25,7 @@
                         <group>
                             <field name="is_end_state" />
                             <field name="is_cancelled_state" />
+                            <field name="is_supply_order_delivered" />
                             <field name="hide_in_statusbar" />
                         </group>
                     </group>
@@ -67,6 +68,7 @@
                 <field name="description" />
                 <field name="is_cancelled_state" />
                 <field name="is_end_state" />
+                <field name="is_supply_order_delivered" />
                 <field name="hide_in_statusbar" />
             </list>
         </field>
