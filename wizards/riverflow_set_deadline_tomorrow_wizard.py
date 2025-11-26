@@ -22,26 +22,36 @@ class SetDeadlineTomorrowWizard(models.TransientModel):
 
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
-        """Set deadline to tomorrow and capture actual trip date"""
+        """Set deadline based on supply date and capture actual trip date.
+
+        If supply_date is in the future, deadline is set to supply_date + 1 day.
+        Otherwise deadline is set to tomorrow for administrative task urgency.
+        """
         super().default_get_using_records(defaultValues, records_to_transition)
+
+        today = fields.Date.today()
+        tomorrow = fields.Date.add(today, days=1)
 
         if len(records_to_transition) == 1:
             service = records_to_transition[0]
             # Set supply_actual_date to the current service deadline (the original trip date)
             defaultValues["supply_actual_date"] = service.supply_date
 
-        # Set deadline to tomorrow for administrative task urgency
-        defaultValues["project_deadline"] = fields.Date.add(fields.Date.today(), days=1)
+            # If supply_date is in the future, deadline = supply_date + 1 day
+            if service.supply_date and service.supply_date > today:
+                defaultValues["project_deadline"] = fields.Date.add(service.supply_date, days=1)
+            else:
+                defaultValues["project_deadline"] = tomorrow
+        else:
+            defaultValues["project_deadline"] = tomorrow
+
         defaultValues["use_project_deadline_from"] = "self"
 
     def update_write_values(self, service, vals):
-        """Capture actual trip date and set deadline to tomorrow"""
+        """Capture actual trip date and use the deadline as entered by the user."""
         super().update_write_values(service, vals)
 
-        # Save the actual supply date for billing purposes
         vals["supply_actual_date"] = self.supply_actual_date
-
-        # Force the deadline to tomorrow and switch to 'self' mode
         vals["project_deadline"] = self.project_deadline
         vals["use_project_deadline_from"] = "self"
         vals["days_relative_to_project"] = 0
