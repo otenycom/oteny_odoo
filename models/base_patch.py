@@ -1,12 +1,92 @@
 # audit_log/models/base_patch.py
 from collections import defaultdict
+import logging
 from odoo import models, api
 from odoo.tools import SQL
+
+_logger = logging.getLogger(__name__)
 
 original_create = models.BaseModel.create
 original_unlink = models.BaseModel.unlink
 original_write = models.BaseModel.write
 original_flush = models.BaseModel._flush
+
+# Global flag to permanently disable auditing when database restore is detected
+# This is set when we detect changes to database.uuid (which happens during restore/copy)
+# and remains set for the lifetime of the process (which terminates after CLI restore anyway)
+_auditing_disabled_due_to_db_restore = False
+
+# Key field that indicates a database restore is in progress
+_DB_RESTORE_INDICATOR_KEY = "database.uuid"
+
+
+def _check_and_disable_on_restore(logs):
+    """
+    Check if any logs indicate a database restore operation and permanently disable auditing.
+
+    During database restore and copy operations, Odoo regenerates database.uuid.
+    When we detect this change, we permanently disable auditing for the remainder of
+    the process lifetime. This is safe because:
+    1. Restore/copy operations are CLI-driven and Odoo terminates after completion
+    2. Attempting to audit during restore will fail due to schema mismatches
+    3. We don't want to log the restore operation itself anyway
+
+    Args:
+        logs: List of log dictionaries to be created
+
+    Returns:
+        True if auditing should be disabled (restore detected), False otherwise
+    """
+    global _auditing_disabled_due_to_db_restore
+
+    # If already disabled, return immediately
+    if _auditing_disabled_due_to_db_restore:
+        return True
+
+    # Check if any log indicates database.uuid is being changed
+    for log in logs:
+        if (
+            log.get("model_name") == "ir.config_parameter"
+            and log.get("record_display_name") == _DB_RESTORE_INDICATOR_KEY
+        ):
+            _auditing_disabled_due_to_db_restore = True
+            _logger.info(
+                "Database restore detected (database.uuid change) - permanently disabling audit logging for this process"
+            )
+            return True
+
+    return False
+
+
+def _should_skip_audit_logging(env):
+    """
+    Determine if audit logging should be skipped based on the current environment state.
+
+    Audit logging is skipped in the following scenarios:
+    1. Database restore has been detected (global flag set)
+    2. Context explicitly disables auditing (oteny_audit_ignore=True)
+    3. Registry is not ready (during module installation or upgrade)
+
+    Args:
+        env: The Odoo environment
+
+    Returns:
+        True if audit logging should be skipped, False otherwise
+    """
+    # Check if auditing was permanently disabled due to database restore
+    if _auditing_disabled_due_to_db_restore:
+        return True
+
+    # Check if auditing is explicitly disabled via context
+    if env.context.get("oteny_audit_ignore", False):
+        return True
+
+    # Check if registry is not ready (during module installation, upgrade)
+    # When registry.ready is False, the system is in an initialization phase
+    if not env.registry.ready:
+        return True
+
+    return False
 
 
 def _create_audit_log_references(env, model, log_records):
@@ -190,8 +270,31 @@ def _resolve_parent_reference_unified(env, record, max_depth=3, current_depth=0)
 
 
 def _create_audit_logs(env, model, logs):
-    """Helper to create audit log records and their references."""
+    """
+    Helper to create audit log records and their references.
+
+    Checks for database restore indicators and permanently disables auditing if detected.
+    Also skips logging when the registry is not ready or when explicitly disabled via context.
+    This prevents schema mismatch errors when the audit schema doesn't match code expectations.
+    """
     if not logs or not env.registry.loaded:
+        return
+
+    # Check if this batch of logs contains database restore indicators
+    # This will set the global flag if restore is detected
+    if _check_and_disable_on_restore(logs):
+        _logger.debug(
+            "Skipping audit logging for %d changes - database restore detected or auditing disabled",
+            len(logs),
+        )
+        return
+
+    # Skip logging if we're in a state where auditing should be disabled
+    if _should_skip_audit_logging(env):
+        _logger.debug(
+            "Skipping audit logging for %d changes - registry not ready or auditing disabled via context",
+            len(logs),
+        )
         return
 
     env.cr.execute("SELECT txid_current()")
@@ -261,8 +364,12 @@ def _get_display_value(field, value, record_env):
 
 @api.model_create_multi
 def patched_create(self, vals_list):
-    # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
+    # Bypass if model is not yet fully loaded, auditing is disabled, or for the audit log model itself
+    if (
+        not self.env.registry.loaded
+        or _should_skip_audit_logging(self.env)
+        or self.env["oteny.audit.log"]._is_audit_ignored(self._name)
+    ):
         return original_create(self, vals_list)
 
     records = original_create(self, vals_list)
@@ -381,8 +488,12 @@ def patched_create(self, vals_list):
 
 
 def patched_unlink(self):
-    # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
+    # Bypass if model is not yet fully loaded, auditing is disabled, or for the audit log model itself
+    if (
+        not self.env.registry.loaded
+        or _should_skip_audit_logging(self.env)
+        or self.env["oteny.audit.log"]._is_audit_ignored(self._name)
+    ):
         return original_unlink(self)
 
     # Skip if no records are being unlinked
@@ -474,8 +585,12 @@ def patched_unlink(self):
 
 
 def patched_write(self, vals):
-    # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
+    # Bypass if model is not yet fully loaded, auditing is disabled, or for the audit log model itself
+    if (
+        not self.env.registry.loaded
+        or _should_skip_audit_logging(self.env)
+        or self.env["oteny.audit.log"]._is_audit_ignored(self._name)
+    ):
         return original_write(self, vals)
 
     # Skip if no records or values are provided
@@ -601,8 +716,12 @@ def patched_flush(self, fnames=None):
     Patched flush method that captures changes and logs them to audit table.
     Compatible with Odoo 18's flush signature.
     """
-    # Bypass if model is not yet fully loaded, or for the audit log model itself
-    if not self.env.registry.loaded or self.env["oteny.audit.log"]._is_audit_ignored(self._name):
+    # Bypass if model is not yet fully loaded, auditing is disabled, or for the audit log model itself
+    if (
+        not self.env.registry.loaded
+        or _should_skip_audit_logging(self.env)
+        or self.env["oteny.audit.log"]._is_audit_ignored(self._name)
+    ):
         return original_flush(self)
 
     # Use transaction-scoped storage to prevent duplicate logging within the same transaction.
@@ -805,6 +924,7 @@ def patched_flush(self, fnames=None):
                     del audit_old_values[field]
 
 
+# Apply all patches
 models.BaseModel.create = patched_create
 models.BaseModel.unlink = patched_unlink
 models.BaseModel.write = patched_write
