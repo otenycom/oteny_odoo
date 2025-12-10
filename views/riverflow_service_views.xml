@@ -416,7 +416,7 @@
         <field name="name">riverflow.service.tag.list</field>
         <field name="model">riverflow.service.tag</field>
         <field name="arch" type="xml">
-            <list editable="bottom">
+            <list>
                 <field name="name" />
                 <field name="color" widget="color_picker" />
             </list>
