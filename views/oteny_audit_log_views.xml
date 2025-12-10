@@ -76,6 +76,11 @@
                 <field name="new_value_display_name" />
                 <field name="create_uid" />
                 <separator />
+                <filter string="Today" name="filter_today" domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="From Yesterday onwards" name="filter_from_yesterday" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]" />
+                <filter string="Last week" name="filter_last_week" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]" />
+                <filter string="Last month" name="filter_last_month" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]" />
+                <separator />
                 <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'i')]" />
                 <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
                 <filter string="Deletes" name="deletes" domain="[('change_type', '=', 'd')]" />
@@ -98,7 +103,7 @@
         <field name="path">audit-raw</field>
         <field name="res_model">oteny.audit.log</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'create': False, 'edit': False}</field>
+        <field name="context">{'create': False, 'edit': False, 'search_default_filter_from_yesterday': 1}</field>
         <field name="search_view_id" ref="oteny_audit_log_view_search" />
     </record>
 
@@ -121,6 +126,11 @@
                 <field name="create_uid" />
                 <field name="is_child_log" />
                 <field name="child_model_name" />
+                <separator />
+                <filter string="Today" name="filter_today" domain="[('create_date', '&gt;=', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="From Yesterday onwards" name="filter_from_yesterday" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=1)).strftime('%Y-%m-%d'))]" />
+                <filter string="Last week" name="filter_last_week" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))]" />
+                <filter string="Last month" name="filter_last_month" domain="[('create_date', '&gt;=', (context_today() - datetime.timedelta(days=30)).strftime('%Y-%m-%d'))]" />
                 <separator />
                 <filter string="Inserts" name="inserts" domain="[('change_type', '=', 'i')]" />
                 <filter string="Updates" name="updates" domain="[('change_type', '=', 'u')]" />
@@ -225,7 +235,7 @@
         <field name="path">audit-log</field>
         <field name="res_model">oteny.audit.log.aggregated</field>
         <field name="view_mode">list,form</field>
-        <field name="context">{'create': False, 'edit': False}</field>
+        <field name="context">{'create': False, 'edit': False, 'search_default_filter_from_yesterday': 1}</field>
         <field name="domain">[('is_child_log', '=', False)]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
