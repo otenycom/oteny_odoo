@@ -309,6 +309,7 @@
                 <field name="name" string="Name"
                     filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
                 <field name="res_name" string="Subject" />
+                <field name="supplier_partner_id" />
                 <field name="workflow_id" />
                 <field name="state_id" />
                 <field name="tag_ids" />
@@ -320,6 +321,9 @@
                 <separator />
                 <filter string="Standalone Services" name="standalone_services" domain="[('res_model', '=', False)]" />
                 <filter string="Linked Services" name="linked_services" domain="[('res_model', '!=', False)]" />
+                <separator />
+                <filter string="Pending Supply Orders" name="pending_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '=', False)]" />
+                <filter string="Completed Supply Orders" name="completed_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '!=', False)]" />
                 <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
                 <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
@@ -390,6 +394,146 @@
                 Add a new service!
             </p>
         </field>
+    </record>
+
+    <!-- Supply Orders Search View: uses supply_date instead of deadline -->
+    <record id="supply_order_view_search" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.search</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <search string="Search Supply Orders">
+                <field name="name" string="Name"
+                    filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="res_name" string="Subject" />
+                <field name="supplier_partner_id" />
+                <field name="workflow_id" />
+                <field name="state_id" />
+                <field name="tag_ids" />
+                <field name="supply_date" />
+                <field name="internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" string="External Messages" />
+                <field name="responsible_team_id" />
+                <field name="company_id" />
+                <separator />
+                <filter string="Pending" name="pending_supply_orders" domain="[('supply_actual_date', '=', False)]" />
+                <filter string="Completed" name="completed_supply_orders" domain="[('supply_actual_date', '!=', False)]" />
+                <separator />
+                <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <separator />
+                <filter string="Supply Date" name="supply_date" date="supply_date" />
+                <separator />
+                <filter string="Overdue" name="overdue" domain="[('supply_date', '&lt;', context_today().strftime('%Y-%m-%d')),('supply_actual_date', '=', False)]" />
+                <filter string="Today" name="today" domain="[('supply_date', '=', context_today().strftime('%Y-%m-%d')),('supply_actual_date', '=', False)]" />
+                <filter string="Upcoming" name="upcoming" domain="['|', ('supply_date', '=', False), ('supply_date', '&gt;', context_today().strftime('%Y-%m-%d')), ('supply_actual_date', '=', False)]" />
+                <separator />
+                <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
+                <group>
+                    <filter string="Supply Date" name="group_by_supply_date" context="{'group_by': 'supply_date'}" />
+                    <filter string="Supplier" name="group_by_supplier" context="{'group_by': 'supplier_partner_id'}" />
+                    <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />
+                    <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'res_name'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Supply Orders List View: includes supply_date column -->
+    <record id="supply_order_view_list" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.list</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <list create="false" js_class="riverflow_service_list" default_order="supply_date desc,res_sortable_name">
+                <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" />
+                <field name="active" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
+                <field name="supply_date" optional="show" />
+                <field name="supply_actual_date" optional="hide" />
+                <field name="res_name" optional="show" width="260px" />
+                <field name='indented_name' optional="show" width="300px" />
+                <field name="supplier_partner_id" optional="show" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" width="140px" />
+                <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
+                <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
+                <field name="state_id" optional="show" decoration-success="is_end_state" width="140px" />
+                <field name="supply_unit_price" optional="hide" />
+                <field name="supply_unit_price_currency_id" column_invisible="1" />
+                <field name="company_id" width="100px" optional="hide" />
+                <field name='internal_notes_summary' optional="show" />
+                <field name="external_messages_summary" optional="hide" />
+                <field name="unreviewed_message_count" width="40px" optional="show" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Supply Orders Calendar View: uses supply_date instead of deadline -->
+    <record id="supply_order_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.calendar</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <calendar string="Supply Orders"
+                date_start="supply_date"
+                date_stop="supply_end_date_for_calendar"
+                color="color_int"
+                create="1" edit="1" delete="0"
+                mode="month"
+                scales="day,week,month,quarter,year"
+                hide_time="true"
+                event_limit="35"
+            >
+                <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
+                <field name="state_name" invisible="not state_name" string="State" />
+                <field name="supplier_partner_id" invisible="not supplier_partner_id" string="Supplier" />
+                <field name="tag_ids" widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}" invisible="not tag_ids" />
+                <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
+                <field name="supply_unit_price" invisible="not supply_unit_price" string="Cost" />
+                <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+            </calendar>
+        </field>
+    </record>
+
+    <!-- Supply Orders Action: filters for is_supply_order services only -->
+    <record id="supply_order_action" model="ir.actions.act_window">
+        <field name="name">Supply Orders</field>
+        <field name="path">supply-orders</field>
+        <field name="res_model">riverflow.service</field>
+        <field name="view_mode">calendar,list,form</field>
+        <field name="search_view_id" ref="riverflow.supply_order_view_search" />
+        <field name="domain">[('is_supply_order', '=', True), ('is_root_a_template', '=', False)]</field>
+        <field name="context">{'default_is_this_a_template': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No supply orders yet!
+            </p>
+            <p>Supply orders are services linked to suppliers, such as taxi bookings, transport orders, etc.</p>
+        </field>
+    </record>
+
+    <!-- Associate the supply order list view with the supply order action -->
+    <record id="supply_order_action_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="supply_order_view_list" />
+        <field name="act_window_id" ref="supply_order_action" />
+    </record>
+
+    <!-- Associate the supply order calendar view with the supply order action -->
+    <record id="supply_order_action_view_calendar" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">calendar</field>
+        <field name="view_id" ref="supply_order_view_calendar" />
+        <field name="act_window_id" ref="supply_order_action" />
     </record>
 
 
@@ -474,6 +618,11 @@
         <menuitem id="riverflow.service_menu_new_service" name="&#10133; New Service"
             action="riverflow.action_riverflow_start_service" sequence="30" />
     </menuitem>
+
+    <!-- Supply Orders Top-level Menu: dedicated view for supply order services -->
+    <menuitem id='riverflow.supply_order_root' name='Supply Orders'
+        web_icon='riverflow,static/description/taxi-cab.png' sequence="15"
+        action="riverflow.supply_order_action" />
 
 
     <record id="action_add_child_service" model="ir.actions.server">
