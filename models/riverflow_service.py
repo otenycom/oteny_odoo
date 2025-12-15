@@ -191,6 +191,12 @@ class Service(models.Model):
         inverse="_inverse_end_date_for_calendar",
         store=True,
     )
+    supply_end_date_for_calendar = fields.Date(
+        string="Supply End Date for Calendar",
+        compute="_compute_supply_end_date_for_calendar",
+        store=True,
+        help="End date for supply order calendar display. Uses end_date if set, otherwise falls back to supply_date.",
+    )
 
     deadline_formatted = fields.Char("Deadline Formatted", compute="_compute_deadline_formatted", store=False)
     timing_json = fields.Json(
@@ -412,6 +418,11 @@ class Service(models.Model):
                 service.end_date = False
             else:
                 service.end_date = service.end_date_for_calendar
+
+    @api.depends("supply_date")
+    def _compute_supply_end_date_for_calendar(self):
+        for service in self:
+            service.supply_end_date_for_calendar = service.supply_date
 
     @api.constrains("project_deadline", "end_date")
     def _check_end_date(self):
