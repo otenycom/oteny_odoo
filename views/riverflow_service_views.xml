@@ -412,17 +412,21 @@
                 <field name="responsible_team_id" />
                 <field name="company_id" />
                 <separator />
-                <filter string="Pending" name="pending_supply_orders" domain="[('supply_actual_date', '=', False)]" />
-                <filter string="Completed" name="completed_supply_orders" domain="[('supply_actual_date', '!=', False)]" />
+                <filter string="Pending" name="pending_supply_orders" domain="[('state_id.is_supply_order_delivered', '=', False), ('state_id.is_end_state', '=', False), ('state_id.is_cancelled_state', '=', False)]" />
+                <!-- 'Delivered' filter: includes services that are either marked as supply order delivered
+                     or are in an end state, but not cancelled.
+                     Logical: (is_supply_order_delivered OR is_end_state) AND NOT is_cancelled_state -->
+                <filter string="Delivered" name="completed_supply_orders"
+                    domain="['|', ('state_id.is_supply_order_delivered', '=', True), ('state_id.is_end_state', '=', True), ('state_id.is_cancelled_state', '=', False)]" />
                 <separator />
                 <filter string="Cancelled" name="cancelled" domain="[('state_id.is_cancelled_state', '=', True)]" />
                 <filter string="Non-cancelled" name="non_cancelled" domain="[('state_id.is_cancelled_state', '=', False)]" />
                 <separator />
                 <filter string="Supply Date" name="supply_date" date="supply_date" />
                 <separator />
-                <filter string="Overdue" name="overdue" domain="[('supply_date', '&lt;', context_today().strftime('%Y-%m-%d')),('supply_actual_date', '=', False)]" />
-                <filter string="Today" name="today" domain="[('supply_date', '=', context_today().strftime('%Y-%m-%d')),('supply_actual_date', '=', False)]" />
-                <filter string="Upcoming" name="upcoming" domain="['|', ('supply_date', '=', False), ('supply_date', '&gt;', context_today().strftime('%Y-%m-%d')), ('supply_actual_date', '=', False)]" />
+                <filter string="Past" name="past" domain="[('supply_date', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Today" name="today" domain="[('supply_date', '=', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Upcoming" name="upcoming" domain="[('supply_date', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"
