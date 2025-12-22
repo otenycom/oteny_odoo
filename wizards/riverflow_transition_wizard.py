@@ -32,7 +32,7 @@ class TransitionWizard(models.AbstractModel):
     )
     internal_notes_summary_invisible = fields.Boolean()
 
-    new_note = fields.Text(string="Internal Note")
+    new_note = fields.Html(string="Internal Note")
     new_note_invisible = fields.Boolean()
 
     @api.model
