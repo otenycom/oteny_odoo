@@ -25,6 +25,7 @@
       - [x] they have an inverse so it makes sense to log them so the change can be accont for between users and computed changes
     - Top 3 External Messages: for services not logged, but Top 3 Internal messages is actually logged for Entries. why?
 
+- View Audit log per field -> Popup icon next to or in each field?
 - [x] Audit log cleaner cronjob with configurable settings (days-based retention)
 - [ ] ! Access rights check when viewing the audit log, hide or obfuscate values as '**No Access**', for models/records to which the user has no rights
 - [ ] Performance check: EXPLAIN ANALYZE and add index for sure on (model,record_id) -> the filter used by the form view action to show the log of a single record
