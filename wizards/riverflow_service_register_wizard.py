@@ -21,12 +21,33 @@ class ServiceRegisterWizard(models.TransientModel):
     supply_unit_price_required = fields.Boolean()
     supply_unit_price_invisible = fields.Boolean()
 
+    def default_get_using_records(self, defaultValues, records_to_transition):
+        """Handle set_deadline_today context flag.
+
+        When set_deadline_today is True in context, force the deadline to today
+        by setting use_project_deadline_from to 'self' and project_deadline to today.
+        """
+        super().default_get_using_records(defaultValues, records_to_transition)
+
+        if self.env.context.get("set_deadline_today"):
+            defaultValues["use_project_deadline_from"] = "self"
+            defaultValues["project_deadline"] = fields.Date.today()
+            # Hide the deadline fields since they're forced
+            defaultValues["use_project_deadline_from_invisible"] = True
+            defaultValues["project_deadline_invisible"] = True
+
     def update_write_values(self, service, vals):
         super().update_write_values(service, vals)
         if not self.supply_quantity_invisible:
             vals["supply_quantity"] = self.supply_quantity
         if not self.supply_unit_price_invisible:
             vals["supply_unit_price"] = self.supply_unit_price
+
+        # When set_deadline_today is used, force the deadline values even though fields are hidden
+        if self.env.context.get("set_deadline_today"):
+            vals["use_project_deadline_from"] = "self"
+            vals["project_deadline"] = self.project_deadline
+            vals["days_relative_to_project"] = 0
 
     def get_visibility_defaults(self, transition_id):
         visibility_defaults = super().get_visibility_defaults(transition_id)
