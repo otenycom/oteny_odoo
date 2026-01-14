@@ -310,6 +310,7 @@
                     filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
                 <field name="res_name" string="Subject" />
                 <field name="supplier_partner_id" />
+                <field name="supplier_partner_id" />
                 <field name="workflow_id" />
                 <field name="state_id" />
                 <field name="tag_ids" />
@@ -321,6 +322,9 @@
                 <separator />
                 <filter string="Standalone Services" name="standalone_services" domain="[('res_model', '=', False)]" />
                 <filter string="Linked Services" name="linked_services" domain="[('res_model', '!=', False)]" />
+                <separator />
+                <filter string="Pending Supply Orders" name="pending_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '=', False)]" />
+                <filter string="Completed Supply Orders" name="completed_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '!=', False)]" />
                 <separator />
                 <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
                 <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
