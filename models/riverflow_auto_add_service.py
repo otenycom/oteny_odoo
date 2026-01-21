@@ -116,22 +116,28 @@ class AutoAddService(models.Model):
             except Exception as e:
                 raise ValidationError(f"Error evaluating domain for rule {auto_add_rule.name}: {e}")
 
+        # Performance optimization: batch-evaluate all subjects per rule using search()
+        # instead of filtered_domain() per subject. This reduces O(subjects x rules) Python
+        # domain evaluations to O(rules) database queries, dramatically improving performance.
+        rule_matching_ids = {}
+        for auto_add_rule, domain in rule_domains.items():
+            # Combine rule domain with subject filter - single DB query per rule
+            # Domain objects are iterable ASTs, so list() converts to traditional list format
+            combined_domain = list(domain) + [("id", "in", subjects.ids)]
+            matching = self.env[model].sudo().search(combined_domain)
+            rule_matching_ids[auto_add_rule] = set(matching.ids)
+
+        # Now iterate without expensive per-record domain evaluation
         for subject in subjects:
-            for auto_add_rule, domain in rule_domains.items():
-                try:
-                    if subject.sudo().filtered_domain(domain):
-                        # Instead of creating immediately, collect the values
-                        new_services.append(
-                            {
-                                "res_id": subject.id,
-                                "res_model": subject._name,
-                                "created_by_auto_add_service_id": auto_add_rule.id,
-                                "template_id": auto_add_rule.service_template_id.id,
-                            }
-                        )
-                except Exception as e:
-                    _logger.error(
-                        f"Error applying domain for rule {auto_add_rule.name} to record {subject}: {e}"
+            for auto_add_rule in rule_domains:
+                if subject.id in rule_matching_ids[auto_add_rule]:
+                    new_services.append(
+                        {
+                            "res_id": subject.id,
+                            "res_model": subject._name,
+                            "created_by_auto_add_service_id": auto_add_rule.id,
+                            "template_id": auto_add_rule.service_template_id.id,
+                        }
                     )
 
         # Get existing auto-added services to avoid duplicates
