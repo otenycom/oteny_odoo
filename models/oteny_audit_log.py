@@ -1,5 +1,5 @@
 # audit_log/models/audit_log.py
-from odoo import fields, models, api
+from odoo import Command, fields, models, api
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -235,6 +235,11 @@ action = {
                 existing_refs[xml_id] = existing_ref
 
         # Process each action
+        # Setting group_ids bypasses Odoo's default write access check on the bound model.
+        # Without group_ids, server actions require write access to the model, which is
+        # too restrictive for read-only audit log viewing. With group_ids set to
+        # base.group_user, any internal user can view audit logs.
+        group_user = self.env.ref("base.group_user")
         for action_data in actions_data:
             xml_id = action_data["xml_id"]
             action_vals = {
@@ -244,6 +249,7 @@ action = {
                 "state": "code",
                 "binding_view_types": "list,form",
                 "code": action_data["code"],
+                "group_ids": [Command.set([group_user.id])],
             }
 
             if xml_id in existing_refs:
