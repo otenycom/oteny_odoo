@@ -239,6 +239,15 @@ export class TransitionButtons extends Component {
             return false;
         }
 
+        // Deadline is required when creating services from templates
+        if (!this.state.projectDeadline) {
+            this.notification.add(
+                "Please set the Deadline before creating services.",
+                { type: "warning" }
+            );
+            return false;
+        }
+
         await this.saveRecords();
 
         // Read the deadline from the state instead of input field
