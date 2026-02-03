@@ -1251,6 +1251,23 @@ class Service(models.Model):
             "domain": [("record_id", "=", self.id), ("model_name", "=", self._name)],
         }
 
+    def handle_journey_drop(self, target_service_id, position):
+        """
+        Handle drop of this service relative to target service in journey widget.
+        Sets daily_prio to target's prio +/- 1 based on position, enabling
+        manual reordering of travel services within the same day.
+
+        Args:
+            target_service_id: ID of the service dropped onto
+            position: 'before' or 'after'
+        """
+        self.ensure_one()
+        target = self.browse(target_service_id)
+        if position == "before":
+            self.daily_prio = target.daily_prio - 1
+        else:  # 'after'
+            self.daily_prio = target.daily_prio + 1
+
 
 class ServiceLeg(models.Model):
     _name = "riverflow.service.leg"
