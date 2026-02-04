@@ -1254,52 +1254,53 @@ class Service(models.Model):
     def handle_journey_drop(self, target_service_id, position, journey_service_ids=None):
         """
         Handle drop of this service relative to target service in journey widget.
-        Sets daily_prio to target's prio +/- 1 based on position, enabling
-        manual reordering of travel services within the same day.
 
-        When other services would have the same or higher priority after the drop,
-        shifts their priorities up to make room. This prevents the bug where dropping
-        has no effect when the source service already has daily_prio = target + 1.
+        Uses a list-based algorithm: get the current sorted order of services,
+        remove the dragged service, insert it at the target position, then
+        renumber all priorities. This correctly handles all edge cases including
+        services with equal priorities, which the previous arithmetic-based
+        algorithm failed to handle.
 
         Args:
             target_service_id: ID of the service dropped onto
             position: 'before' or 'after'
-            journey_service_ids: Optional list of service IDs in the journey, used to
-                scope which services should have their priorities shifted. If not
-                provided, falls back to using parent_id to find siblings.
+            journey_service_ids: Optional list of service IDs in the journey. Required
+                for the reordering to work correctly. If not provided, falls back to
+                simple priority assignment (legacy behavior).
         """
         self.ensure_one()
         target = self.browse(target_service_id)
 
-        # Calculate new priority: place before or after target
-        if position == "before":
-            new_prio = target.daily_prio - 1
-        else:  # 'after'
-            new_prio = target.daily_prio + 1
+        if not journey_service_ids:
+            # Legacy fallback: just set priority relative to target
+            # This won't handle equal priorities correctly but maintains backward compat
+            if position == "before":
+                self.daily_prio = target.daily_prio - 1
+            else:
+                self.daily_prio = target.daily_prio + 1
+            return
 
-        # Find services that need their priorities shifted up to make room.
-        # These are services with the same supply_date and daily_prio >= new_prio.
-        if journey_service_ids:
-            # Use the provided journey service IDs to scope the shift
-            services_to_shift = self.browse(journey_service_ids).filtered(
-                lambda s: s.id != self.id and s.supply_date == self.supply_date and s.daily_prio >= new_prio
-            )
-        else:
-            # Fallback: find siblings by parent_id (for backward compatibility)
-            services_to_shift = self.search(
-                [
-                    ("parent_id", "=", self.parent_id.id),
-                    ("supply_date", "=", self.supply_date),
-                    ("daily_prio", ">=", new_prio),
-                    ("id", "!=", self.id),
-                ]
-            )
+        # Get journey services on same date, sorted by current order.
+        # Use (daily_prio, id) as sort key to get deterministic ordering when
+        # priorities are equal (which is the bug case we're fixing).
+        services = self.browse(journey_service_ids).filtered(
+            lambda s: s.supply_date == self.supply_date
+        ).sorted(key=lambda s: (s.daily_prio, s.id))
 
-        # Shift priorities up in reverse order to avoid conflicts during writes
-        for svc in services_to_shift.sorted(key=lambda s: -s.daily_prio):
-            svc.daily_prio = svc.daily_prio + 1
+        # Build the new order: remove self from current position, insert at target
+        services_list = [s for s in services if s.id != self.id]
+        target_idx = next((i for i, s in enumerate(services_list) if s.id == target.id), None)
 
-        self.daily_prio = new_prio
+        if target_idx is None:
+            return  # Target not found in list
+
+        # Insert at position relative to target
+        insert_idx = target_idx + 1 if position == "after" else target_idx
+        services_list.insert(insert_idx, self)
+
+        # Renumber all services with well-spaced priorities to avoid future collisions
+        for idx, svc in enumerate(services_list):
+            svc.daily_prio = (idx + 1) * 10
 
 
 class ServiceLeg(models.Model):
