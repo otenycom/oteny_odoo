@@ -1255,52 +1255,40 @@ class Service(models.Model):
         """
         Handle drop of this service relative to target service in journey widget.
 
-        Uses a list-based algorithm: get the current sorted order of services,
-        remove the dragged service, insert it at the target position, then
-        renumber all priorities. This correctly handles all edge cases including
-        services with equal priorities, which the previous arithmetic-based
-        algorithm failed to handle.
+        The journey_service_ids list must be in display order (as shown in widget).
+        This method trusts that order and does not re-sort, ensuring the drop
+        always works correctly regardless of initial priority values.
 
         Args:
             target_service_id: ID of the service dropped onto
             position: 'before' or 'after'
-            journey_service_ids: Optional list of service IDs in the journey. Required
-                for the reordering to work correctly. If not provided, falls back to
-                simple priority assignment (legacy behavior).
+            journey_service_ids: List of service IDs in display order (required)
         """
         self.ensure_one()
-        target = self.browse(target_service_id)
-
         if not journey_service_ids:
-            # Legacy fallback: just set priority relative to target
-            # This won't handle equal priorities correctly but maintains backward compat
-            if position == "before":
-                self.daily_prio = target.daily_prio - 1
-            else:
-                self.daily_prio = target.daily_prio + 1
-            return
+            return  # Required for reordering
 
-        # Get journey services on same date, sorted by current order.
-        # Use (daily_prio, id) as sort key to get deterministic ordering when
-        # priorities are equal (which is the bug case we're fixing).
-        services = self.browse(journey_service_ids).filtered(
-            lambda s: s.supply_date == self.supply_date
-        ).sorted(key=lambda s: (s.daily_prio, s.id))
+        # Filter to same date, preserving the display order from the widget.
+        # The widget passes IDs in display order, so we trust that sequence.
+        same_date_ids = [
+            sid for sid in journey_service_ids
+            if self.browse(sid).supply_date == self.supply_date
+        ]
 
         # Build the new order: remove self from current position, insert at target
-        services_list = [s for s in services if s.id != self.id]
-        target_idx = next((i for i, s in enumerate(services_list) if s.id == target.id), None)
-
-        if target_idx is None:
+        services_list = [sid for sid in same_date_ids if sid != self.id]
+        try:
+            target_idx = services_list.index(target_service_id)
+        except ValueError:
             return  # Target not found in list
 
         # Insert at position relative to target
         insert_idx = target_idx + 1 if position == "after" else target_idx
-        services_list.insert(insert_idx, self)
+        services_list.insert(insert_idx, self.id)
 
-        # Renumber all services with well-spaced priorities to avoid future collisions
-        for idx, svc in enumerate(services_list):
-            svc.daily_prio = (idx + 1) * 10
+        # Renumber all services with well-spaced priorities
+        for idx, service_id in enumerate(services_list):
+            self.browse(service_id).daily_prio = (idx + 1) * 10
 
 
 class ServiceLeg(models.Model):
