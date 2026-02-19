@@ -253,10 +253,9 @@ def _patched_run_suite(suite, global_report=None):
     if _is_post_install_phase() and _should_parallelize(suite):
         try:
             return _parallel_run(suite, global_report)
-        except Exception:
-            _logger.warning(
-                "Parallel execution failed, falling back to sequential",
-                exc_info=True,
+        except Exception as exc:
+            _logger.info(
+                "Parallel execution unavailable, running sequentially (%s)", exc
             )
 
     # Path 3: sequential (at-install, single class, or fallback)

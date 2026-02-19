@@ -112,7 +112,7 @@ def clone_databases(base_db, count):
         _stdout, stderr = proc.communicate()
         if proc.returncode != 0:
             err = stderr.decode().strip()
-            _logger.error("Failed to clone %s -> %s: %s", base_db, clone_name, err)
+            _logger.info("Cannot clone %s -> %s: %s", base_db, clone_name, err)
             drop_databases(created)
             raise RuntimeError(f"Database cloning failed: {err}")
         created.append(clone_name)
