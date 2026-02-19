@@ -110,9 +110,12 @@ def _worker_run(suite, batch_spec, global_report):
     filtered_suite = OdooSuite(filtered)
     result = _original_run_suite(filtered_suite, global_report=global_report)
 
-    # Write structured result for the master process
+    # Write structured result for the master process, including per-class
+    # timing so the master can update the stats file for future balancing
     result_file = os.environ.get("ODOO_PARALLEL_RESULT")
     if result_file:
+        from .stats import extract_class_durations
+
         with open(result_file, "w") as f:
             json.dump(
                 {
@@ -120,6 +123,7 @@ def _worker_run(suite, batch_spec, global_report):
                     "errors_count": result.errors_count,
                     "testsRun": result.testsRun,
                     "skipped": result.skipped,
+                    "class_durations": extract_class_durations(result),
                 },
                 f,
             )
@@ -159,7 +163,13 @@ def _parallel_run(suite, global_report):
         worker_count,
     )
 
-    batches = build_batches(class_groups, worker_count)
+    # Load prior timing stats for duration-based balancing (LPT);
+    # falls back to round-robin if no stats file exists yet
+    from .stats import load_stats, save_stats
+
+    class_durations = load_stats()
+
+    batches = build_batches(class_groups, worker_count, class_durations)
     actual_workers = len(batches)
     if actual_workers < worker_count:
         _logger.info(
@@ -221,11 +231,20 @@ def _parallel_run(suite, global_report):
         aggregated,
     )
 
-    # Clean up cloned databases
-    if not config.keep_clones():
+    # Merge per-class durations from all workers into the persistent stats
+    # file so the next run can use LPT balancing
+    all_durations = {}
+    for wr in worker_results:
+        tr = wr.get("test_result")
+        if tr and "class_durations" in tr:
+            all_durations.update(tr["class_durations"])
+    if all_durations:
+        save_stats(all_durations)
+
+    # Keep clones for reuse on the next run (default). Stale clones are
+    # cleaned up at the start of the next run inside clone_databases().
+    if not config.reuse_clones():
         drop_databases(clone_names)
-    else:
-        _logger.info("Keeping cloned databases: %s", clone_names)
 
     return aggregated
 

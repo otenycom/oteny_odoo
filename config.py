@@ -9,8 +9,14 @@ import os
 
 
 def get_worker_count():
-    """Number of parallel test workers. Defaults to half CPU cores, min 2, max 8."""
-    default = min(8, max(2, multiprocessing.cpu_count() // 2))
+    """
+    Number of parallel test workers. Defaults to 80% of CPU cores,
+    with a minimum of 2 and a maximum of 16.
+    """
+    cores = multiprocessing.cpu_count()
+    # Calculate 80% of available cores, rounding down
+    calculated = max(2, int(cores * 0.8))
+    default = min(16, calculated)
     return int(os.environ.get("ODOO_TEST_WORKERS", default))
 
 
@@ -29,6 +35,15 @@ def get_clone_prefix():
     return os.environ.get("ODOO_TEST_CLONE_PREFIX", "{db}-worker-")
 
 
+def reuse_clones():
+    """
+    Whether to keep clone databases between runs and reuse them when the
+    base DB schema has not changed. Defaults to True — saves ~9s on
+    repeated runs. Set to false to always create fresh clones.
+    """
+    return os.environ.get("ODOO_TEST_REUSE_CLONES", "true").lower() not in ("false", "0", "no")
+
+
 def keep_clones():
-    """Whether to keep cloned databases after the run (useful for debugging)."""
-    return os.environ.get("ODOO_TEST_KEEP_CLONES", "false").lower() in ("true", "1", "yes")
+    """Legacy alias — reuse_clones supersedes this."""
+    return reuse_clones()

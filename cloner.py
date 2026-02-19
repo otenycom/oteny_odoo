@@ -5,17 +5,25 @@ Uses PostgreSQL's createdb -T (template clone) which is fast because
 it does a file-level copy. Requires no active connections on the
 template database during cloning.
 
-Cloning and cleanup run as concurrent subprocesses to overlap the
-per-process overhead. PostgreSQL serializes createdb -T against the
-same template via locks, but we still save on subprocess startup,
-dropdb cleanup, and especially the drop phase at the end.
+Clone reuse: after a parallel run, clones are kept. On the next run a
+schema fingerprint (md5 of all public table columns + types) detects
+whether the base DB was upgraded. If unchanged AND the right number of
+clones still exist, cloning is skipped entirely (~0s vs ~9s).
 """
 
+import json
 import logging
 import os
 import subprocess
 
 _logger = logging.getLogger(__name__)
+
+CLONE_STATE_PATH = "/tmp/odoo_parallel_test_clones.json"
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL helpers
+# ---------------------------------------------------------------------------
 
 
 def _get_pg_env():
@@ -54,14 +62,93 @@ def _terminate_connections(db_name):
     subprocess.run(cmd, env=env, capture_output=True)
 
 
+# ---------------------------------------------------------------------------
+# Schema fingerprint & clone state persistence
+# ---------------------------------------------------------------------------
+
+
+def _get_db_fingerprint(db_name):
+    """
+    Compute an md5 hash of the database's public schema (all table columns
+    and their types). Changes whenever -u adds, removes, or changes any
+    column — even without a manifest version bump.
+    """
+    env = _get_pg_env()
+    args = _get_pg_args()
+    sql = (
+        "SELECT md5(string_agg("
+        "schemaname || '.' || tablename || ':' || attname || '=' || typname, "
+        "',' ORDER BY schemaname, tablename, attname)) "
+        "FROM ("
+        "  SELECT s.nspname AS schemaname, c.relname AS tablename, "
+        "         a.attname, t.typname "
+        "  FROM pg_attribute a "
+        "  JOIN pg_class c ON a.attrelid = c.oid "
+        "  JOIN pg_namespace s ON c.relnamespace = s.oid "
+        "  JOIN pg_type t ON a.atttypid = t.oid "
+        "  WHERE s.nspname = 'public' AND c.relkind = 'r' "
+        "    AND a.attnum > 0 AND NOT a.attisdropped"
+        ") sub"
+    )
+    cmd = ["psql", "-d", db_name] + args + ["-t", "-A", "-c", sql]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return None
+
+
+def _load_clone_state():
+    """Load the clone state file. Returns dict or empty dict on any error."""
+    if not os.path.exists(CLONE_STATE_PATH):
+        return {}
+    try:
+        with open(CLONE_STATE_PATH) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_clone_state(base_db, fingerprint, clone_names):
+    """Persist the clone state so the next run can attempt reuse."""
+    try:
+        with open(CLONE_STATE_PATH, "w") as f:
+            json.dump(
+                {
+                    "base_db": base_db,
+                    "fingerprint": fingerprint,
+                    "clone_names": clone_names,
+                    "worker_count": len(clone_names),
+                },
+                f,
+            )
+    except OSError as exc:
+        _logger.warning("Could not save clone state: %s", exc)
+
+
+def _clones_exist(clone_names):
+    """Verify all clone databases exist in PostgreSQL."""
+    env = _get_pg_env()
+    args = _get_pg_args()
+    cmd = ["psql", "-d", "postgres"] + args + ["-t", "-A", "-c",
+           "SELECT datname FROM pg_database"]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        return False
+    existing = set(result.stdout.strip().splitlines())
+    return all(name in existing for name in clone_names)
+
+
+# ---------------------------------------------------------------------------
+# Clone / reuse
+# ---------------------------------------------------------------------------
+
+
 def clone_databases(base_db, count):
     """
-    Clone the base test database into N worker databases.
+    Provide N worker databases, either by reusing existing clones (when the
+    base DB schema has not changed and the right number of clones still exist)
+    or by creating fresh clones via createdb -T.
 
-    Closes Odoo's connection pool first so createdb -T can acquire
-    exclusive access to the template. Launches all clone operations
-    concurrently — PostgreSQL serializes the template lock internally,
-    but we overlap subprocess startup and the dropdb cleanup.
     Returns list of clone db names.
     """
     from . import config
@@ -69,19 +156,53 @@ def clone_databases(base_db, count):
     prefix = config.get_clone_prefix().replace("{db}", base_db)
     clone_names = [f"{prefix}{i}" for i in range(count)]
 
-    # Close Odoo's connections to allow createdb -T to access the template
+    # Check if we can reuse clones from the previous run
+    if config.reuse_clones():
+        fingerprint = _get_db_fingerprint(base_db)
+        state = _load_clone_state()
+        if (
+            fingerprint
+            and state.get("base_db") == base_db
+            and state.get("fingerprint") == fingerprint
+            and state.get("worker_count") == count
+            and state.get("clone_names") == clone_names
+            and _clones_exist(clone_names)
+        ):
+            _logger.info("Reusing %d existing clone databases (schema unchanged)", count)
+            return clone_names
+        _logger.info("Clone cache miss — creating fresh clones")
+    else:
+        fingerprint = None
+
+    # Need fresh clones — close connections and clone
+    _fresh_clone(base_db, clone_names)
+
+    # Save state for future reuse
+    if config.reuse_clones():
+        if not fingerprint:
+            fingerprint = _get_db_fingerprint(base_db)
+        if fingerprint:
+            _save_clone_state(base_db, fingerprint, clone_names)
+
+    return clone_names
+
+
+def _fresh_clone(base_db, clone_names):
+    """
+    Drop any existing clones and create fresh ones from the base database.
+
+    Closes Odoo's connection pool first so createdb -T can acquire exclusive
+    access to the template. Launches all operations concurrently.
+    """
     import odoo.sql_db
 
     odoo.sql_db.close_db(base_db)
-
-    # Belt-and-suspenders: also terminate via psql in case other processes
-    # (e.g. pgAdmin, monitoring) hold connections
     _terminate_connections(base_db)
 
     env = _get_pg_env()
     pg_args = _get_pg_args()
 
-    # Phase 1: drop leftover clones in parallel (fully independent)
+    # Phase 1: drop stale clones in parallel
     drop_procs = []
     for clone_name in clone_names:
         proc = subprocess.Popen(
@@ -117,8 +238,6 @@ def clone_databases(base_db, count):
             raise RuntimeError(f"Database cloning failed: {err}")
         created.append(clone_name)
         _logger.info("Cloned database: %s", clone_name)
-
-    return clone_names
 
 
 def drop_databases(clone_names):
