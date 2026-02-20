@@ -299,4 +299,9 @@ def _apply():
     )
 
 
-_apply()
+# Guard: only patch when running tests. Importing odoo.tests outside of test
+# mode triggers an ERROR log in odoo.tests.common (Odoo 19 safeguard).
+from odoo.tools import config as odoo_config
+
+if odoo_config["test_enable"]:
+    _apply()
