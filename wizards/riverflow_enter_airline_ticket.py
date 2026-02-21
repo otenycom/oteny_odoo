@@ -58,5 +58,11 @@ class RiverflowEnterAirlineTicketWizard(models.TransientModel):
             service.message_post(
                 attachment_ids=self.attachment_ids.ids,
             )
+            self._after_ticket_attachment_posted(service)
         elif service.message_attachment_count == 0:
             raise UserError("Please attach the ticket file.")
+
+    def _after_ticket_attachment_posted(self, service):
+        """Hook called after new ticket attachments are posted to the service.
+        Override in downstream modules to add post-upload processing (e.g. PDF parsing)."""
+        pass
