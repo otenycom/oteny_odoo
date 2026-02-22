@@ -62,6 +62,26 @@ def _terminate_connections(db_name):
     subprocess.run(cmd, env=env, capture_output=True)
 
 
+def _can_createdb():
+    """
+    Pre-flight check: verify that createdb will work by testing the
+    pg_catalog.set_config permission that createdb uses internally.
+    On managed PostgreSQL hosts (e.g. Odoo.sh) this permission is
+    sometimes revoked, causing createdb to fail with zombie processes.
+    """
+    env = _get_pg_env()
+    args = _get_pg_args()
+    sql = "SELECT pg_catalog.set_config('search_path', '', false);"
+    cmd = ["psql", "-d", "postgres"] + args + ["-t", "-A", "-c", sql]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        _logger.info(
+            "Parallel cloning unavailable: pg_catalog.set_config permission denied"
+        )
+        return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Schema fingerprint & clone state persistence
 # ---------------------------------------------------------------------------
@@ -150,11 +170,19 @@ def clone_databases(base_db, count):
     or by creating fresh clones via createdb -T.
 
     Returns list of clone db names.
+    Raises RuntimeError if cloning is not possible (e.g. permission issues).
     """
     from . import config
 
     prefix = config.get_clone_prefix().replace("{db}", base_db)
     clone_names = [f"{prefix}{i}" for i in range(count)]
+
+    # Pre-flight: verify we have the permissions that createdb needs.
+    # Avoids spawning N doomed processes that become zombies on failure.
+    if not _can_createdb():
+        raise RuntimeError(
+            "Database cloning unavailable: insufficient PostgreSQL permissions"
+        )
 
     # Check if we can reuse clones from the previous run
     if config.reuse_clones():
@@ -227,17 +255,25 @@ def _fresh_clone(base_db, clone_names):
         )
         clone_procs.append((clone_name, proc))
 
-    # Collect results; abort on first failure
+    # Collect results; on failure, wait for ALL remaining processes before
+    # raising to prevent zombie processes lingering until the test harness
+    # detects and warns about them.
     created = []
+    first_error = None
     for clone_name, proc in clone_procs:
         _stdout, stderr = proc.communicate()
         if proc.returncode != 0:
             err = stderr.decode().strip()
             _logger.info("Cannot clone %s -> %s: %s", base_db, clone_name, err)
-            drop_databases(created)
-            raise RuntimeError(f"Database cloning failed: {err}")
-        created.append(clone_name)
-        _logger.info("Cloned database: %s", clone_name)
+            if first_error is None:
+                first_error = err
+        else:
+            created.append(clone_name)
+            _logger.info("Cloned database: %s", clone_name)
+
+    if first_error is not None:
+        drop_databases(created)
+        raise RuntimeError(f"Database cloning failed: {first_error}")
 
 
 def drop_databases(clone_names):
