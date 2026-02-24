@@ -5,10 +5,13 @@ Uses PostgreSQL's createdb -T (template clone) which is fast because
 it does a file-level copy. Requires no active connections on the
 template database during cloning.
 
-Clone reuse: after a parallel run, clones are kept. On the next run a
-schema fingerprint (md5 of all public table columns + types) detects
-whether the base DB was upgraded. If unchanged AND the right number of
-clones still exist, cloning is skipped entirely (~0s vs ~9s).
+Clone reuse: after a parallel run, clones are kept. On the next run two
+fingerprints detect whether the base DB has changed:
+1. Schema fingerprint — md5 of all public table columns + types
+2. XML-ID fingerprint — md5 of ir_model_data rows (module.name=model:res_id)
+If both match AND the right number of clones still exist, cloning is
+skipped entirely (~0s vs ~9s). The XML-ID fingerprint catches the common
+case where noupdate=1 data records are added without schema changes.
 """
 
 import json
@@ -117,6 +120,30 @@ def _get_db_fingerprint(db_name):
     return None
 
 
+def _get_xmlid_fingerprint(db_name):
+    """
+    Compute an md5 hash of ir_model_data rows (XML IDs). Detects when
+    -u or -i adds/removes/changes data records without altering the schema.
+
+    This catches the common case where noupdate=1 records are added to XML
+    data files: the schema fingerprint stays the same (no new columns), but
+    the clones are stale because they lack the new data records.
+    """
+    env = _get_pg_env()
+    args = _get_pg_args()
+    sql = (
+        "SELECT md5(string_agg("
+        "module || '.' || name || '=' || model || ':' || res_id::text, "
+        "',' ORDER BY module, name)) "
+        "FROM ir_model_data"
+    )
+    cmd = ["psql", "-d", db_name] + args + ["-t", "-A", "-c", sql]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return None
+
+
 def _load_clone_state():
     """Load the clone state file. Returns dict or empty dict on any error."""
     if not os.path.exists(CLONE_STATE_PATH):
@@ -128,7 +155,7 @@ def _load_clone_state():
         return {}
 
 
-def _save_clone_state(base_db, fingerprint, clone_names):
+def _save_clone_state(base_db, fingerprint, xmlid_fingerprint, clone_names):
     """Persist the clone state so the next run can attempt reuse."""
     try:
         with open(CLONE_STATE_PATH, "w") as f:
@@ -136,6 +163,7 @@ def _save_clone_state(base_db, fingerprint, clone_names):
                 {
                     "base_db": base_db,
                     "fingerprint": fingerprint,
+                    "xmlid_fingerprint": xmlid_fingerprint,
                     "clone_names": clone_names,
                     "worker_count": len(clone_names),
                 },
@@ -184,23 +212,41 @@ def clone_databases(base_db, count):
             "Database cloning unavailable: insufficient PostgreSQL permissions"
         )
 
-    # Check if we can reuse clones from the previous run
+    # Check if we can reuse clones from the previous run.
+    # Both the schema fingerprint (column definitions) and the XML-ID
+    # fingerprint (ir_model_data rows) must match. The XML-ID check
+    # catches additions of noupdate=1 data records that don't alter
+    # the schema but do change the database content.
     if config.reuse_clones():
         fingerprint = _get_db_fingerprint(base_db)
+        xmlid_fingerprint = _get_xmlid_fingerprint(base_db)
         state = _load_clone_state()
         if (
             fingerprint
+            and xmlid_fingerprint
             and state.get("base_db") == base_db
             and state.get("fingerprint") == fingerprint
+            and state.get("xmlid_fingerprint") == xmlid_fingerprint
             and state.get("worker_count") == count
             and state.get("clone_names") == clone_names
             and _clones_exist(clone_names)
         ):
-            _logger.info("Reusing %d existing clone databases (schema unchanged)", count)
+            _logger.info("Reusing %d existing clone databases (schema and XML IDs unchanged)", count)
             return clone_names
-        _logger.info("Clone cache miss — creating fresh clones")
+        if state:
+            reasons = []
+            if state.get("fingerprint") != fingerprint:
+                reasons.append("schema changed")
+            if state.get("xmlid_fingerprint") != xmlid_fingerprint:
+                reasons.append("XML IDs changed")
+            if state.get("worker_count") != count:
+                reasons.append("worker count changed")
+            _logger.info("Clone cache miss — %s", ", ".join(reasons) if reasons else "creating fresh clones")
+        else:
+            _logger.info("Clone cache miss — no prior state")
     else:
         fingerprint = None
+        xmlid_fingerprint = None
 
     # Need fresh clones — close connections and clone
     _fresh_clone(base_db, clone_names)
@@ -209,8 +255,10 @@ def clone_databases(base_db, count):
     if config.reuse_clones():
         if not fingerprint:
             fingerprint = _get_db_fingerprint(base_db)
+        if not xmlid_fingerprint:
+            xmlid_fingerprint = _get_xmlid_fingerprint(base_db)
         if fingerprint:
-            _save_clone_state(base_db, fingerprint, clone_names)
+            _save_clone_state(base_db, fingerprint, xmlid_fingerprint, clone_names)
 
     return clone_names
 
