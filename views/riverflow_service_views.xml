@@ -63,7 +63,7 @@
 
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
-                            <field name="daily_prio" />
+                            <field name="daily_prio" options="{'enable_formatting': false}" />
                             <field name="use_project_deadline_from" widget="filterable_selection"
                                 options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
                             <field
@@ -155,7 +155,7 @@
                                         decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                         decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                                     /> -->
-                                    <field name="daily_prio" optional="hide" />
+                                    <field name="daily_prio" optional="hide" options="{'enable_formatting': false}" />
 
                                     <field name="end_date" optional="hide" />
                                     <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
@@ -286,7 +286,7 @@
                     decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                     decoration-muted="is_end_state" />
-                <field name="daily_prio" optional="hide" />
+                <field name="daily_prio" optional="hide" options="{'enable_formatting': false}" />
                 <field name="end_date" optional="hide" />
                 <field name="write_uid" string="Updated By" optional="hide" />
                 <field name="write_date" string="Updated On" optional="hide" />

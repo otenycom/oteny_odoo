@@ -223,8 +223,8 @@ class Service(models.Model):
 
     daily_prio = fields.Integer(
         default=1,
-        string="Priority",
-        help="Orders services that have the same deadline",
+        string="Departure Time or Priority",
+        help="Use HHMM format (e.g. 0830 for 08:30, 1110 for 11:10) to control the departure time in the journey timeline.",
         required=True,
     )
 
@@ -507,7 +507,7 @@ class Service(models.Model):
             else:
                 sortable_deadline = self._generate_sortable_root_deadline().strftime("%Y-%m-%d")
 
-            service.root_name = f"{sortable_deadline} {root_service.daily_prio:03d} {root_service.name}"
+            service.root_name = f"{sortable_deadline} {root_service.daily_prio:04d} {root_service.name}"
 
     def _generate_sortable_root_deadline(self):
         # In the derived class', generate date with day offset for sorting templates
@@ -1271,8 +1271,7 @@ class Service(models.Model):
         # Filter to same date, preserving the display order from the widget.
         # The widget passes IDs in display order, so we trust that sequence.
         same_date_ids = [
-            sid for sid in journey_service_ids
-            if self.browse(sid).supply_date == self.supply_date
+            sid for sid in journey_service_ids if self.browse(sid).supply_date == self.supply_date
         ]
 
         # Build the new order: remove self from current position, insert at target
@@ -1286,9 +1285,10 @@ class Service(models.Model):
         insert_idx = target_idx + 1 if position == "after" else target_idx
         services_list.insert(insert_idx, self.id)
 
-        # Renumber all services with well-spaced priorities
+        # Renumber all services with well-spaced priorities.
+        # Uses *100 spacing to accommodate HHMM time-based daily_prio values.
         for idx, service_id in enumerate(services_list):
-            self.browse(service_id).daily_prio = (idx + 1) * 10
+            self.browse(service_id).daily_prio = (idx + 1) * 100
 
 
 class ServiceLeg(models.Model):
