@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Extend the ir.filters form view with shortcut fields -->
+    <record id="ir_filters_view_form_shortcut" model="ir.ui.view">
+        <field name="name">ir.filters.form.shortcut</field>
+        <field name="model">ir.filters</field>
+        <field name="inherit_id" ref="base.ir_filters_view_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//group/group[last()]" position="after">
+                <group string="Shortcut Banner">
+                    <field name="shortcut_sequence" />
+                    <field name="shortcut_view_type" />
+                    <field name="shortcut_icon" placeholder="e.g. fa-clock-o" />
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Extend the ir.filters list view with shortcut columns -->
+    <record id="ir_filters_view_tree_shortcut" model="ir.ui.view">
+        <field name="name">ir.filters.list.shortcut</field>
+        <field name="model">ir.filters</field>
+        <field name="inherit_id" ref="base.ir_filters_view_tree" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='is_default']" position="after">
+                <field name="shortcut_sequence" optional="show" string="Shortcut Seq." />
+                <field name="shortcut_view_type" optional="show" string="Shortcut View" />
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Extend the ir.filters search view with shortcut filter -->
+    <record id="ir_filters_view_search_shortcut" model="ir.ui.view">
+        <field name="name">ir.filters.search.shortcut</field>
+        <field name="model">ir.filters</field>
+        <field name="inherit_id" ref="base.ir_filters_view_search" />
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='inactive']" position="before">
+                <filter string="Shortcuts" name="shortcuts" domain="[('shortcut_sequence', '&gt;', 0)]" />
+                <separator />
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
