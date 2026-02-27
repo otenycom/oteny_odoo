@@ -35,7 +35,8 @@
         <field name="name">riverflow.state.record.list</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
-            <list action="row_click" type="object"
+            <list js_class="shortcut_list"
+                action="row_click" type="object"
                 create="0" edit="0" delete="0"
                 decoration-info="is_subject and not is_end_state"
                 decoration-success="is_subject and is_end_state"

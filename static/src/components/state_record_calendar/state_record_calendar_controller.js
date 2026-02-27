@@ -1,10 +1,10 @@
 /** @odoo-module **/
 
-import { CalendarController } from "@web/views/calendar/calendar_controller";
+import { ShortcutCalendarController } from "@oteny_shortcut/views/shortcut_calendar/shortcut_calendar_controller";
 import { FormViewDialog } from "@web/views/view_dialogs/form_view_dialog";
 import { useService } from "@web/core/utils/hooks";
 
-export class StateRecordCalendarController extends CalendarController {
+export class StateRecordCalendarController extends ShortcutCalendarController {
     setup() {
         super.setup();
         this.actionService = useService("action");
