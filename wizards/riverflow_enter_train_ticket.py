@@ -60,9 +60,22 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
             # Using existing attachment from the service
             pass
         elif self.attachment_ids:
-            # Attach new files (one or more)
+            # Post new files to the service chatter. Include file names as body
+            # text so Odoo's JS showDelete logic sees hasTextContent=true and
+            # renders the delete button (without body text, single-attachment
+            # notification messages have no way to be removed from the chatter).
+            att_names = ", ".join(self.attachment_ids.mapped("name"))
             service.message_post(
+                body=att_names,
                 attachment_ids=self.attachment_ids.ids,
+            )
+            # Re-link attachments from the transient wizard to the service record.
+            # Odoo's _process_attachments_for_post only re-links attachments from
+            # mail.compose.message; wizard-originated attachments stay orphaned
+            # on res_model='wizard' / res_id=0 which breaks server-side delete
+            # access checks. Follows the pattern from purchase_order.py.
+            self.attachment_ids.write(
+                {"res_model": service._name, "res_id": service.id}
             )
             self._after_ticket_attachment_posted(service)
         elif service.message_attachment_count == 0:
