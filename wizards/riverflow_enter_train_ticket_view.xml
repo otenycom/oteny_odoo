@@ -8,11 +8,11 @@
                 <sheet>
                     <group>
                         <field name="date" />
-                        <field name="from_station" />
-                        <field name="to_station" />
+                        <field name="from_station" required="1" />
+                        <field name="to_station" required="1" />
                         <field name="is_round_trip" />
 
-                        <field name="price" />
+                        <field name="price" required="1" />
                         <field name="notes" />
 
                         <field name="attachment_ids" widget="many2many_binary" invisible="use_existing_attachment" />

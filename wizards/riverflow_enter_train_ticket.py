@@ -8,10 +8,10 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
     _description = "Enter Train Ticket Wizard"
 
     date = fields.Date(string="Date", required=True)
-    from_station = fields.Char(string="From", required=True)
-    to_station = fields.Char(string="To", required=True)
+    from_station = fields.Char(string="From")
+    to_station = fields.Char(string="To")
     is_round_trip = fields.Boolean(string="Is Round Trip")
-    price = fields.Float(string="Price", required=True)
+    price = fields.Float(string="Price")
     notes = fields.Text(string="Notes")
     attachment_ids = fields.Many2many(
         "ir.attachment",
@@ -69,6 +69,15 @@ class RiverflowEnterTrainTicketWizard(models.TransientModel):
             # No attachments at all - require at least one
             raise UserError("Please attach at least one file.")
 
+        self._process_legs(service)
+
+    def _process_legs(self, service):
+        """Create or update legs on the service from wizard field values.
+
+        Hook method: downstream modules (e.g. crewradar_wilma) can override
+        to skip manual leg creation when AI parsing already produced legs
+        with richer data (place_ids, distance, duration).
+        """
         service.write(
             {
                 "leg_ids": [
