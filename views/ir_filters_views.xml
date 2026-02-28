@@ -12,6 +12,7 @@
                     <field name="shortcut_sequence" />
                     <field name="shortcut_view_type" />
                     <field name="shortcut_icon" placeholder="e.g. fa-clock-o" />
+                    <field name="shortcut_layout" readonly="1" />
                 </group>
             </xpath>
         </field>

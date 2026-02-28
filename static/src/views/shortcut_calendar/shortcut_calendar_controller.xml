@@ -3,7 +3,7 @@
 
     <t t-name="oteny_shortcut.ShortcutCalendarView" t-inherit="web.CalendarController" t-inherit-mode="primary">
         <xpath expr="//div[hasclass('o_calendar_container')]" position="before">
-            <ViewShortcutsBanner />
+            <ViewShortcutsBanner getViewLayout.bind="getViewLayout" applyViewLayout.bind="applyViewLayout"/>
         </xpath>
     </t>
 

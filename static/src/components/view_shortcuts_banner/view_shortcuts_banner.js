@@ -5,7 +5,10 @@ import { useBus, useService } from "@web/core/utils/hooks";
 
 export class ViewShortcutsBanner extends Component {
     static template = "oteny_shortcut.ViewShortcutsBanner";
-    static props = {};
+    static props = {
+        getViewLayout: { type: Function, optional: true },
+        applyViewLayout: { type: Function, optional: true },
+    };
 
     setup() {
         this.orm = useService("orm");
@@ -17,6 +20,10 @@ export class ViewShortcutsBanner extends Component {
         });
         // Maps ir.filters record id -> searchModel searchItem id
         this._serverIdToSearchItemId = {};
+        // Tracks which shortcut's layout was last applied, so we only
+        // re-apply when the active shortcut actually changes (not on
+        // every SearchModel update like sort or pagination).
+        this._lastAppliedLayoutId = null;
 
         onWillStart(async () => {
             const resModel = this.env.searchModel.resModel;
@@ -53,6 +60,8 @@ export class ViewShortcutsBanner extends Component {
     /**
      * Check the SearchModel query to determine which shortcuts correspond
      * to an active favorite, and update the highlighted button state.
+     * Also auto-applies stored layout when the active shortcut changes
+     * (including on initial page load).
      */
     _syncActiveState() {
         const activeSearchItemIds = new Set(
@@ -66,6 +75,41 @@ export class ViewShortcutsBanner extends Component {
             }
         }
         this.state.activeIds = activeIds;
+
+        this._applyActiveShortcutLayout();
+    }
+
+    /**
+     * If exactly one shortcut with a stored layout is now active, and it
+     * differs from the last one we applied, push its layout to the
+     * controller. This covers both explicit clicks AND the initial page
+     * load where a favorite is already active from the URL/default.
+     */
+    _applyActiveShortcutLayout() {
+        if (!this.props.applyViewLayout) {
+            return;
+        }
+
+        const shortcut = this._getActiveShortcut();
+        const layoutId = shortcut?.shortcut_layout ? shortcut.id : null;
+
+        if (layoutId === this._lastAppliedLayoutId) {
+            return;
+        }
+        this._lastAppliedLayoutId = layoutId;
+
+        if (shortcut?.shortcut_layout) {
+            try {
+                const layout = JSON.parse(shortcut.shortcut_layout);
+                this.props.applyViewLayout(layout);
+            } catch {
+                // Ignore invalid JSON
+            }
+        } else {
+            // Active shortcut changed to one without layout, or no shortcut
+            // is active -- clear any previously applied layout state.
+            this.props.applyViewLayout(null);
+        }
     }
 
     isActive(shortcut) {
@@ -73,8 +117,55 @@ export class ViewShortcutsBanner extends Component {
     }
 
     /**
+     * True when exactly one shortcut is active, so the Store Layout button
+     * has an unambiguous target filter.
+     */
+    get canStoreLayout() {
+        return this.state.activeIds.size === 1 && !!this.props.getViewLayout;
+    }
+
+    /**
+     * Return the single active shortcut, or null if none/multiple.
+     */
+    _getActiveShortcut() {
+        if (this.state.activeIds.size !== 1) {
+            return null;
+        }
+        const activeId = [...this.state.activeIds][0];
+        return this.state.shortcuts.find((s) => s.id === activeId) || null;
+    }
+
+    /**
+     * Capture the current view layout and open the confirmation wizard.
+     */
+    async onStoreLayout() {
+        const shortcut = this._getActiveShortcut();
+        if (!shortcut || !this.props.getViewLayout) {
+            return;
+        }
+        const layout = this.props.getViewLayout();
+        if (!layout) {
+            return;
+        }
+        await this.actionService.doAction({
+            type: "ir.actions.act_window",
+            res_model: "shortcut.store.layout.wizard",
+            views: [[false, "form"]],
+            target: "new",
+            context: {
+                default_filter_id: shortcut.id,
+                default_layout_json: JSON.stringify(layout),
+            },
+        });
+    }
+
+    /**
      * Activate the favorite matching this shortcut in the SearchModel,
      * then switch view if the shortcut specifies a different view type.
+     *
+     * Layout restoration is handled automatically by _syncActiveState()
+     * which fires on the SearchModel "update" event triggered by
+     * toggleSearchItem().
      */
     async onShortcutClick(shortcut) {
         const searchItemId = this._serverIdToSearchItemId[shortcut.id];

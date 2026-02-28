@@ -13,6 +13,12 @@
                     <t t-esc="shortcut.name"/>
                 </button>
             </t>
+            <button t-if="canStoreLayout"
+                    class="btn btn-sm btn-outline-secondary ms-auto"
+                    title="Store current view layout into the active shortcut"
+                    t-on-click="onStoreLayout">
+                <i class="fa fa-save"/><span class="d-none d-md-inline ms-1">Store Layout</span>
+            </button>
         </div>
     </t>
 

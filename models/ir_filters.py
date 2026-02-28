@@ -22,6 +22,14 @@ class IrFilters(models.Model):
         string="Shortcut Icon",
         help="Font Awesome icon class for the shortcut button, e.g. fa-clock-o",
     )
+    # Layout state captured from the view, stored as JSON.
+    # For list views: {"optional_columns": [...], "column_widths": {...}}
+    # For calendar views: {"scale": "week", "show_weekends": true}
+    shortcut_layout = fields.Text(
+        string="Shortcut Layout",
+        help="JSON layout state captured from the view "
+        "(column selection, widths, calendar scale, etc.)",
+    )
 
     @api.model
     def get_shortcuts(self, res_model, action_id=None):
@@ -39,5 +47,11 @@ class IrFilters(models.Model):
         ]
         return (
             self.search(domain, order="shortcut_sequence, name")
-            .read(["name", "shortcut_sequence", "shortcut_view_type", "shortcut_icon"])
+            .read([
+                "name",
+                "shortcut_sequence",
+                "shortcut_view_type",
+                "shortcut_icon",
+                "shortcut_layout",
+            ])
         )

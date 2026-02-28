@@ -10,6 +10,8 @@
     Any view can opt in via js_class="shortcut_list" or js_class="shortcut_calendar".
     """,
     "data": [
+        "security/ir.model.access.csv",
+        "wizard/store_layout_wizard_views.xml",
         "views/ir_filters_views.xml",
     ],
     "assets": {
