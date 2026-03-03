@@ -28,8 +28,8 @@
         <field name="arch" type="xml">
             <list editable="bottom">
                 <field name="active" column_invisible="1" />
+                <field name="applies_to_model_id" optional="show" />
                 <field name="domain_id" optional="show" />
-                <field name="applies_to_model_id" optional="hide" />
                 <field name="service_template_id" optional="show" />
                 <field name="template_relative_timing" optional="show" />
             </list>
@@ -46,6 +46,10 @@
                 <field name="service_template_id" />
                 <separator />
                 <filter string="Archived" name="inactive" domain="[('active','=',False)]" />
+                <separator />
+                <filter string="Model" name="group_applies_to_model_id" context="{'group_by': 'applies_to_model_id'}" />
+                <filter string="Domain" name="group_domain_id" context="{'group_by': 'domain_id'}" />
+                <filter string="Service Template" name="group_service_template_id" context="{'group_by': 'service_template_id'}" />
             </search>
         </field>
     </record>

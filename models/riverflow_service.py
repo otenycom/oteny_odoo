@@ -43,6 +43,14 @@ class Service(models.Model):
         string="Created by Auto Add Rule",
         help="The auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
     )
+    auto_add_context_ref = fields.Char(
+        string="Auto-Add Context Reference",
+        index=True,
+        help="Contextual key for dedup of auto-added services. Distinguishes "
+        "different occasions for the same auto-add rule on the same subject. "
+        "For example, 'missing' for initial credential arrangement vs "
+        "'cred:42' for renewal of a specific expiring credential.",
+    )
 
     is_this_a_template = fields.Boolean(
         string="Is This a Template",
@@ -1010,6 +1018,7 @@ class Service(models.Model):
             "res_id": self.env.context.get("default_res_id"),
             "res_model": self.env.context.get("default_res_model"),
             "created_by_auto_add_service_id": self.env.context.get("default_created_by_auto_add_service_id"),
+            "auto_add_context_ref": self.env.context.get("default_auto_add_context_ref"),
             "workflow_id": template_service.workflow_id.id,
             "state_id": template_service.state_id.id,
             "responsible_team_id": template_service.responsible_team_id.id,
