@@ -651,6 +651,28 @@
         </field>
     </record>
 
+    <!-- Server action to bulk update service deadlines -->
+    <record id="action_bulk_update_service_deadline" model="ir.actions.server">
+        <field name="name">Update Deadline</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list</field>
+        <field name="code">
+            action = {
+            'name': 'Update Deadline',
+            'type': 'ir.actions.act_window',
+            'res_model': 'crewradar.service.deadline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+            'active_ids': records.ids,
+            'active_model': 'riverflow.service',
+            },
+            }
+        </field>
+    </record>
+
     <!-- Server action to move services to another log entry -->
     <record id="action_move_services_to_log_entry" model="ir.actions.server">
         <field name="name">Move Services to Log Entry</field>
