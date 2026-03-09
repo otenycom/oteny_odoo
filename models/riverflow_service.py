@@ -153,6 +153,20 @@ class Service(models.Model):
         store=True,
     )
 
+    weekend_deadline_rule = fields.Selection(
+        [
+            ("allow", "Allow weekend"),
+            ("friday_before", "Bring to Friday"),
+            ("monday_after", "Delay to Monday"),
+        ],
+        string="Weekend",
+        default="allow",
+        required=True,
+        help="When a computed deadline falls on Saturday or Sunday: "
+        "Allow keeps it, Bring to Friday shifts to the preceding Friday, "
+        "Delay to Monday shifts to the following Monday.",
+    )
+
     # This field is either set manually (if use_project_deadline_from is set to 'self')
     # or it is set to the project_deadline of the root service, or some other related entity in an inherited class
     project_deadline = fields.Date(
@@ -165,7 +179,7 @@ class Service(models.Model):
         recursive=True,
     )
     root_service_deadline = fields.Date(
-        "Top-level service deadline",
+        "Top-level deadline",
         related="root_id.deadline",
         help="Deadline of the top-level parent of this service",
         store=False,
@@ -223,7 +237,7 @@ class Service(models.Model):
 
     daily_prio = fields.Integer(
         default=1,
-        string="Departure Time or Priority",
+        string="Time or Priority",
         help="Use HHMM format (e.g. 0830 for 08:30, 1110 for 11:10) to control the departure time in the journey timeline.",
         required=True,
     )
@@ -633,15 +647,39 @@ class Service(models.Model):
         "use_project_deadline_from",
         "is_days_relative_to_project_applicable",
         "supply_order_service_id.deadline",
+        "weekend_deadline_rule",
     )
     def _compute_deadline(self):
         for service in self:
             if not service.project_deadline:
                 service.deadline = False
             elif service.is_days_relative_to_project_applicable:
-                service.deadline = self.project_deadline + timedelta(days=service.days_relative_to_project)
+                deadline = service.project_deadline + timedelta(days=service.days_relative_to_project)
+                service.deadline = service._apply_weekend_deadline_rule(deadline)
             else:
                 service.deadline = service.project_deadline
+
+    def _apply_weekend_deadline_rule(self, deadline):
+        """Shift a weekend deadline to Friday or Monday based on the service's rule.
+
+        Only called for computed deadlines (is_days_relative_to_project_applicable=True).
+        Manual deadlines (use_project_deadline_from='self') bypass this entirely.
+        """
+        self.ensure_one()
+        if not deadline or self.weekend_deadline_rule == "allow":
+            return deadline
+        weekday = deadline.weekday()  # 0=Monday ... 5=Saturday, 6=Sunday
+        if self.weekend_deadline_rule == "friday_before":
+            if weekday == 5:  # Saturday
+                return deadline - timedelta(days=1)
+            elif weekday == 6:  # Sunday
+                return deadline - timedelta(days=2)
+        elif self.weekend_deadline_rule == "monday_after":
+            if weekday == 5:  # Saturday
+                return deadline + timedelta(days=2)
+            elif weekday == 6:  # Sunday
+                return deadline + timedelta(days=1)
+        return deadline
 
     @api.depends("deadline")
     def _compute_timing_json(self):
@@ -1022,6 +1060,7 @@ class Service(models.Model):
             "supply_order_instructions": template_service.supply_order_instructions,
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
             "daily_prio": template_service.daily_prio,
+            "weekend_deadline_rule": template_service.weekend_deadline_rule,
         }
 
         if deadline:
