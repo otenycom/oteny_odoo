@@ -90,6 +90,22 @@
         <field name="sequence">20</field>
     </record>
 
+    <record id="trans_train_booked_to_not_started" model="riverflow.transition">
+        <field name="name">Back to Not Started</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-undo</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="trans_train_booked_to_cancelled" model="riverflow.transition">
+        <field name="name">Cancel</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_cancelled" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">40</field>
+    </record>
 
     <!-- Transitions from Registered -->
     <record id="trans_train_registered_to_booked" model="riverflow.transition">
@@ -99,6 +115,14 @@
         <field name="action_id" ref="riverflow.transition_action_enter_train_ticket" />
         <field name="icon">fa-pencil</field>
         <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_train_registered_to_cancelled" model="riverflow.transition">
+        <field name="name">Cancel</field>
+        <field name="from_state_id" ref="state_train_registered" />
+        <field name="to_state_id" ref="state_train_cancelled" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
     </record>
 
     <!-- Transitions from Cancelled -->

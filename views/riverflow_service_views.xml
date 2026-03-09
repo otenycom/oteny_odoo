@@ -43,6 +43,7 @@
                             <field name="state_id" on_change="1" invisible="1" />
                             <field name="model" invisible="1" />
                             <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
+                            <field name="company_id" groups="base.group_no_one" />
                             <field name="responsible_team_id" />
                             <field name="tag_ids" widget="many2many_tags"
                                 options="{'color_field': 'color', 'no_create_edit': True}" />
@@ -59,8 +60,6 @@
                             <field name="parent_id" on_change="1" can_create="False"
                                 can_write="True" invisible="1" />
                             <field name="active" invisible="1" />
-                            <field name="company_id" groups="base.group_no_one" />
-
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
                             <field name="daily_prio" options="{'enable_formatting': false}" />
@@ -81,6 +80,7 @@
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
                                 on_change="1" />
+                            <field name="weekend_deadline_rule" invisible="not is_days_relative_to_project_applicable" />
                             <!-- readonly because the deadline because there is an inverse method on it, which will reset use_project_deadline_from back to 'self'
                             to change the deadline for a relative use_project_deadline_from, use the calendar or first set use_project_deadline_from to self  
                             -->
@@ -648,6 +648,28 @@
         <field name="code">
             for record in records:
             record._send_dummy_external_message()
+        </field>
+    </record>
+
+    <!-- Server action to bulk update service deadlines -->
+    <record id="action_bulk_update_service_deadline" model="ir.actions.server">
+        <field name="name">Update Deadline</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list</field>
+        <field name="code">
+            action = {
+            'name': 'Update Deadline',
+            'type': 'ir.actions.act_window',
+            'res_model': 'crewradar.service.deadline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+            'active_ids': records.ids,
+            'active_model': 'riverflow.service',
+            },
+            }
         </field>
     </record>
 
