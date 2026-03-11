@@ -96,7 +96,10 @@ class AutoAddService(models.Model):
         TODO: also make this a log_entry.applicable_auto_add_service_ids field, so that log entry services_ids can take 
         a  dependency on applicable_auto_add_service_ids.domain to make this more responsive
         """
-        auto_add_rules = self.search(
+        # Force active_test=True so deactivated rules are never evaluated,
+        # even when the calling compute method runs with active_test=False
+        # leaked from the ORM's trigger traversal context.
+        auto_add_rules = self.with_context(active_test=True).search(
             [
                 ("applies_to_model", "=", model),
             ]
