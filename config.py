@@ -10,13 +10,13 @@ import os
 
 def get_worker_count():
     """
-    Number of parallel test workers. Defaults to 80% of CPU cores,
-    with a minimum of 2 and a maximum of 16.
+    Number of parallel test workers. Defaults to 120% of CPU cores,
+    with a minimum of 2 and a maximum of 32.
     """
     cores = multiprocessing.cpu_count()
-    # Calculate 80% of available cores, rounding down
-    calculated = max(2, int(cores * 0.8))
-    default = min(16, calculated)
+    # Calculate 120% of available cores, rounding down
+    calculated = max(2, int(cores * 1.2))
+    default = min(32, calculated)
     return int(os.environ.get("ODOO_TEST_WORKERS", default))
 
 

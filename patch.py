@@ -13,6 +13,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
 import time
 
@@ -23,6 +24,11 @@ _logger = logging.getLogger(__name__)
 
 # The original run_suite function, saved before patching
 _original_run_suite = None
+
+# Matches Odoo's test failure log lines produced by OdooTestResult.logError:
+#   TIMESTAMP PID ERROR DB LOGGER: FAIL: TestClass.test_method
+#   TIMESTAMP PID ERROR DB LOGGER: ERROR: TestClass.test_method
+_TEST_FAIL_RE = re.compile(r" ERROR \S+ \S+: (FAIL|ERROR): (\S+\.\S+)")
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +231,32 @@ def _parallel_run(suite, global_report):
                 wr["returncode"],
             )
 
+    # Extract failed/errored test names from worker output for the summary.
+    # OdooTestResult only keeps counts (not names), so we parse the log lines
+    # that logError() emits at ERROR level.
+    all_failed_tests = []
+    for wr in worker_results:
+        idx = wr["index"]
+        for line in wr["output"].splitlines():
+            m = _TEST_FAIL_RE.search(line)
+            if m:
+                all_failed_tests.append((m.group(1), m.group(2), idx))
+
     _logger.info(
         "Parallel run complete in %.1fs: %s",
         elapsed,
         aggregated,
     )
+
+    if all_failed_tests:
+        summary_lines = [
+            f"  {flavour}: {test_name} (worker {widx})"
+            for flavour, test_name, widx in all_failed_tests
+        ]
+        _logger.error(
+            "FAILED TESTS:\n%s",
+            "\n".join(summary_lines),
+        )
 
     # Merge per-class durations from all workers into the persistent stats
     # file so the next run can use LPT balancing
