@@ -1,6 +1,6 @@
 {
     "name": "View Shortcuts",
-    "version": "19.0.1.3",
+    "version": "19.0.1.4",
     "depends": ["web"],
     "author": "Oteny",
     "category": "Tools",
