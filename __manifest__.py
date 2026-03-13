@@ -32,7 +32,6 @@
         "views/riverflow_team_views.xml",
         "views/riverflow_auto_add_domain_views.xml",
         "views/riverflow_auto_add_service_views.xml",
-        "views/riverflow_check_result_views.xml",
         "views/res_config_settings_views.xml",
         "data/transition_action_data.xml",
         "data/workflow_service_task.xml",
