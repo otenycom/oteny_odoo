@@ -1,13 +1,20 @@
-import { utils, SIZES } from "@web/core/ui/ui_service";
 import { cookie } from "@web/core/browser/cookie";
 
-// Force chatter to be always at the bottom
-const orgUtilsGetSize = utils.getSize;
-utils.getSize = () => {
-    let size = orgUtilsGetSize();
-    if (size > SIZES.XL) size = SIZES.XL;
-    return size;
-};
+// The XL size cap below was used to force the chatter to always render below
+// the form sheet instead of beside it. Commented out because it also prevents
+// the o_attachment_preview sidebar (PDF/image preview) from rendering — that
+// component only activates at the XXL breakpoint (>= 1400px). With the cap
+// removed, wide screens get the standard Odoo XXL layout: chatter beside the
+// form on regular forms, or attachment preview beside the form + chatter below
+// on forms with o_attachment_preview (e.g. credentials, invoices).
+//
+// import { utils, SIZES } from "@web/core/ui/ui_service";
+// const orgUtilsGetSize = utils.getSize;
+// utils.getSize = () => {
+//     let size = orgUtilsGetSize();
+//     if (size > SIZES.XL) size = SIZES.XL;
+//     return size;
+// };
 
 // --- HACK to set default companies on first load ---
 // On initial load, this checks if the 'cids' cookie is present.
