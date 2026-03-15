@@ -78,6 +78,14 @@ class AutoAddService(models.Model):
             "ref": self.env.ref,
         }
 
+    def _filter_auto_add_candidates(self, new_services, model):
+        """Hook for filtering auto-add candidates before dedup.
+
+        Called between candidate building and dedup. Override in inheriting
+        modules to add filtering logic (e.g. credential plan-item check).
+        """
+        return new_services
+
     @api.model
     def auto_add_services(self, subjects):
         if subjects and isinstance(subjects[0].id, api.NewId):
@@ -143,6 +151,9 @@ class AutoAddService(models.Model):
                         }
                     )
 
+        # Hook for filtering candidates before dedup (e.g. credential plan-item check)
+        new_services = self._filter_auto_add_candidates(new_services, model)
+
         # Get existing auto-added services to avoid duplicates.
         # Dedup key is (rule_id, subject_id, context_ref) so the same rule can create
         # multiple services for different occasions (e.g. initial vs renewal credentials).
@@ -171,10 +182,13 @@ class AutoAddService(models.Model):
 
         if to_create:
             for service_vals in to_create:
-                service_context = self.env["riverflow.service"].with_context(
-                    default_res_id=service_vals["res_id"],
-                    default_res_model=service_vals["res_model"],
-                    default_created_by_auto_add_service_id=service_vals["created_by_auto_add_service_id"],
-                    default_auto_add_context_ref=service_vals.get("auto_add_context_ref"),
-                )
+                ctx = {
+                    "default_res_id": service_vals["res_id"],
+                    "default_res_model": service_vals["res_model"],
+                    "default_created_by_auto_add_service_id": service_vals["created_by_auto_add_service_id"],
+                    "default_auto_add_context_ref": service_vals.get("auto_add_context_ref"),
+                }
+                if service_vals.get("credential_plan_item_id"):
+                    ctx["default_credential_plan_item_id"] = service_vals["credential_plan_item_id"]
+                service_context = self.env["riverflow.service"].with_context(**ctx)
                 service_context._create_services_from_template(service_vals["template_id"])
