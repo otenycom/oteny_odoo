@@ -117,6 +117,18 @@ class TransitionWizard(models.AbstractModel):
                 write_vals = {"state_id": transition.to_state_id.id}
                 self.update_write_values(record, write_vals)
 
+                # Deadline overrides from transition action_context:
+                # clear_deadline: permanently remove the deadline (e.g. A1 Await Reply)
+                # set_deadline_to_today: freeze deadline as today (e.g. A1 Done)
+                if self.env.context.get("clear_deadline"):
+                    write_vals["use_project_deadline_from"] = "self"
+                    write_vals["project_deadline"] = False
+                    write_vals["days_relative_to_project"] = 0
+                elif self.env.context.get("set_deadline_to_today"):
+                    write_vals["use_project_deadline_from"] = "self"
+                    write_vals["project_deadline"] = fields.Date.today()
+                    write_vals["days_relative_to_project"] = 0
+
                 if not createNewRecord:
                     record.write(write_vals)
                     self.create_related_records(record)
