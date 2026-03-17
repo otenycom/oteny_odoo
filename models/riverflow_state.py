@@ -105,6 +105,13 @@ class RiverflowWorkflowState(models.Model):
         "ship states where ship documents are needed (e.g. Onboarding, Active).",
         default=False,
     )
+    show_state_in_crew_planning = fields.Boolean(
+        "Show in Crew Planning",
+        help="If true, this state is shown as a badge on the slot label in the crew planning view. "
+        "Set on states that are not the normal operating state (e.g. not 'Employed' for employees, "
+        "not 'Active' for ships) to alert planners.",
+        default=False,
+    )
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",

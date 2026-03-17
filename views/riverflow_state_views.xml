@@ -27,6 +27,7 @@
                             <field name="is_cancelled_state" />
                             <field name="is_supply_order_delivered" />
                             <field name="hide_in_statusbar" />
+                            <field name="show_state_in_crew_planning" />
                         </group>
                     </group>
                     <notebook>
@@ -70,6 +71,7 @@
                 <field name="is_end_state" />
                 <field name="is_supply_order_delivered" />
                 <field name="hide_in_statusbar" />
+                <field name="show_state_in_crew_planning" />
             </list>
         </field>
     </record>
