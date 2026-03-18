@@ -74,7 +74,7 @@ class ServiceWizard(models.TransientModel):
         vals["res_id"] = self.res_id
         vals["res_model"] = self.res_model
 
-        if not self.env.context.get("name_readonly"):
+        if not self.env.context.get("name_readonly") and self.name:
             vals["name"] = self.name
 
         if not self.days_relative_to_project_invisible:

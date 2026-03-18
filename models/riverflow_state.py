@@ -97,6 +97,21 @@ class RiverflowWorkflowState(models.Model):
         "when the actual service completion occurred.",
         default=False,
     )
+    requires_onboarding_credentials = fields.Boolean(
+        "Requires Onboarding Credentials",
+        help="If true, onboarding credential slots are shown in the credential plan "
+        "for entities in this state. Set on employee states where credential "
+        "arrangement should be tracked (e.g. Agreement Signed, Employed) and "
+        "ship states where ship documents are needed (e.g. Onboarding, Active).",
+        default=False,
+    )
+    show_state_in_crew_planning = fields.Boolean(
+        "Show in Crew Planning",
+        help="If true, this state is shown as a badge on the slot label in the crew planning view. "
+        "Set on states that are not the normal operating state (e.g. not 'Employed' for employees, "
+        "not 'Active' for ships) to alert planners.",
+        default=False,
+    )
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",

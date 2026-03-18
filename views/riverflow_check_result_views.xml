@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<odoo>
+    <!-- Form view for check results (system-generated, mostly readonly) -->
+    <record id="view_check_result_form" model="ir.ui.view">
+        <field name="name">riverflow.check.result.form</field>
+        <field name="model">riverflow.check.result</field>
+        <field name="arch" type="xml">
+            <form string="Check Result" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group name="details" string="Details">
+                            <field name="name" />
+                            <field name="check_type" />
+                            <field name="severity" />
+                        </group>
+                        <group name="related_to" string="Related to">
+                            <field name="state_record_id" invisible="not state_record_id" />
+                        </group>
+                    </group>
+                    <group name="extra" />
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- List view -->
+    <record id="view_check_result_list" model="ir.ui.view">
+        <field name="name">riverflow.check.result.list</field>
+        <field name="model">riverflow.check.result</field>
+        <field name="arch" type="xml">
+            <list string="Check Results" create="false" edit="false"
+                  decoration-danger="severity == 'error'"
+                  decoration-warning="severity == 'warning'"
+                  decoration-info="severity == 'info'">
+                <field name="name" />
+                <field name="check_type" optional="show" />
+                <field name="severity" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Search view -->
+    <record id="view_check_result_search" model="ir.ui.view">
+        <field name="name">riverflow.check.result.search</field>
+        <field name="model">riverflow.check.result</field>
+        <field name="arch" type="xml">
+            <search string="Check Results">
+                <field name="name" />
+                <filter string="Errors" name="errors" domain="[('severity', '=', 'error')]" />
+                <filter string="Warnings" name="warnings" domain="[('severity', '=', 'warning')]" />
+                <filter string="Info" name="info" domain="[('severity', '=', 'info')]" />
+                <filter string="Check Type" name="group_check_type" context="{'group_by': 'check_type'}" />
+                <filter string="Severity" name="group_severity" context="{'group_by': 'severity'}" />
+            </search>
+        </field>
+    </record>
+</odoo>

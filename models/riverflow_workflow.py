@@ -22,6 +22,14 @@ class RiverflowWorkflow(models.Model):
 
     state_ids = fields.One2many("riverflow.state", "workflow_id", string="Workflow states")
 
+    auto_complete_state_id = fields.Many2one(
+        "riverflow.state",
+        string="Auto-Complete State",
+        domain="[('workflow_id', '=', id), ('is_end_state', '=', True)]",
+        help="End state for services auto-completed when a credential plan item "
+        "becomes 'issued'. Set to 'Not Needed' or similar end state.",
+    )
+
     workflow_start_transition_ids = fields.One2many(
         "riverflow.transition",
         "workflow_id",

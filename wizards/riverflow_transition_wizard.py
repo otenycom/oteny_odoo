@@ -131,6 +131,9 @@ class TransitionWizard(models.AbstractModel):
 
                 if not createNewRecord:
                     record.write(write_vals)
+                    # Flush stored computes that depend on state_id (e.g. auto_add_trigger)
+                    # so side-effects like auto-add services run before create_related_records.
+                    record.flush_recordset()
                     self.create_related_records(record)
                 else:
                     # Merge write_vals into create_vals
@@ -145,6 +148,8 @@ class TransitionWizard(models.AbstractModel):
                         .create(create_vals)
                     )
                     action["res_id"] = new_record.id
+                    # Flush stored computes that depend on state_id (e.g. auto_add_trigger)
+                    new_record.flush_recordset()
                     self.create_related_records(new_record)
 
         return action

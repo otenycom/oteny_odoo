@@ -43,6 +43,14 @@ class Service(models.Model):
         string="Created by Auto Add Rule",
         help="The auto add rule that created this service. The system can use this to determine if the rule that created the service is still applicable.",
     )
+    auto_add_context_ref = fields.Char(
+        string="Auto-Add Context Reference",
+        index=True,
+        help="Contextual key for dedup of auto-added services. Distinguishes "
+        "different occasions for the same auto-add rule on the same subject. "
+        "For example, 'missing' for initial credential arrangement vs "
+        "'cred:42' for renewal of a specific expiring credential.",
+    )
 
     is_this_a_template = fields.Boolean(
         string="Is This a Template",
@@ -137,6 +145,7 @@ class Service(models.Model):
         [
             ("self", "Self"),
             ("root", "Top-level service"),
+            ("creation", "Creation Date"),
         ],
         string="Deadline From",
         required=True,
@@ -608,7 +617,10 @@ class Service(models.Model):
                 service.project_deadline = service.supply_order_service_id.deadline
             else:
                 use_project_deadline_from = service.use_project_deadline_from
-                if use_project_deadline_from == "self":
+                if use_project_deadline_from in ("self", "creation"):
+                    # "creation" on templates: deadline is materialized at clone time
+                    # by _create_service_member_from_template; the template itself
+                    # keeps its own project_deadline (usually False).
                     service.project_deadline = service.project_deadline
                 elif use_project_deadline_from == "root":
                     service.project_deadline = service.root_id.deadline
@@ -637,7 +649,7 @@ class Service(models.Model):
     def _compute_is_days_relative_to_project_applicable(self):
         for service in self:
             service.is_days_relative_to_project_applicable = (
-                service.use_project_deadline_from != "self"
+                service.use_project_deadline_from not in ("self",)
                 and not (service.use_project_deadline_from == "root" and service.root_id.ids == service.ids)
             )
 
@@ -1016,6 +1028,8 @@ class Service(models.Model):
         # when creating templates, any 'use from' is allowed because we don't know yet which parent service or subject will be selected
         if parent_id or is_root_a_template:
             options.append("root")
+        if is_root_a_template:
+            options.append("creation")
 
         return options
 
@@ -1048,6 +1062,7 @@ class Service(models.Model):
             "res_id": self.env.context.get("default_res_id"),
             "res_model": self.env.context.get("default_res_model"),
             "created_by_auto_add_service_id": self.env.context.get("default_created_by_auto_add_service_id"),
+            "auto_add_context_ref": self.env.context.get("default_auto_add_context_ref"),
             "workflow_id": template_service.workflow_id.id,
             "state_id": template_service.state_id.id,
             "responsible_team_id": template_service.responsible_team_id.id,
@@ -1064,7 +1079,18 @@ class Service(models.Model):
         }
 
         if deadline:
+            # deadline param is an instance-level override set by the caller after creation;
+            # project_deadline is intentionally not set here -- "self" mode with no
+            # project_deadline means the service starts without a deadline until the
+            # caller assigns one. The "creation" option below is the template-level
+            # alternative for auto-setting deadlines at clone time.
             vals["use_project_deadline_from"] = "self"
+            vals["days_relative_to_project"] = 0
+        elif template_service.use_project_deadline_from == "creation":
+            # Materialize the deadline relative to today at clone time, then store
+            # as a concrete "self" date so it doesn't shift on recomputation.
+            vals["use_project_deadline_from"] = "self"
+            vals["project_deadline"] = fields.Date.today() + timedelta(days=template_service.days_relative_to_project)
             vals["days_relative_to_project"] = 0
         else:
             vals["use_project_deadline_from"] = template_service.use_project_deadline_from

@@ -57,11 +57,13 @@ class StartWizard(RiverflowTransitionMixin):
             if not icon:
                 icon = "plus"  # for 'create new record'
 
-            # Only include transition name if multiple transitions exist for this workflow
+            # When multiple start transitions exist for the same workflow,
+            # prefix with workflow name to disambiguate. Otherwise show
+            # the transition name which reflects the target state.
             caption = (
                 f"{transition.workflow_name} - {transition.name}"
                 if workflow_transition_count[transition.workflow_name] > 1
-                else transition.workflow_name
+                else transition.name
             )
 
             transition_buttons["buttons"].append(

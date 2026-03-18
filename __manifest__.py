@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "19.0.1.1047",
+    "version": "19.0.1.1048",
     "depends": ["base", "mail", "documents", "oteny_shortcut"],
     "author": "Vriend Studio",
     "category": "Workflow",
@@ -32,6 +32,7 @@
         "views/riverflow_team_views.xml",
         "views/riverflow_auto_add_domain_views.xml",
         "views/riverflow_auto_add_service_views.xml",
+        "views/riverflow_check_result_views.xml",
         "views/res_config_settings_views.xml",
         "data/transition_action_data.xml",
         "data/workflow_service_task.xml",
