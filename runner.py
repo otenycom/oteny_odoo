@@ -13,11 +13,29 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 
 _logger = logging.getLogger(__name__)
 
 # Workers that exceed this timeout are killed
 WORKER_TIMEOUT = 600  # 10 minutes
+
+# Shared lock so lines from concurrent workers don't interleave on stdout
+_stdout_lock = threading.Lock()
+
+
+def _stream_worker_output(proc, out_fh, prefix):
+    """
+    Read a worker's stdout line by line, writing each line to both the log
+    file and the master console so progress is visible in real time.
+    Runs in a daemon thread; exits when the worker process closes its stdout.
+    """
+    for line in proc.stdout:
+        out_fh.write(line)
+        with _stdout_lock:
+            sys.stdout.write(prefix + line)
+            sys.stdout.flush()
+    out_fh.flush()
 
 
 def _build_worker_command(clone_db, port):
@@ -108,12 +126,22 @@ def spawn_workers(clone_names, batch_specs):
         out_fh = open(output_path, "w")
         proc = subprocess.Popen(
             cmd,
-            stdout=out_fh,
+            stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            text=True,
             env=env,
         )
 
-        workers.append((proc, output_path, result_path, i, out_fh))
+        # Stream each worker's output to both its log file and the console,
+        # prefixed with the worker index so interleaved lines stay readable.
+        thread = threading.Thread(
+            target=_stream_worker_output,
+            args=(proc, out_fh, f"[W{i}] "),
+            daemon=True,
+        )
+        thread.start()
+
+        workers.append((proc, output_path, result_path, i, out_fh, thread))
 
     return workers
 
@@ -127,7 +155,7 @@ def wait_for_workers(workers):
     """
     results = []
 
-    for proc, output_path, result_path, idx, out_fh in workers:
+    for proc, output_path, result_path, idx, out_fh, thread in workers:
         try:
             proc.wait(timeout=WORKER_TIMEOUT)
         except subprocess.TimeoutExpired:
@@ -137,6 +165,9 @@ def wait_for_workers(workers):
             proc.kill()
             proc.wait()
         finally:
+            # Wait for the streaming thread to drain all buffered output before
+            # closing the file handle; otherwise the last lines can be lost.
+            thread.join()
             out_fh.close()
 
         # Read captured output
