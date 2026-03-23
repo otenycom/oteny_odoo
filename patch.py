@@ -178,9 +178,7 @@ def _parallel_run(suite, global_report):
     batches = build_batches(class_groups, worker_count, class_durations)
     actual_workers = len(batches)
     if actual_workers < worker_count:
-        _logger.info(
-            "Using %d workers (fewer classes than requested)", actual_workers
-        )
+        _logger.info("Using %d workers (fewer classes than requested)", actual_workers)
 
     # Build batch specs: comma-separated qualified class names per worker
     batch_specs = []
@@ -250,8 +248,7 @@ def _parallel_run(suite, global_report):
 
     if all_failed_tests:
         summary_lines = [
-            f"  {flavour}: {test_name} (worker {widx})"
-            for flavour, test_name, widx in all_failed_tests
+            f"  {flavour}: {test_name} (worker {widx})" for flavour, test_name, widx in all_failed_tests
         ]
         _logger.error(
             "FAILED TESTS:\n%s",
@@ -300,9 +297,7 @@ def _patched_run_suite(suite, global_report=None):
         try:
             return _parallel_run(suite, global_report)
         except Exception as exc:
-            _logger.info(
-                "Parallel execution unavailable, running sequentially (%s)", exc
-            )
+            _logger.info("Parallel execution unavailable, running sequentially (%s)", exc)
 
     # Path 3: sequential (at-install, single class, or fallback)
     return _original_run_suite(suite, global_report=global_report)
@@ -311,6 +306,7 @@ def _patched_run_suite(suite, global_report=None):
 # ---------------------------------------------------------------------------
 # Patch application (called from __init__.py)
 # ---------------------------------------------------------------------------
+
 
 def _apply():
     global _original_run_suite
