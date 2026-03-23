@@ -1056,6 +1056,16 @@ class Service(models.Model):
             )
 
     @api.model
+    def _get_template_clone_vals(self, template_service):
+        """Hook: return additional vals to merge when cloning a service template.
+
+        Modules that add fields to service templates override this method
+        and call super() to accumulate all extra vals. Called from
+        _create_service_member_from_template before the create() call.
+        """
+        return {}
+
+    @api.model
     def _create_service_member_from_template(self, template_service, parent_id=False, deadline=False):
         """Create a new service based on a template service.
 
@@ -1107,6 +1117,8 @@ class Service(models.Model):
 
         if parent_id:
             vals["parent_id"] = parent_id
+
+        vals.update(self._get_template_clone_vals(template_service))
 
         new_service = self.env["riverflow.service"].with_context(mail_create_nosubscribe=True).create(vals)
 
