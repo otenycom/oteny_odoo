@@ -662,6 +662,31 @@ class TestAuditLog(TransactionCase):
         self.assertEqual(street_log.old_value, partner_street)
         self.assertEqual(street_log.new_value, "")  # Delete logs have empty new_value
 
+    def test_is_audit_ignored_stale_ir_model(self):
+        """Stale ir.model records (model dropped from code but row still in DB)
+        must not crash _is_audit_ignored / install_for_all_models_action.
+        Reproduces: KeyError 'rivercreds.rule' after that model was removed."""
+        audit_log = self.env["oteny.audit.log"]
+
+        # A model name that exists nowhere in the registry
+        phantom_model = "test.phantom.removed.model"
+        self.assertNotIn(phantom_model, self.env.registry.models)
+
+        # _is_audit_ignored should return True (ignore) instead of raising
+        result = audit_log._is_audit_ignored(phantom_model)
+        self.assertTrue(result, "Stale model not in registry should be treated as ignored")
+
+        # Simulate a stale ir.model row left behind after a module dropped a model.
+        # Raw SQL because ORM validation rejects non-x_ manual model names.
+        self.env.cr.execute(
+            """INSERT INTO ir_model (name, model, state, transient, "order")
+               VALUES (%s::jsonb, %s, 'manual', false, 'id')""",
+            ('{"en_US": "Phantom Removed Model"}', phantom_model),
+        )
+
+        # install_for_all_models_action iterates all ir.model rows — must not raise
+        audit_log.install_for_all_models_action()
+
     def test_create_all_defaults_or_empty_logs_placeholder(self):
         """Test that creating record with only defaults/empty values logs at least one placeholder"""
         # Use test models that allow empty records
