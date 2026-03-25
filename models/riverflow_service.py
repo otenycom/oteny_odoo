@@ -1283,11 +1283,17 @@ class Service(models.Model):
         existing_names = set(self.child_ids.filtered("active").mapped("name"))
 
         # Clear credential-related context defaults so children don't
-        # inherit the parent's credential group or plan item link via
-        # Odoo's default_* context mechanism in create().
+        # inherit the parent's credential group, plan item link, or
+        # credential records via Odoo's default_* context in create().
+        # The transition mixin copies ALL parent service fields as
+        # default_* context keys (riverflow_transition_mixin.py lines
+        # 35-39). Without this guard, default_credential_ids causes
+        # the ORM to reassign the parent's credentials to the child
+        # by writing service_id = child_id on them.
         Service = self.env["riverflow.service"].with_context(
             default_credential_type_group_id=False,
             default_credential_plan_item_id=False,
+            default_credential_ids=False,
         )
         for child_template in deferred_children:
             if child_template.name in existing_names:
