@@ -112,6 +112,15 @@ class RiverflowWorkflowState(models.Model):
         "not 'Active' for ships) to alert planners.",
         default=False,
     )
+    auto_progress_on_children_done = fields.Boolean(
+        "Auto-Progress When Children Done",
+        help="When set, services in this state automatically progress to the "
+        "next sequential workflow state once all active child services "
+        "have reached an end state. Used for states that spawn deferred "
+        "child tasks (e.g. parallel email-sending services) and should "
+        "complete when those tasks finish.",
+        default=False,
+    )
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",

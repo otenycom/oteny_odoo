@@ -1282,7 +1282,13 @@ class Service(models.Model):
         # Existing child names for dedup (prevent duplicates on repeated transitions)
         existing_names = set(self.child_ids.filtered("active").mapped("name"))
 
-        Service = self.env["riverflow.service"]
+        # Clear credential-related context defaults so children don't
+        # inherit the parent's credential group or plan item link via
+        # Odoo's default_* context mechanism in create().
+        Service = self.env["riverflow.service"].with_context(
+            default_credential_type_group_id=False,
+            default_credential_plan_item_id=False,
+        )
         for child_template in deferred_children:
             if child_template.name in existing_names:
                 continue
@@ -1297,6 +1303,44 @@ class Service(models.Model):
                 Service._create_service_member_from_template(
                     grandchild, new_child.id
                 )
+
+    def _check_parent_auto_progress(self):
+        """Check if this service's parent should auto-progress after a child transition.
+
+        Called from the transition wizard after a child service reaches a new state.
+        If the parent's current state has auto_progress_on_children_done and all
+        active children are in end states, the parent advances to the next
+        sequential workflow state.
+        """
+        for service in self:
+            parent = service.parent_id
+            if not parent or not parent.state_id.auto_progress_on_children_done:
+                continue
+            active_children = parent.child_ids.filtered("active")
+            if active_children and all(child.is_end_state for child in active_children):
+                parent._auto_progress_to_next_state()
+
+    def _auto_progress_to_next_state(self):
+        """Progress to the next visible workflow state by sequence.
+
+        Finds the next state in the same workflow with a higher sequence number,
+        skipping states hidden from the statusbar. Sets state_id and creates
+        any deferred children for the new state.
+        """
+        self.ensure_one()
+        current_state = self.state_id
+        next_state = self.env["riverflow.state"].search(
+            [
+                ("workflow_id", "=", current_state.workflow_id.id),
+                ("sequence", ">", current_state.sequence),
+                ("hide_in_statusbar", "=", False),
+            ],
+            order="sequence",
+            limit=1,
+        )
+        if next_state:
+            self.state_id = next_state
+            self._create_deferred_children(next_state)
 
     @api.model
     def _add_state_record(self, record):
