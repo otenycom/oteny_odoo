@@ -3,6 +3,7 @@ from odoo.exceptions import UserError
 from odoo.fields import Command
 from datetime import datetime, date, timedelta
 import logging
+import re
 
 _logger = logging.getLogger(__name__)
 
@@ -80,6 +81,11 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         store=True,
     )
 
+    show_attachment_warning = fields.Boolean(
+        compute="_compute_show_attachment_warning",
+        store=False,
+    )
+
     is_supply_order = fields.Boolean(
         "Is Supply Order",
         help="If checked, the service is a supply order, e.g a Taxi Order",
@@ -149,6 +155,29 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
                 wizard.attachment_ids = wizard.mail_template_id.attachment_ids
             else:
                 wizard.attachment_ids = False
+
+    @api.depends("attachment_ids", "body_updatable")
+    def _compute_show_attachment_warning(self):
+        """Warn when the email body mentions attachments but none are added.
+        The regex pattern is configurable via system parameter
+        riverflow.email_attachment_warning_regex (case-insensitive).
+        """
+        pattern = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param(
+                "riverflow.email_attachment_warning_regex",
+                r"attach|enclos|herewith|bijlage|bijge|ingesloten|meegezonden|anhang|anbei|beigefüg|beilieg|anliegend",
+            )
+        )
+        for wizard in self:
+            if wizard.attachment_ids or not wizard.body_updatable or not pattern:
+                wizard.show_attachment_warning = False
+                continue
+            plain_text = tools.html2plaintext(wizard.body_updatable)
+            wizard.show_attachment_warning = bool(
+                re.search(pattern, plain_text, re.IGNORECASE)
+            )
 
     def render(self):
         self._compute_rendered_content()
