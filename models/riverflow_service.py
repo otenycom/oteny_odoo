@@ -1282,19 +1282,23 @@ class Service(models.Model):
         # Existing child names for dedup (prevent duplicates on repeated transitions)
         existing_names = set(self.child_ids.filtered("active").mapped("name"))
 
-        # Clear credential-related context defaults so children don't
-        # inherit the parent's credential group, plan item link, or
-        # credential records via Odoo's default_* context in create().
-        # The transition mixin copies ALL parent service fields as
-        # default_* context keys (riverflow_transition_mixin.py lines
-        # 35-39). Without this guard, default_credential_ids causes
-        # the ORM to reassign the parent's credentials to the child
-        # by writing service_id = child_id on them.
-        Service = self.env["riverflow.service"].with_context(
-            default_credential_type_group_id=False,
-            default_credential_plan_item_id=False,
-            default_credential_ids=False,
-        )
+        # Build a clean context with only the defaults that
+        # _create_service_member_from_template needs for deferred children.
+        # The transition mixin copies ALL parent fields as default_* context
+        # keys for wizard form pre-population (riverflow_transition_mixin.py
+        # lines 35-39), but those must not leak into child service creation.
+        # Without isolation, the ORM's create() picks up parent values for
+        # any field not explicitly set in the vals dict — causing children
+        # to inherit tags, deadlines, is_service_with_journey, credential
+        # links, supply prices, etc. from the parent instead of the template.
+        clean_ctx = {
+            k: v
+            for k, v in self.env.context.items()
+            if not k.startswith("default_")
+        }
+        clean_ctx["default_res_model"] = self.res_model
+        clean_ctx["default_res_id"] = self.res_id
+        Service = self.env["riverflow.service"].with_context(clean_ctx)
         for child_template in deferred_children:
             if child_template.name in existing_names:
                 continue
