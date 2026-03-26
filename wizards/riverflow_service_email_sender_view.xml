@@ -21,6 +21,7 @@
                             <field name="is_supply_order" invisible="1" />
                             <field name="records_to_transition_ids" invisible="1" />
                             <field name="transition_id" invisible="1" />
+                            <field name="show_attachment_warning" invisible="1" />
                         </group>
                     </group>
                     <group string="Recipients">
@@ -51,6 +52,10 @@
                     </notebook>
                 </sheet>
                 <footer>
+                    <div class="alert alert-warning mb-0 ms-auto" role="alert"
+                        invisible="not show_attachment_warning">
+                        Attachments not yet added
+                    </div>
                     <button string="Send" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
                     <button string="Cancel" class="btn-secondary" special="cancel" />
                 </footer>

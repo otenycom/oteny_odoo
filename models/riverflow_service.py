@@ -69,6 +69,15 @@ class Service(models.Model):
         help="If checked, only the children of this template will be added when creating a new service from this template",
         recursive=True,
     )
+    create_on_state_id = fields.Many2one(
+        "riverflow.state",
+        string="Create on State",
+        help="Template children only. When set, this child is NOT cloned during "
+        "initial template cloning. Instead, it is automatically cloned when "
+        "the parent service transitions to this state. This enables deferred "
+        "child creation -- e.g. transport/notification children that should "
+        "only exist once an appointment is booked.",
+    )
     mail_template_id = fields.Many2one(
         "mail.template",
         string="Email Template",
@@ -1047,6 +1056,16 @@ class Service(models.Model):
             )
 
     @api.model
+    def _get_template_clone_vals(self, template_service):
+        """Hook: return additional vals to merge when cloning a service template.
+
+        Modules that add fields to service templates override this method
+        and call super() to accumulate all extra vals. Called from
+        _create_service_member_from_template before the create() call.
+        """
+        return {}
+
+    @api.model
     def _create_service_member_from_template(self, template_service, parent_id=False, deadline=False):
         """Create a new service based on a template service.
 
@@ -1098,6 +1117,8 @@ class Service(models.Model):
 
         if parent_id:
             vals["parent_id"] = parent_id
+
+        vals.update(self._get_template_clone_vals(template_service))
 
         new_service = self.env["riverflow.service"].with_context(mail_create_nosubscribe=True).create(vals)
 
@@ -1189,11 +1210,13 @@ class Service(models.Model):
         if not template_service:
             raise UserError(_("No template service selected."))
 
-        # Clone children recursively
-        def clone_children(template, parent):
+        # Clone children recursively, skipping deferred children (create_on_state_id set)
+        def clone_children(template, parent, include_deferred=False):
             for child in template.child_ids:
+                if child.create_on_state_id and not include_deferred:
+                    continue
                 new_child = self._create_service_member_from_template(child, parent.id)
-                clone_children(child, new_child)
+                clone_children(child, new_child, include_deferred=include_deferred)
 
         newly_created_services = self.env["riverflow.service"]
         if template_service.only_add_children:
@@ -1212,6 +1235,118 @@ class Service(models.Model):
             newly_created_services += new_service
 
         return newly_created_services
+
+    def _create_deferred_children(self, target_state):
+        """Clone deferred template children that match the target state.
+
+        When a service transitions to a new state, this method checks
+        the source template for children with create_on_state_id matching
+        the target state, and clones them onto the current service.
+
+        Deferred children are template children skipped during initial
+        cloning (because create_on_state_id was set). They are created
+        later when the service reaches the specified state.
+
+        Idempotent: skips children whose template name already exists
+        as a child of the current service (prevents duplicates on
+        repeated transitions to the same state, e.g. self-loops).
+        """
+        self.ensure_one()
+        if not target_state:
+            return
+
+        # Find the source template via the auto-add rule or by name match
+        template = False
+        if self.created_by_auto_add_service_id:
+            template = self.created_by_auto_add_service_id.service_template_id
+        if not template:
+            # Fallback: find template by matching name
+            template = self.env["riverflow.service"].search(
+                [
+                    ("name", "=", self.name),
+                    ("is_this_a_template", "=", True),
+                    ("active", "=", True),
+                ],
+                limit=1,
+            )
+        if not template:
+            return
+
+        # Find deferred children matching the target state
+        deferred_children = template.child_ids.filtered(
+            lambda c: c.create_on_state_id == target_state
+        )
+        if not deferred_children:
+            return
+
+        # Existing child names for dedup (prevent duplicates on repeated transitions)
+        existing_names = set(self.child_ids.filtered("active").mapped("name"))
+
+        # Clear credential-related context defaults so children don't
+        # inherit the parent's credential group, plan item link, or
+        # credential records via Odoo's default_* context in create().
+        # The transition mixin copies ALL parent service fields as
+        # default_* context keys (riverflow_transition_mixin.py lines
+        # 35-39). Without this guard, default_credential_ids causes
+        # the ORM to reassign the parent's credentials to the child
+        # by writing service_id = child_id on them.
+        Service = self.env["riverflow.service"].with_context(
+            default_credential_type_group_id=False,
+            default_credential_plan_item_id=False,
+            default_credential_ids=False,
+        )
+        for child_template in deferred_children:
+            if child_template.name in existing_names:
+                continue
+            new_child = Service._create_service_member_from_template(
+                child_template, self.id
+            )
+            # Clone grandchildren of the deferred child (these are immediate,
+            # not deferred themselves)
+            for grandchild in child_template.child_ids:
+                if grandchild.create_on_state_id:
+                    continue
+                Service._create_service_member_from_template(
+                    grandchild, new_child.id
+                )
+
+    def _check_parent_auto_progress(self):
+        """Check if this service's parent should auto-progress after a child transition.
+
+        Called from the transition wizard after a child service reaches a new state.
+        If the parent's current state has auto_progress_on_children_done and all
+        active children are in end states, the parent advances to the next
+        sequential workflow state.
+        """
+        for service in self:
+            parent = service.parent_id
+            if not parent or not parent.state_id.auto_progress_on_children_done:
+                continue
+            active_children = parent.child_ids.filtered("active")
+            if active_children and all(child.is_end_state for child in active_children):
+                parent._auto_progress_to_next_state()
+
+    def _auto_progress_to_next_state(self):
+        """Progress to the next visible workflow state by sequence.
+
+        Finds the next state in the same workflow with a higher sequence number,
+        skipping states hidden from the statusbar. Sets state_id and creates
+        any deferred children for the new state.
+        """
+        self.ensure_one()
+        current_state = self.state_id
+        next_state = self.env["riverflow.state"].search(
+            [
+                ("workflow_id", "=", current_state.workflow_id.id),
+                ("sequence", ">", current_state.sequence),
+                ("hide_in_statusbar", "=", False),
+            ],
+            order="sequence",
+            limit=1,
+        )
+        if next_state:
+            self.state_id = next_state
+            self._create_deferred_children(next_state)
 
     @api.model
     def _add_state_record(self, record):

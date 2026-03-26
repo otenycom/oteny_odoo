@@ -185,6 +185,7 @@
                                     <field name="is_root_a_template" />
                                     <field name="is_this_a_template" />
                                     <field name="only_add_children" />
+                                    <field name="create_on_state_id" />
                                 </group>
                             </group>
                         </page>

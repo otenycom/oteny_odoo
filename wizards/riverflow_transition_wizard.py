@@ -134,7 +134,15 @@ class TransitionWizard(models.AbstractModel):
                     # Flush stored computes that depend on state_id (e.g. auto_add_trigger)
                     # so side-effects like auto-add services run before create_related_records.
                     record.flush_recordset()
+                    # Create deferred template children that match the new state.
+                    # Runs before create_related_records so wizards see the full child tree.
+                    if hasattr(record, "_create_deferred_children"):
+                        record._create_deferred_children(transition.to_state_id)
                     self.create_related_records(record)
+                    # Check if this record's parent should auto-progress now that
+                    # this child has transitioned (e.g. all sibling tasks done).
+                    if hasattr(record, "_check_parent_auto_progress"):
+                        record._check_parent_auto_progress()
                 else:
                     # Merge write_vals into create_vals
                     create_vals.update(write_vals)
