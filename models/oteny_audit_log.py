@@ -126,7 +126,12 @@ class OtenyAuditLog(models.Model):
         if self.env.context.get("oteny_audit_ignore", False):
             return True
 
-        model_class = self.env[model_name]
+        # Model may exist in ir.model (database) but no longer in the registry
+        # (e.g. after a module dropped a model). Can't audit what doesn't exist.
+        try:
+            model_class = self.env[model_name]
+        except KeyError:
+            return True
         if hasattr(model_class, "_oteny_audit_ignore"):
             return model_class._oteny_audit_ignore
 
