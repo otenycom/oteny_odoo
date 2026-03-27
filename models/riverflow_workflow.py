@@ -75,6 +75,13 @@ class RiverflowWorkflow(models.Model):
         tracking=True,
         default=False,
     )
+    has_supply_time = fields.Boolean(
+        "Has Time of Day",
+        help="If checked, services in this workflow show a time-of-day field "
+        "for recording appointment times, pickup times, or departure times.",
+        tracking=True,
+        default=False,
+    )
 
     # Upgrade to Odoo 19 constraint style
     _name_uniq = models.Constraint(

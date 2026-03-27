@@ -255,8 +255,9 @@ class Service(models.Model):
 
     daily_prio = fields.Integer(
         default=1,
-        string="Time or Priority",
-        help="Use HHMM format (e.g. 0830 for 08:30, 1110 for 11:10) to control the departure time in the journey timeline.",
+        string="Priority",
+        help="Controls the display order of services with the same deadline in list views "
+        "and the journey timeline. Lower numbers appear first.",
         required=True,
     )
 
@@ -363,6 +364,12 @@ class Service(models.Model):
         store=True,
     )
 
+    has_supply_time = fields.Boolean(
+        "Has Time of Day",
+        related="front_office_workflow_id.has_supply_time",
+        store=True,
+    )
+
     supply_unit_price = fields.Monetary("Cost", currency_field="supply_unit_price_currency_id", tracking=True)
     supply_unit_price_currency_id = fields.Many2one(
         comodel_name="res.currency",
@@ -392,6 +399,12 @@ class Service(models.Model):
         help="The actual date when this supply order was executed/completed. "
         "Set when trip is marked as completed. Used for billing/invoicing. "
         "If not set, the service deadline is used as fallback.",
+    )
+
+    supply_time_of_day = fields.Float(
+        string="Time of Day",
+        help="Time of day for this service (e.g. appointment time, pickup time, "
+        "departure time). Displayed as HH:MM. Value 0 means not set.",
     )
 
     supply_date = fields.Date(
@@ -455,6 +468,14 @@ class Service(models.Model):
     def _compute_supply_end_date_for_calendar(self):
         for service in self:
             service.supply_end_date_for_calendar = service.supply_date
+
+    @api.constrains("supply_time_of_day")
+    def _check_supply_time_of_day(self):
+        for service in self:
+            if service.supply_time_of_day < 0 or service.supply_time_of_day > 23.99:
+                raise ValidationError(
+                    _("Time of day must be between 00:00 and 23:59.")
+                )
 
     @api.constrains("project_deadline", "end_date")
     def _check_end_date(self):

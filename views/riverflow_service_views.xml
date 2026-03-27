@@ -62,9 +62,6 @@
                             <field name="active" invisible="1" />
                             <field name="is_days_relative_to_project_applicable" invisible="1" />
                             <field name="use_project_deadline_from_options" invisible="1" />
-                            <field name="daily_prio" options="{'enable_formatting': false}" />
-                            <field name="use_project_deadline_from" widget="filterable_selection"
-                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
                             <field
                                 name="project_deadline"
                                 widget="daterange"
@@ -77,19 +74,21 @@
                                 decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                             />
                             <field name="end_date" invisible="1" />
-                            <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
-                            <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
-                                on_change="1" />
-                            <field name="weekend_deadline_rule" invisible="not is_days_relative_to_project_applicable" />
-                            <!-- readonly because the deadline because there is an inverse method on it, which will reset use_project_deadline_from back to 'self'
-                            to change the deadline for a relative use_project_deadline_from, use the calendar or first set use_project_deadline_from to self  
-                            -->
+                            <!-- readonly: changing this resets use_project_deadline_from to 'self'.
+                            To change the deadline for relative mode, use the calendar or switch to self first. -->
                             <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable"
                                 decoration-muted="is_end_state"
                                 decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
                                 decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
                             />
-
+                            <field name="daily_prio" string="Priority"
+                                options="{'enable_formatting': false}" />
+                            <field name="use_project_deadline_from" widget="filterable_selection"
+                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
+                            <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
+                            <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
+                                on_change="1" />
+                            <field name="weekend_deadline_rule" invisible="not is_days_relative_to_project_applicable" />
                         </group>
                     </group>
                     <notebook>
@@ -108,6 +107,8 @@
                             <group>
                                 <field name="supply_date" />
                                 <field name="supply_actual_date" />
+                                <field name="supply_time_of_day" widget="float_time"
+                                    invisible="not has_supply_time" />
                             </group>
                             <group invisible="not has_legs">
                                 <field name="leg_ids" nolabel="1">
