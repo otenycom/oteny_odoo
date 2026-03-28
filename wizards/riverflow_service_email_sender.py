@@ -135,6 +135,20 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             defaultValues["recipient_partner_ids"] = [Command.set(default_recipients.ids)]
             defaultValues["subject_updatable"] = service.name
 
+        # Resolve the email template: transition-level overrides service-level.
+        # This allows different email transitions in the same workflow to use
+        # different templates (e.g., AB appointment request vs. pickup request).
+        transition_id = self.env.context.get("transition_id")
+        if transition_id:
+            transition = self.env["riverflow.transition"].browse(transition_id)
+            if transition.mail_template_id:
+                defaultValues["mail_template_id"] = transition.mail_template_id.id
+                return
+        if records_to_transition:
+            service = records_to_transition[0]
+            if service.mail_template_id:
+                defaultValues["mail_template_id"] = service.mail_template_id.id
+
     def _inverse_subject_updatable(self):
         # This method allows manual updates to subject_updatable to persist
         pass

@@ -28,6 +28,7 @@
                             <field name="action_id" required="1" />
                             <field name="to_responsible_team_id" />
                             <field name="action_context" />
+                            <field name="mail_template_id" />
                         </group>
                     </group>
                 </sheet>
@@ -56,6 +57,7 @@
                 <field name="action_id" />
                 <field name="to_responsible_team_id" optional="hide" />
                 <field name="action_context" optional="hide" />
+                <field name="mail_template_id" optional="hide" />
                 <field name="description" />
             </list>
         </field>
