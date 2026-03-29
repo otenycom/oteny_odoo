@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from odoo import models, fields, Command
 
 
@@ -47,6 +49,16 @@ class ServiceWizard(models.TransientModel):
     def default_get_using_records(self, defaultValues, records_to_transition):
         if not "project_deadline" in defaultValues:
             defaultValues["project_deadline"] = fields.Date.today()
+
+        # followup_in_days (from transition action_context): pre-fill deadline
+        # so the user sees and can adjust the follow-up date before confirming.
+        followup_days = self.env.context.get("followup_in_days")
+        if followup_days:
+            defaultValues["project_deadline"] = fields.Date.today() + timedelta(
+                days=int(followup_days)
+            )
+            defaultValues["use_project_deadline_from"] = "self"
+            defaultValues["project_deadline_invisible"] = False
 
         super().default_get_using_records(defaultValues, records_to_transition)
 
