@@ -414,6 +414,7 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             email_notification_allow_footer=False,  # No 'Sent by Odoo' footer
         ).message_post(
             message_type="email",
+            subject=self.subject_updatable,
             partner_ids=recipient_ids.ids,
             body=safe_body,
             subtype_id=self.env.ref("mail.mt_comment").id,

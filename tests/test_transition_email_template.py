@@ -225,6 +225,53 @@ class TestKeepServiceName(TransactionCase):
             "vals should contain 'name' when keep_service_name is not set",
         )
 
+    def test_email_message_uses_template_subject(self):
+        """The mail.message created by _send_email must carry the rendered
+        template subject, not the service name.
+
+        Bug: message_post was called without subject=, causing Odoo to fall
+        back to the record's display_name (service name) as the email subject.
+        With keep_service_name the service name stays "Arrange Work Permit at AB"
+        but the outgoing email should still use the template's subject line.
+        """
+        service = self.env["riverflow.service"].create({
+            "name": "Arrange Work Permit at AB",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+
+        import ast
+        extra_ctx = ast.literal_eval(self.trans_keep_name.action_context)
+        ctx = {
+            "transition_id": self.trans_keep_name.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        defaults["recipient_partner_ids"] = [(6, 0, [self.recipient.id])]
+        wizard = Wizard.create(defaults)
+        # Simulate the UI: onchange populates subject/body from the template
+        wizard.onchange_email_template_id()
+        wizard.recipient_partner_ids = self.recipient
+        wizard.action_save()
+
+        # The service name must be preserved (keep_service_name)
+        self.assertEqual(service.name, "Arrange Work Permit at AB")
+
+        # The mail.message subject must be the template subject, not the service name
+        message = service.message_ids.filtered(
+            lambda m: m.message_type == "email"
+        )
+        self.assertTrue(message, "An email message should have been posted")
+        self.assertEqual(
+            message[0].subject,
+            "Alpha subject",
+            "mail.message subject should be the rendered template subject, "
+            "not the service name",
+        )
+
 
 @tagged("post_install", "-at_install", "riverflow", "test_transition_email_template")
 class TestFollowupInDays(TransactionCase):
