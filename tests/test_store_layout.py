@@ -3,7 +3,7 @@ import json
 from odoo.tests import tagged, TransactionCase
 
 
-@tagged("oteny_shortcut", "post_install", "-at_install", "test_store_layout")
+@tagged("oteny_shortcut", "crewradar", "post_install", "-at_install", "test_store_layout")
 class TestStoreLayout(TransactionCase):
     """Test the Store Layout wizard and ir.filters shortcut_layout field."""
 
