@@ -87,9 +87,18 @@ class RiverflowTransition(models.Model):
     )
     display_name = fields.Char("Display Name", compute="_compute_display_name", store=True, index="trigram")
 
-    # email_template_id = fields.Many2one('mail.template', 'Email Template', copy=True, domain=[
-    #                                     ('model', '=', 'riverflow.workflow')])
-    # report_id = fields.Many2one('ir.actions.report', 'Report', copy=True, domain=[
+    # Per-transition email template override. When set, the Send Email wizard
+    # uses this template instead of the service's mail_template_id. This allows
+    # different email transitions within the same workflow to use different
+    # templates (e.g., AB appointment request vs. pickup request).
+    mail_template_id = fields.Many2one(
+        "mail.template",
+        string="Email Template",
+        copy=True,
+        domain="[('model', '=', 'riverflow.service')]",
+        help="When set, the Send Email transition wizard uses this template "
+        "instead of the service's mail_template_id.",
+    )
 
     @api.depends("from_state_id.workflow_id", "to_state_id.workflow_id")
     def _compute_workflow_id(self):

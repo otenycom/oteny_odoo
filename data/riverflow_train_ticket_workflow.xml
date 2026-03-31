@@ -11,6 +11,7 @@
         <field name="has_supplier">False</field>
         <field name="has_supply_unit_price">False</field>
         <field name="has_legs">True</field>
+        <field name="has_supply_time">True</field>
     </record>
 
     <!-- States -->

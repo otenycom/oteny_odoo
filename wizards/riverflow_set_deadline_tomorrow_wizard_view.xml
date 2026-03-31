@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='name']" position="after">
                 <field name="supply_actual_date" required="1" force_save="1" />
+                <field name="supply_time_of_day" widget="float_time" />
             </xpath>
             <xpath expr="//field[@name='use_project_deadline_from']" position="attributes">
                 <attribute name="invisible">1</attribute>

@@ -20,6 +20,11 @@ class SetDeadlineTomorrowWizard(models.TransientModel):
         help="The date when the trip actually occurred. This will be saved for billing purposes.",
     )
 
+    supply_time_of_day = fields.Float(
+        string="Trip Time",
+        help="Time of day when the trip occurred (e.g. pickup time, departure time).",
+    )
+
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
         """Set deadline based on supply date and capture actual trip date.
@@ -36,6 +41,8 @@ class SetDeadlineTomorrowWizard(models.TransientModel):
             service = records_to_transition[0]
             # Set supply_actual_date to the current service deadline (the original trip date)
             defaultValues["supply_actual_date"] = service.supply_date
+            if service.supply_time_of_day:
+                defaultValues["supply_time_of_day"] = service.supply_time_of_day
 
             # If supply_date is in the future, deadline = supply_date + 1 day
             if service.supply_date and service.supply_date > today:
@@ -48,10 +55,12 @@ class SetDeadlineTomorrowWizard(models.TransientModel):
         defaultValues["use_project_deadline_from"] = "self"
 
     def update_write_values(self, service, vals):
-        """Capture actual trip date and use the deadline as entered by the user."""
+        """Capture actual trip date/time and use the deadline as entered by the user."""
         super().update_write_values(service, vals)
 
         vals["supply_actual_date"] = self.supply_actual_date
+        if self.supply_time_of_day:
+            vals["supply_time_of_day"] = self.supply_time_of_day
         vals["project_deadline"] = self.project_deadline
         vals["use_project_deadline_from"] = "self"
         vals["days_relative_to_project"] = 0

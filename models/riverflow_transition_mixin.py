@@ -24,6 +24,14 @@ class RiverflowTransitionMixin(models.AbstractModel):
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
 
+        # Resolve the wizard model before building defaults, so we can
+        # filter to only fields the wizard declares.
+        odoo_view = transition.action_id.odoo_view
+        if "." not in odoo_view:
+            odoo_view = f"riverflow.{odoo_view}"
+        view = self.sudo().env.ref(odoo_view)
+        res_model = view.model
+
         defaults_context = {}
         if isWizard:
             # start transition selection wizard; carry over the default field values passed in by the caller
@@ -31,20 +39,22 @@ class RiverflowTransitionMixin(models.AbstractModel):
                 if key.startswith("default_"):
                     defaults_context[key] = value
         elif len(self.ids) == 1:
-            # Actual entity, such as a Service. We copy the record's fields to defaults for the transition action wizard
+            # Pre-populate the wizard with current entity field values.
+            # Access ALL entity fields (getattr triggers stored computes that
+            # must fire for state_record tracker consistency), but only include
+            # fields the wizard model declares in the context defaults. Entity-
+            # only fields (is_service_with_journey, credential_ids, supply_unit_price,
+            # etc.) must not leak into context where they pollute create() calls
+            # on unrelated models during action_save.
+            wizard_fields = set(self.env[res_model]._fields.keys())
             for field_name in self._fields:
                 field = self._fields[field_name]
                 value = getattr(self, field_name)
                 converted_value = field.convert_to_cache(value, self)
-                defaults_context["default_" + field_name] = converted_value
+                if field_name in wizard_fields:
+                    defaults_context["default_" + field_name] = converted_value
 
         action_context.update(defaults_context)
-
-        odoo_view = transition.action_id.odoo_view
-        if "." not in odoo_view:
-            odoo_view = f"riverflow.{odoo_view}"
-        view = self.sudo().env.ref(odoo_view)
-        res_model = view.model
 
         title = transition.name if not transition.from_state_id else f"{transition.workflow_name} | {transition.name}"
         action = {

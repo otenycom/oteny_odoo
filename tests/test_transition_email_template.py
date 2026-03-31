@@ -1,0 +1,384 @@
+from datetime import timedelta
+
+from odoo import fields
+from odoo.tests.common import TransactionCase
+from odoo.tests import tagged
+
+
+def _create_email_test_data(cls):
+    """Shared setup for email template and keep_service_name tests."""
+    Service = cls.env["riverflow.service"]
+    State = cls.env["riverflow.state"]
+    Workflow = cls.env["riverflow.workflow"]
+    Transition = cls.env["riverflow.transition"]
+    service_model = cls.env["ir.model"]._get("riverflow.service")
+    cls.email_action = cls.env.ref("riverflow.transition_action_email_sender")
+
+    cls.workflow = Workflow.create({
+        "model_id": service_model.id,
+        "name": "Test Email Template WF",
+    })
+    cls.state_a = State.create({
+        "workflow_id": cls.workflow.id,
+        "name": "State A",
+        "sequence": 10,
+    })
+    cls.state_b = State.create({
+        "workflow_id": cls.workflow.id,
+        "name": "State B",
+        "sequence": 20,
+    })
+
+    cls.template_alpha = cls.env["mail.template"].create({
+        "name": "Template Alpha",
+        "model_id": service_model.id,
+        "subject": "Alpha subject",
+        "body_html": "<p>Alpha body</p>",
+    })
+    cls.template_beta = cls.env["mail.template"].create({
+        "name": "Template Beta",
+        "model_id": service_model.id,
+        "subject": "Beta subject",
+        "body_html": "<p>Beta body</p>",
+    })
+
+    cls.trans_with_template = Transition.create({
+        "name": "Send Alpha",
+        "from_state_id": cls.state_a.id,
+        "to_state_id": cls.state_b.id,
+        "action_id": cls.email_action.id,
+        "mail_template_id": cls.template_alpha.id,
+        "sequence": 10,
+    })
+
+    cls.trans_without_template = Transition.create({
+        "name": "Send Fallback",
+        "from_state_id": cls.state_a.id,
+        "to_state_id": cls.state_b.id,
+        "action_id": cls.email_action.id,
+        "sequence": 20,
+    })
+
+
+@tagged("post_install", "-at_install", "riverflow", "test_transition_email_template")
+class TestTransitionEmailTemplate(TransactionCase):
+    """Test mail_template_id on riverflow.transition and fallback logic
+    in the email sender wizard.
+
+    The transition-level template allows different email transitions within
+    the same workflow to use different templates (e.g., AB appointment request
+    vs. pickup request in the Work Permit workflow).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _create_email_test_data(cls)
+
+        cls.service = cls.env["riverflow.service"].create({
+            "name": "Test Service",
+            "state_id": cls.state_a.id,
+            "company_id": cls.env.company.id,
+            "mail_template_id": cls.template_beta.id,
+        })
+
+    def test_transition_mail_template_id_field(self):
+        """The mail_template_id field exists on riverflow.transition."""
+        self.assertIn("mail_template_id", self.env["riverflow.transition"]._fields)
+        self.assertEqual(self.trans_with_template.mail_template_id, self.template_alpha)
+        self.assertFalse(self.trans_without_template.mail_template_id)
+
+    def _wizard_defaults(self, transition, service):
+        """Open the email sender wizard as if the transition button was clicked."""
+        Wizard = self.env["riverflow.service.email.sender.wizard"]
+        return Wizard.with_context(
+            transition_id=transition.id,
+            active_model="riverflow.service",
+            active_ids=service.ids,
+        ).default_get(Wizard._fields.keys())
+
+    def test_email_wizard_prefers_transition_template(self):
+        """When the transition has a mail_template_id, the wizard uses it
+        instead of the service's template."""
+        defaults = self._wizard_defaults(self.trans_with_template, self.service)
+
+        self.assertEqual(
+            defaults.get("mail_template_id"),
+            self.template_alpha.id,
+            "Wizard should use the transition's template (Alpha), not the service's (Beta)",
+        )
+
+    def test_email_wizard_falls_back_to_service_template(self):
+        """When the transition has no mail_template_id, the wizard falls
+        back to the service's mail_template_id."""
+        defaults = self._wizard_defaults(self.trans_without_template, self.service)
+
+        self.assertEqual(
+            defaults.get("mail_template_id"),
+            self.template_beta.id,
+            "Wizard should fall back to the service's template (Beta)",
+        )
+
+    def test_email_wizard_no_template_anywhere(self):
+        """When neither transition nor service has a template, wizard
+        should not set mail_template_id."""
+        service_no_tpl = self.env["riverflow.service"].create({
+            "name": "No Template Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        defaults = self._wizard_defaults(self.trans_without_template, service_no_tpl)
+
+        self.assertFalse(
+            defaults.get("mail_template_id"),
+            "Wizard should not set mail_template_id when neither transition nor service has one",
+        )
+
+
+@tagged("post_install", "-at_install", "riverflow", "test_transition_email_template")
+class TestKeepServiceName(TransactionCase):
+    """Test that keep_service_name in action_context prevents the email sender
+    wizard from overwriting the service name with the email subject.
+
+    Multi-step workflows (e.g. Work Permit) use email transitions as intermediate
+    steps — the service name should stay descriptive ("Arrange Work Permit at AB")
+    rather than being overwritten with the German email subject line.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _create_email_test_data(cls)
+
+        Transition = cls.env["riverflow.transition"]
+
+        cls.recipient = cls.env["res.partner"].create({
+            "name": "Test Recipient",
+            "email": "test@example.com",
+        })
+
+        cls.trans_keep_name = Transition.create({
+            "name": "Send Keep Name",
+            "from_state_id": cls.state_a.id,
+            "to_state_id": cls.state_b.id,
+            "action_id": cls.email_action.id,
+            "mail_template_id": cls.template_alpha.id,
+            "action_context": "{'keep_service_name': True}",
+            "sequence": 30,
+        })
+
+    def _get_write_vals(self, service, transition):
+        """Open the email sender wizard and collect the write vals that
+        update_write_values would apply to the service, without actually
+        sending the email. Tests the name-setting logic in isolation.
+
+        Merges the transition's action_context into the wizard context
+        (mimicking what _prepare_action_context does in the real flow).
+        """
+        import ast
+        extra_ctx = {}
+        if transition.action_context:
+            extra_ctx = ast.literal_eval(transition.action_context) or {}
+
+        ctx = {
+            "transition_id": transition.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        defaults["recipient_partner_ids"] = [(6, 0, [self.recipient.id])]
+        wizard = Wizard.create(defaults)
+
+        vals = {}
+        wizard.update_write_values(service, vals)
+        return vals
+
+    def test_keep_service_name_preserves_name(self):
+        """With keep_service_name in action_context, update_write_values does
+        NOT set vals["name"] — the service name stays as originally set."""
+        service = self.env["riverflow.service"].create({
+            "name": "Arrange Work Permit at AB",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        vals = self._get_write_vals(service, self.trans_keep_name)
+
+        self.assertNotIn(
+            "name", vals,
+            "vals should not contain 'name' when keep_service_name is set",
+        )
+
+    def test_default_email_transition_renames_service(self):
+        """Without keep_service_name, update_write_values sets vals["name"]
+        to the email subject (existing behavior)."""
+        service = self.env["riverflow.service"].create({
+            "name": "Original Name",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        vals = self._get_write_vals(service, self.trans_with_template)
+
+        self.assertIn(
+            "name", vals,
+            "vals should contain 'name' when keep_service_name is not set",
+        )
+
+
+@tagged("post_install", "-at_install", "riverflow", "test_transition_email_template")
+class TestFollowupInDays(TransactionCase):
+    """Test that followup_in_days in action_context pre-fills the deadline
+    and overrides the email sender's default of tomorrow.
+
+    HR workflows (e.g. Work Permit) need configurable follow-up periods
+    per transition — 7 days for AB requests (weekly visit rhythm), 14 days
+    for AT Applied (preparation time for pickup request).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _create_email_test_data(cls)
+
+        Transition = cls.env["riverflow.transition"]
+        cls.default_action = cls.env.ref("riverflow.transition_action_default")
+
+        cls.trans_followup_7 = Transition.create({
+            "name": "Default with followup 7",
+            "from_state_id": cls.state_a.id,
+            "to_state_id": cls.state_b.id,
+            "action_id": cls.default_action.id,
+            "action_context": "{'followup_in_days': 7}",
+            "sequence": 40,
+        })
+
+        cls.trans_email_followup_14 = Transition.create({
+            "name": "Email with followup 14",
+            "from_state_id": cls.state_a.id,
+            "to_state_id": cls.state_b.id,
+            "action_id": cls.email_action.id,
+            "mail_template_id": cls.template_alpha.id,
+            "action_context": "{'keep_service_name': True, 'followup_in_days': 14}",
+            "sequence": 50,
+        })
+
+        cls.recipient = cls.env["res.partner"].create({
+            "name": "Test Recipient",
+            "email": "test@example.com",
+        })
+
+    def _get_wizard_defaults(self, service, transition):
+        """Get wizard defaults with action_context merged into context."""
+        import ast
+        extra_ctx = {}
+        if transition.action_context:
+            extra_ctx = ast.literal_eval(transition.action_context) or {}
+
+        ctx = {
+            "transition_id": transition.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.wizard"].with_context(**ctx)
+        return Wizard.default_get(Wizard._fields.keys())
+
+    def test_followup_in_days_prefills_project_deadline(self):
+        """When followup_in_days is in context, project_deadline is pre-filled
+        with today + N days and the deadline field is visible."""
+        service = self.env["riverflow.service"].create({
+            "name": "Test Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        defaults = self._get_wizard_defaults(service, self.trans_followup_7)
+
+        expected_date = fields.Date.today() + timedelta(days=7)
+        self.assertEqual(
+            defaults.get("project_deadline"),
+            expected_date,
+            "project_deadline should be today + 7 days",
+        )
+        self.assertFalse(
+            defaults.get("project_deadline_invisible"),
+            "project_deadline should be visible when followup_in_days is set",
+        )
+
+    def test_followup_in_days_sets_service_deadline(self):
+        """Firing a default-action transition with followup_in_days sets the
+        service deadline to today + N days."""
+        service = self.env["riverflow.service"].create({
+            "name": "Test Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        import ast
+        extra_ctx = ast.literal_eval(self.trans_followup_7.action_context)
+        ctx = {
+            "transition_id": self.trans_followup_7.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        wizard = Wizard.create(defaults)
+        wizard.action_save()
+
+        expected_date = fields.Date.today() + timedelta(days=7)
+        self.assertEqual(service.state_id, self.state_b)
+        self.assertEqual(service.project_deadline, expected_date)
+
+    def test_followup_in_days_overrides_email_sender_default(self):
+        """When an email transition has followup_in_days, the deadline is
+        today + N (not the email sender's default of tomorrow)."""
+        service = self.env["riverflow.service"].create({
+            "name": "Test Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        import ast
+        extra_ctx = ast.literal_eval(self.trans_email_followup_14.action_context)
+        ctx = {
+            "transition_id": self.trans_email_followup_14.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        defaults["recipient_partner_ids"] = [(6, 0, [self.recipient.id])]
+        wizard = Wizard.create(defaults)
+
+        # Check that defaults show the followup date, not tomorrow
+        expected_date = fields.Date.today() + timedelta(days=14)
+        self.assertEqual(
+            defaults.get("project_deadline"),
+            expected_date,
+            "Email sender defaults should show followup date, not tomorrow",
+        )
+        self.assertFalse(
+            defaults.get("project_deadline_invisible"),
+            "Follow-up deadline should be visible on the email sender form",
+        )
+
+    def test_email_sender_hides_deadline_by_default(self):
+        """Without followup_in_days, the email sender hides project_deadline."""
+        service = self.env["riverflow.service"].create({
+            "name": "Test Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        ctx = {
+            "transition_id": self.trans_with_template.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+
+        self.assertTrue(
+            defaults.get("project_deadline_invisible"),
+            "project_deadline should be hidden for normal email transitions",
+        )

@@ -126,6 +126,12 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
     @api.model
     def default_get_using_records(self, defaultValues, records_to_transition):
+        # Hide deadline by default on email forms — email sender sets its own
+        # deadline (tomorrow) in update_write_values. When followup_in_days is
+        # active, the base wizard's default_get overrides this to False so the
+        # user sees and can adjust the follow-up deadline.
+        defaultValues["project_deadline_invisible"] = True
+
         super().default_get_using_records(defaultValues, records_to_transition)
 
         # Get default recipients from the first service record
@@ -134,6 +140,20 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             default_recipients = service._get_default_recipients()
             defaultValues["recipient_partner_ids"] = [Command.set(default_recipients.ids)]
             defaultValues["subject_updatable"] = service.name
+
+        # Resolve the email template: transition-level overrides service-level.
+        # This allows different email transitions in the same workflow to use
+        # different templates (e.g., AB appointment request vs. pickup request).
+        transition_id = self.env.context.get("transition_id")
+        if transition_id:
+            transition = self.env["riverflow.transition"].browse(transition_id)
+            if transition.mail_template_id:
+                defaultValues["mail_template_id"] = transition.mail_template_id.id
+                return
+        if records_to_transition:
+            service = records_to_transition[0]
+            if service.mail_template_id:
+                defaultValues["mail_template_id"] = service.mail_template_id.id
 
     def _inverse_subject_updatable(self):
         # This method allows manual updates to subject_updatable to persist
@@ -294,7 +314,13 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(service, vals)
 
         subject = self.subject_updatable
-        vals["name"] = subject
+        # keep_service_name (from transition action_context): preserve the original
+        # service name instead of overwriting it with the email subject. Used by
+        # workflows where the service represents a multi-step process and the email
+        # is just one step (e.g. Work Permit: "Arrange Work Permit at AB" should
+        # not be renamed to the German AB request email subject).
+        if not self.env.context.get("keep_service_name"):
+            vals["name"] = subject
 
         if self.responsible_team_id:
             vals["responsible_team_id"] = self.responsible_team_id.id

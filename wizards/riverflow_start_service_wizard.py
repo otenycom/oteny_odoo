@@ -10,11 +10,17 @@ class ServiceNewWizard(models.TransientModel):
     _workflow_model = "riverflow.service"
 
     def _add_template_start_transitions(self, transition_buttons, defaults_context):
-        # fetch all services with is_root_a_template=True, sorted by default order (respecting the tree structure)
         template_services = self.env["riverflow.service"].search([("is_root_a_template", "=", True)])
 
+        # Sort alphabetically by root template name, preserving tree structure
+        # within each root (root before children, ordered by display_order)
+        sorted_templates = sorted(
+            template_services,
+            key=lambda s: (s.root_id.name.lower(), s.display_order),
+        )
+
         index = 0
-        for template_service in template_services:
+        for template_service in sorted_templates:
             button_context = defaults_context.copy()
             button_context["template_service_id"] = template_service.id
             icon = template_service.workflow_id.icon or "plus"
