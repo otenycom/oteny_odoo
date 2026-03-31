@@ -1,6 +1,7 @@
 from datetime import timedelta
 
-from odoo import models, fields, Command
+from odoo import api, models, fields, Command
+from odoo.exceptions import UserError
 
 
 class ServiceWizard(models.TransientModel):
@@ -45,6 +46,50 @@ class ServiceWizard(models.TransientModel):
 
     tag_ids = fields.Many2many("riverflow.service.tag", string="Tags")
     tag_ids_invisible = fields.Boolean()
+
+    # Warns the user when the service's current state uses
+    # auto_progress_on_children_done but active children haven't finished.
+    incomplete_children_warning = fields.Text(
+        compute="_compute_incomplete_children_warning",
+    )
+    ignore_incomplete_children = fields.Boolean(
+        string="I confirm — skip the child services",
+    )
+
+    @api.depends("records_to_transition_ids")
+    def _compute_incomplete_children_warning(self):
+        for wizard in self:
+            service = wizard.records_to_transition_ids[:1]
+            if (
+                service
+                and service.state_id.auto_progress_on_children_done
+                and service.child_ids
+            ):
+                incomplete = service.child_ids.filtered(
+                    lambda c: c.active and not c.is_end_state
+                )
+                if incomplete:
+                    names = ", ".join(
+                        f"{c.name} ({c.state_id.name})" for c in incomplete
+                    )
+                    wizard.incomplete_children_warning = (
+                        "This service will complete automatically when all "
+                        "child services are done. The following child services "
+                        f"are not yet completed: {names}. "
+                        "Complete the child services first, or check the box "
+                        "below to skip."
+                    )
+                    continue
+            wizard.incomplete_children_warning = False
+
+    def action_save(self):
+        for wizard in self:
+            if (
+                wizard.incomplete_children_warning
+                and not wizard.ignore_incomplete_children
+            ):
+                raise UserError(wizard.incomplete_children_warning)
+        return super().action_save()
 
     def default_get_using_records(self, defaultValues, records_to_transition):
         if not "project_deadline" in defaultValues:
