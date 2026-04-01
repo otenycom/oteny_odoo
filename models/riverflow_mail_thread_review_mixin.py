@@ -142,7 +142,7 @@ class MailThreadReviewMixin(models.AbstractModel):
                 channel_id = self.sudo().env["discuss.channel"].channel_get(team.ids)
 
             if not channel_id:
-                _logger.warning("No discuss channel found for team %s", team.name)
+                _logger.info("No discuss channel found for team %s", team.name)
                 return False
 
             # Prepare message posting parameters
