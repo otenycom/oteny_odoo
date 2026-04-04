@@ -86,6 +86,7 @@
                             <field name="use_project_deadline_from" widget="filterable_selection"
                                 options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
                             <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
+                            <field name="root_service_appointment_date" invisible="use_project_deadline_from != 'root_appointment'" />
                             <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
                                 on_change="1" />
                             <field name="weekend_deadline_rule" invisible="not is_days_relative_to_project_applicable" />

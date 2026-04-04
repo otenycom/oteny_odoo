@@ -5,3 +5,4 @@ from . import test_auto_progress
 from . import test_deferred_children
 from . import test_supply_time
 from . import test_transition_email_template
+from . import test_project_deadline

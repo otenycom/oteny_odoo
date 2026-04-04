@@ -154,6 +154,7 @@ class Service(models.Model):
         [
             ("self", "Self"),
             ("root", "Top-level service"),
+            ("root_appointment", "Top-level appointment"),
             ("creation", "Creation Date"),
         ],
         string="Deadline From",
@@ -203,6 +204,12 @@ class Service(models.Model):
         store=False,
         index=True,
         recursive=True,
+    )
+    root_service_appointment_date = fields.Date(
+        "Top-level appointment date",
+        related="root_id.supply_actual_date",
+        help="Appointment date (supply_actual_date) of the top-level parent",
+        store=False,
     )
     deadline = fields.Date(
         "Deadline",
@@ -637,6 +644,7 @@ class Service(models.Model):
     @api.depends(
         "use_project_deadline_from",
         "root_id.deadline",
+        "root_id.supply_actual_date",
         "root_id",
         "supply_order_service_id.deadline",
     )
@@ -654,6 +662,13 @@ class Service(models.Model):
                     service.project_deadline = service.project_deadline
                 elif use_project_deadline_from == "root":
                     service.project_deadline = service.root_id.deadline
+                elif use_project_deadline_from == "root_appointment":
+                    # Use root's appointment date (supply_actual_date) with
+                    # fallback to root's deadline. Keeps child deadlines stable
+                    # even as the root's deadline changes during workflow progression.
+                    service.project_deadline = (
+                        service.root_id.supply_actual_date or service.root_id.deadline
+                    )
 
     def _inverse_project_deadline(self):
         # this is a flag method specifying the user is allowed to store the project_deadline
@@ -680,7 +695,10 @@ class Service(models.Model):
         for service in self:
             service.is_days_relative_to_project_applicable = (
                 service.use_project_deadline_from not in ("self",)
-                and not (service.use_project_deadline_from == "root" and service.root_id.ids == service.ids)
+                and not (
+                    service.use_project_deadline_from in ("root", "root_appointment")
+                    and service.root_id.ids == service.ids
+                )
             )
 
     @api.depends(
@@ -776,7 +794,9 @@ class Service(models.Model):
         if self.use_project_deadline_from == "self":
             return ""
         elif self.use_project_deadline_from == "root":
-            return f"Top-level service"
+            return "Top-level service"
+        elif self.use_project_deadline_from == "root_appointment":
+            return "Appointment"
         else:
             return "(unknown: use_project_deadline_from)"
 
@@ -1058,6 +1078,7 @@ class Service(models.Model):
         # when creating templates, any 'use from' is allowed because we don't know yet which parent service or subject will be selected
         if parent_id or is_root_a_template:
             options.append("root")
+            options.append("root_appointment")
         if is_root_a_template:
             options.append("creation")
 
