@@ -18,16 +18,21 @@ class ServiceWizard(models.TransientModel):
 
     days_relative_to_project_invisible = fields.Boolean()
     use_project_deadline_from = fields.Selection(
-        [
-            ("self", "Self"),
-            ("root", "Top-level service"),
-        ],
+        selection="_selection_use_project_deadline_from",
         string="Deadline From",
         required=False,
         default="self",
     )
+
+    @api.model
+    def _selection_use_project_deadline_from(self):
+        """Mirror the selection from riverflow.service so the wizard always
+        accepts every value the service model can store."""
+        service_field = self.env["riverflow.service"]._fields["use_project_deadline_from"]
+        return service_field._description_selection(self.env)
+
     use_project_deadline_from_invisible = fields.Boolean()
-    use_project_deadline_from_options = fields.Json()
+    use_project_deadline_from_options = fields.Json(default=list)
 
     project_deadline = fields.Date(
         "Project deadline",
