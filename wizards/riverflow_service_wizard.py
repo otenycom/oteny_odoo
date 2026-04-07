@@ -61,14 +61,21 @@ class ServiceWizard(models.TransientModel):
         string="I confirm — skip the child services",
     )
 
-    @api.depends("records_to_transition_ids")
+    @api.depends("records_to_transition_ids", "transition_id")
     def _compute_incomplete_children_warning(self):
         for wizard in self:
             service = wizard.records_to_transition_ids[:1]
+            # Only warn when the user manually moves to an end state,
+            # bypassing the auto-progress mechanism. Going Back or
+            # Cancelling does not need this gate.
+            to_state = wizard.transition_id.to_state_id
             if (
                 service
                 and service.state_id.auto_progress_on_children_done
                 and service.child_ids
+                and to_state
+                and to_state.is_end_state
+                and not to_state.is_cancelled_state
             ):
                 incomplete = service.child_ids.filtered(
                     lambda c: c.active and not c.is_end_state
