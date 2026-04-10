@@ -188,6 +188,9 @@
                                     <field name="is_this_a_template" />
                                     <field name="only_add_children" />
                                     <field name="create_on_state_id" />
+                                    <field name="can_be_root_service" />
+                                    <field name="can_be_child_service" />
+                                    <field name="allowed_subject_model_ids" widget="many2many_tags" />
                                 </group>
                             </group>
                         </page>
