@@ -140,8 +140,13 @@ class ServiceWizard(models.TransientModel):
 
     def update_write_values(self, service, vals):
         super().update_write_values(service, vals)
-        vals["res_id"] = self.res_id
-        vals["res_model"] = self.res_model
+        # Only push res_model/res_id into write_vals when creating a new
+        # service (start-transition wizard).  For existing records the subject
+        # is already set and the wizard fields are empty defaults — writing
+        # them would blank out the service's subject.
+        if self.res_model:
+            vals["res_id"] = self.res_id
+            vals["res_model"] = self.res_model
 
         if not self.env.context.get("name_readonly") and self.name:
             vals["name"] = self.name
