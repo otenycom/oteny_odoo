@@ -113,6 +113,13 @@ class TransitionWizard(models.AbstractModel):
             expected_state = transition.from_state_id
             for record in recordsToTransition:
                 current_state = record.state_id
+
+                # #region agent log
+                import json as _json, time as _time
+                with open("/Users/thijsvanwaaij/oteny/radar/.cursor/debug-2eb149.log", "a") as _f:
+                    _f.write(_json.dumps({"sessionId": "2eb149", "hypothesisId": "H2", "location": "riverflow_transition_wizard.py:action_save", "message": "state check in action_save", "data": {"wizard_model": self._name, "record_model": record._name, "record_id": record.id, "current_state": current_state.name if current_state else None, "current_state_id": current_state.id if current_state else None, "expected_state": expected_state.name if expected_state else None, "expected_state_id": expected_state.id if expected_state else None, "transition_name": transition.name, "transition_id": transition.id, "is_chained": bool(self.env.context.get("chained_attachment_ids")), "match": bool(not expected_state or current_state == expected_state)}, "timestamp": int(_time.time() * 1000)}) + "\n")
+                # #endregion
+
                 if expected_state and current_state != expected_state:
                     raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
