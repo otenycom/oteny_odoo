@@ -69,6 +69,30 @@ class Service(models.Model):
         help="If checked, only the children of this template will be added when creating a new service from this template",
         recursive=True,
     )
+    can_be_root_service = fields.Boolean(
+        string="Can be root service",
+        default=True,
+        help="Template setting: when unchecked, this template cannot be instantiated "
+        "as a top-level (root) service. Useful for deferred child templates that "
+        "should only exist under a parent.",
+    )
+    can_be_child_service = fields.Boolean(
+        string="Can be child service",
+        default=True,
+        help="Template setting: when unchecked, this template cannot be added as a "
+        "child of another service. Useful for complex workflows (A1, Work Permit) "
+        "that must always be root-level on their subject.",
+    )
+    allowed_subject_model_ids = fields.Many2many(
+        "ir.model",
+        "riverflow_service_allowed_subject_model_rel",
+        "service_id",
+        "model_id",
+        string="Allowed subjects",
+        help="Template setting: restrict which subject types this template can be "
+        "attached to. Empty means any subject is allowed. For example, set to "
+        "'Logbook Entry' for crew-change templates that require a log entry context.",
+    )
     create_on_state_id = fields.Many2one(
         "riverflow.state",
         string="Create on State",
@@ -1098,6 +1122,91 @@ class Service(models.Model):
             )
 
     @api.model
+    def _template_placement_allowed(self, template_service, res_model=None, is_child_add=False):
+        """Check whether a template may be instantiated in the given context.
+
+        Used by both the wizard (to filter visible templates) and the server
+        (to reject invalid creation in _create_service_member_from_template).
+
+        Args:
+            template_service: The template service record to check.
+            res_model: The subject model technical name (e.g. 'crewradar.log.entry').
+            is_child_add: True when adding as a child of another service.
+
+        Returns:
+            True if placement is allowed, False otherwise.
+        """
+        if is_child_add and not template_service.can_be_child_service:
+            return False
+        if not is_child_add and not template_service.can_be_root_service:
+            return False
+        allowed_models = template_service.allowed_subject_model_ids
+        if allowed_models:
+            # Template is restricted to specific subjects: reject if no subject
+            # is provided or if the subject model is not in the allowed list.
+            if not res_model or res_model not in allowed_models.mapped("model"):
+                return False
+        return True
+
+    def _check_template_placement(self, template_service, parent_id=False):
+        """Validate placement rules before creating a service from a template.
+
+        Raises UserError if the template cannot be placed in the current context.
+        Skipped when context has 'skip_service_template_placement_check'.
+        """
+        if self.env.context.get("skip_service_template_placement_check"):
+            return
+        # Only check templates that have placement rules configured
+        # (avoids false positives on non-template records and on templates
+        # where all flags are at their permissive defaults)
+        has_rules = (
+            not template_service.can_be_root_service
+            or not template_service.can_be_child_service
+            or template_service.allowed_subject_model_ids
+        )
+        if not has_rules:
+            return
+
+        is_child_add = bool(parent_id)
+        if parent_id:
+            parent = self.env["riverflow.service"].browse(parent_id)
+            res_model = parent.res_model
+        else:
+            res_model = self.env.context.get("default_res_model")
+
+        if not self._template_placement_allowed(template_service, res_model=res_model, is_child_add=is_child_add):
+            # Build a descriptive error message
+            reasons = []
+            if is_child_add and not template_service.can_be_child_service:
+                reasons.append(
+                    _("'%s' cannot be added as a child service.", template_service.name)
+                )
+            if not is_child_add and not template_service.can_be_root_service:
+                reasons.append(
+                    _("'%s' cannot be used as a standalone (root) service.", template_service.name)
+                )
+            allowed_models = template_service.allowed_subject_model_ids
+            if allowed_models:
+                allowed_names = ", ".join(allowed_models.mapped("name"))
+                if not res_model:
+                    reasons.append(
+                        _(
+                            "'%s' requires a subject (%s).",
+                            template_service.name,
+                            allowed_names,
+                        )
+                    )
+                elif res_model not in allowed_models.mapped("model"):
+                    reasons.append(
+                        _(
+                            "'%s' can only be used on: %s.",
+                            template_service.name,
+                            allowed_names,
+                        )
+                    )
+            raise UserError("\n".join(reasons))
+
+    @api.model
     def _get_template_clone_vals(self, template_service):
         """Hook: return additional vals to merge when cloning a service template.
 
@@ -1118,6 +1227,8 @@ class Service(models.Model):
         Returns:
             The newly created service record
         """
+        self._check_template_placement(template_service, parent_id=parent_id)
+
         vals = {
             "name": template_service.name,
             "res_id": self.env.context.get("default_res_id"),

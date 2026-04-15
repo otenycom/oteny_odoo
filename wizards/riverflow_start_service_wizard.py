@@ -19,8 +19,26 @@ class ServiceNewWizard(models.TransientModel):
             key=lambda s: (s.root_id.name.lower(), s.display_order),
         )
 
+        # Determine placement context from the wizard defaults
+        res_model = defaults_context.get("default_res_model")
+        is_child_add = bool(defaults_context.get("default_parent_id"))
+        Service = self.env["riverflow.service"]
+
+        # Pre-compute which root templates are allowed so we can skip
+        # entire subtrees when the root is disallowed.
+        excluded_root_ids = set()
+        for tpl in sorted_templates:
+            if tpl.indent_level == 0:
+                if not Service._template_placement_allowed(
+                    tpl, res_model=res_model, is_child_add=is_child_add
+                ):
+                    excluded_root_ids.add(tpl.root_id.id)
+
         index = 0
         for template_service in sorted_templates:
+            if template_service.root_id.id in excluded_root_ids:
+                continue
+
             button_context = defaults_context.copy()
             button_context["template_service_id"] = template_service.id
             icon = template_service.workflow_id.icon or "plus"
