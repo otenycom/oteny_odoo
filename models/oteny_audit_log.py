@@ -1,8 +1,13 @@
 # audit_log/models/audit_log.py
-from odoo import Command, fields, models, api
+import hashlib
 import logging
 
+from odoo import Command, api, fields, models
+
 _logger = logging.getLogger(__name__)
+
+_AUDIT_ACTION_XML_MODULE = "oteny_audit"
+_AUDIT_ACTION_XML_PREFIX = "action_audit_log_"
 
 
 class OtenyAuditLog(models.Model):
@@ -154,6 +159,17 @@ class OtenyAuditLog(models.Model):
 
         return False
 
+    @api.model
+    def _audit_log_action_xml_id(self, technical_model_name):
+        """Full XML id for the per-model audit server action (``module.name`` for ``ir.model.data``).
+
+        Uses a SHA-256 hex suffix so distinct technical names never collide (unlike
+        ``model.replace('.', '_')``, where e.g. ``a.b.c`` and ``a.b_c`` map to the same string).
+        Only ``[a-z0-9_]`` appear in the suffix, which is valid for Odoo external identifiers.
+        """
+        digest = hashlib.sha256(technical_model_name.encode("utf-8")).hexdigest()
+        return f"{_AUDIT_ACTION_XML_MODULE}.{_AUDIT_ACTION_XML_PREFIX}{digest}"
+
     def install_for_all_models_action(self):
         """Create audit log actions for all models that don't already have them.
         This will be called automatically when modules are installed.
@@ -162,6 +178,16 @@ class OtenyAuditLog(models.Model):
         # Get all non-transient models except ourselves
         all_models = self.env["ir.model"].search([("transient", "=", False), ("model", "!=", self._name)])
         eligible_models = all_models.filtered(lambda m: not self._is_audit_ignored(m.model))
+        # One ir.model row per technical model name (DB can contain duplicates, e.g. stale rows);
+        # otherwise _batch_process_actions would try to create the same xml_id twice.
+        seen_names = set()
+        unique_ids = []
+        for m in eligible_models.sorted("id"):
+            if m.model in seen_names:
+                continue
+            seen_names.add(m.model)
+            unique_ids.append(m.id)
+        eligible_models = self.env["ir.model"].browse(unique_ids)
 
         _logger.info(f"Starting audit log action setup for {len(eligible_models)} models")
 
@@ -205,12 +231,11 @@ action = {
     def _batch_process_actions(self, models):
         """Process action creation/updates in batches for better performance."""
         action_code = self._get_action_code()
-        module_name = "oteny_audit"
 
         actions_data = []
 
         for model in models:
-            xml_id = f"{module_name}.action_audit_log_{model.model.replace('.', '_')}"
+            xml_id = self._audit_log_action_xml_id(model.model)
             actions_data.append(
                 {
                     "xml_id": xml_id,
@@ -227,7 +252,7 @@ action = {
 
     def _process_action_batch(self, actions_data, action_type):
         """Process a batch of actions, creating new ones and updating existing ones."""
-        module_name = "oteny_audit"
+        module_name = _AUDIT_ACTION_XML_MODULE
         actions_created = 0
         actions_updated = 0
 
@@ -274,25 +299,24 @@ action = {
                         "noupdate": True,
                     }
                 )
+                existing_refs[xml_id] = new_action
                 actions_created += 1
 
         return actions_created, actions_updated
 
     def _cleanup_obsolete_actions(self, eligible_models):
         """Remove actions for models that are no longer eligible for auditing."""
-        module_name = "oteny_audit"
+        module_name = _AUDIT_ACTION_XML_MODULE
         actions_removed = 0
 
         # Build a set of expected XML IDs for all eligible models
-        expected_xml_ids = {
-            f"{module_name}.action_audit_log_{model.model.replace('.', '_')}" for model in eligible_models
-        }
+        expected_xml_ids = {self._audit_log_action_xml_id(m.model) for m in eligible_models}
 
         # Find all existing audit log actions for this module
         existing_xml_id_records = self.env["ir.model.data"].search(
             [
                 ("module", "=", module_name),
-                ("name", "like", "action_audit_log_%"),
+                ("name", "like", f"{_AUDIT_ACTION_XML_PREFIX}%"),
                 ("model", "=", "ir.actions.server"),
             ]
         )

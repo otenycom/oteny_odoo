@@ -687,6 +687,19 @@ class TestAuditLog(TransactionCase):
         # install_for_all_models_action iterates all ir.model rows — must not raise
         audit_log.install_for_all_models_action()
 
+    def test_audit_action_xml_id_injective_for_similar_names(self):
+        """Technical names that collided under dot-to-underscore must get distinct xml ids."""
+        log = self.env["oteny.audit.log"]
+        m1 = "a.b.c"
+        m2 = "a.b_c"
+        self.assertNotEqual(
+            log._audit_log_action_xml_id(m1),
+            log._audit_log_action_xml_id(m2),
+        )
+        self.assertTrue(
+            log._audit_log_action_xml_id(m1).startswith("oteny_audit.action_audit_log_"),
+        )
+
     def test_create_all_defaults_or_empty_logs_placeholder(self):
         """Test that creating record with only defaults/empty values logs at least one placeholder"""
         # Use test models that allow empty records
