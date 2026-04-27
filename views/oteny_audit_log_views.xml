@@ -218,7 +218,7 @@
                         <group string="Raw Field Values">
                             <field name="record_id" />
                             <field name="field_model_name" />
-                            <field name="field_name" />
+                            <field name="field_name" groups="base.group_no_one" />
                             <field name="old_value" />
                             <field name="new_value" />
                         </group>

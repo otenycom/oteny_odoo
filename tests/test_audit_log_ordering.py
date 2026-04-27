@@ -16,72 +16,40 @@ class TestAuditLogOrdering(TransactionCase):
         self.aggregated_model = self.env["oteny.audit.log.aggregated"]
 
     def test_create_then_write_ordering(self):
-        """Test that when creating a record and immediately writing to it, logs are in correct order"""
-        # Create a parent record and immediately write to it (before any flush)
+        """Create then immediately write: a single insert snapshot precedes per-field updates."""
         parent = self.parent_model.create({"name": "Initial Name"})
-
-        # Immediately write to the same record (before flush)
         parent.write({"name": "Updated Name"})
-
-        # Now flush to trigger the deferred logging for the write
         parent.flush_recordset()
 
-        # Get all audit logs for this parent record
         logs = self.log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
                 ("record_id", "=", parent.id),
             ],
-            order="id ASC",  # Order by ID ascending to see chronological order
+            order="id ASC",
         )
 
-        # Debug output to see what logs we have
-        print(f"\nDebug test_create_then_write_ordering: Found {len(logs)} logs")
-        for i, log in enumerate(logs):
-            print(f"  Log {i}: field={log.field_name}, type={log.change_type}, new={log.new_value}")
+        insert_logs = logs.filtered(lambda l: l.change_type == "i")
+        update_logs = logs.filtered(lambda l: l.change_type == "u")
 
-        # Filter out computed_field which might be set during creation
-        non_computed_logs = logs.filtered(lambda l: l.field_name != "computed_field")
+        # One tombstone snapshot for the create.
+        self.assertEqual(len(insert_logs), 1, "Should have a single insert snapshot")
+        self.assertEqual(insert_logs.field_name, "__snapshot__")
+        snapshot = insert_logs.snapshot or {}
+        self.assertEqual(snapshot.get("name", {}).get("raw"), "Initial Name")
 
-        # Should have exactly 2 logs for 'name' field: 1 insert, 1 update
-        self.assertEqual(
-            len(non_computed_logs), 2, "Should have 2 audit logs for 'name' field (1 insert, 1 update)"
-        )
+        # Per-field update for the subsequent write to 'name'.
+        name_updates = update_logs.filtered(lambda l: l.field_name == "name")
+        self.assertEqual(len(name_updates), 1, "Should have one update log for 'name'")
+        self.assertEqual(name_updates.old_value, "Initial Name")
+        self.assertEqual(name_updates.new_value, "Updated Name")
 
-        # First log should be the insert
-        self.assertEqual(non_computed_logs[0].change_type, "i", "First log should be insert")
-        self.assertEqual(non_computed_logs[0].field_name, "name", "First log should be for name field")
-        self.assertEqual(non_computed_logs[0].new_value, "Initial Name", "Insert should have initial value")
-        self.assertEqual(non_computed_logs[0].old_value, "", "Insert should have empty old value")
-
-        # Second log should be the update
-        self.assertEqual(non_computed_logs[1].change_type, "u", "Second log should be update")
-        self.assertEqual(non_computed_logs[1].field_name, "name", "Second log should be for name field")
-        self.assertEqual(
-            non_computed_logs[1].old_value, "Initial Name", "Update should have initial as old value"
-        )
-        self.assertEqual(non_computed_logs[1].new_value, "Updated Name", "Update should have updated value")
-
-        # Verify ordering in aggregated view as well
-        aggregated_logs = self.aggregated_model.search(
-            [
-                ("model_name", "=", self.parent_model._name),
-                ("record_id", "=", parent.id),
-                ("is_child_log", "=", False),  # Only direct logs
-                ("field_name", "!=", "computed_field"),  # Exclude computed field
-            ],
-        )
-
-        # In DESC order, update should come first, then insert
-        self.assertEqual(len(aggregated_logs), 2, "Should have 2 aggregated logs for 'name' field")
-        self.assertEqual(aggregated_logs[0].change_type, "u", "Most recent should be update")
-        self.assertEqual(aggregated_logs[1].change_type, "i", "Older should be insert")
+        # The snapshot row precedes any update rows (id-ascending).
+        self.assertLess(insert_logs.id, name_updates.id, "Insert snapshot must precede updates")
 
     def test_child_create_update_parent_ordering(self):
-        """Test ordering when child is created and updated, showing in parent's audit trail"""
-        # Create parent first
+        """Child create + update: snapshot insert + per-field update, both visible in parent audit trail."""
         parent = self.parent_model.create({"name": "Parent Record"})
-
         # Clear parent's own creation logs to focus on child logs
         self.log_model.search(
             [
@@ -90,14 +58,10 @@ class TestAuditLogOrdering(TransactionCase):
             ]
         ).unlink()
 
-        # Create a child and immediately update it
         child = self.child_model.create({"name": "Initial Child Name", "parent_id": parent.id})
-
-        # Immediately update the child
         child.write({"name": "Updated Child Name"})
         child.flush_recordset()
 
-        # Get child's direct audit logs
         child_logs = self.log_model.search(
             [
                 ("model_name", "=", self.child_model._name),
@@ -106,28 +70,20 @@ class TestAuditLogOrdering(TransactionCase):
             order="id ASC",
         )
 
-        # Should have 3 logs: name insert, parent_id insert, name update
-        self.assertGreaterEqual(len(child_logs), 3, "Should have at least 3 child logs")
+        # One snapshot for the create, plus a per-field update for 'name'.
+        snapshot_logs = child_logs.filtered(lambda l: l.field_name == "__snapshot__")
+        self.assertEqual(len(snapshot_logs), 1, "Should have one tombstone snapshot for child create")
+        self.assertEqual(snapshot_logs.change_type, "i")
+        snapshot = snapshot_logs.snapshot or {}
+        self.assertEqual(snapshot.get("name", {}).get("raw"), "Initial Child Name")
+        self.assertIn("parent_id", snapshot, "parent_id must be in the create snapshot")
 
-        # Find the logs for the name field
-        name_logs = child_logs.filtered(lambda l: l.field_name == "name")
-        self.assertEqual(len(name_logs), 2, "Should have 2 logs for name field")
+        name_update = child_logs.filtered(lambda l: l.field_name == "name" and l.change_type == "u")
+        self.assertEqual(len(name_update), 1)
+        self.assertEqual(name_update.old_value, "Initial Child Name")
+        self.assertEqual(name_update.new_value, "Updated Child Name")
 
-        # First name log should be insert
-        self.assertEqual(name_logs[0].change_type, "i", "First name log should be insert")
-        self.assertEqual(name_logs[0].new_value, "Initial Child Name")
-
-        # Second name log should be update
-        self.assertEqual(name_logs[1].change_type, "u", "Second name log should be update")
-        self.assertEqual(name_logs[1].old_value, "Initial Child Name")
-        self.assertEqual(name_logs[1].new_value, "Updated Child Name")
-
-        # Check parent_id insert log
-        parent_id_log = child_logs.filtered(lambda l: l.field_name == "parent_id")
-        self.assertEqual(len(parent_id_log), 1, "Should have 1 log for parent_id")
-        self.assertEqual(parent_id_log.change_type, "i", "parent_id log should be insert")
-
-        # Verify in parent's aggregated view
+        # In parent's aggregated view, both the snapshot and update show up as child logs.
         parent_view_logs = self.aggregated_model.search(
             [
                 ("model_name", "=", parent._name),
@@ -135,195 +91,132 @@ class TestAuditLogOrdering(TransactionCase):
                 ("is_child_log", "=", True),
             ],
         )
-
-        # Should see child logs in reverse chronological order
-        child_name_logs = parent_view_logs.filtered(lambda l: l.field_name == "name")
-        self.assertEqual(len(child_name_logs), 2, "Parent should see 2 child name changes")
-
-        # Most recent first (due to DESC order)
-        self.assertEqual(child_name_logs[0].change_type, "u", "Most recent should be update")
-        self.assertEqual(child_name_logs[0].new_value, "Updated Child Name")
-
-        self.assertEqual(child_name_logs[1].change_type, "i", "Older should be insert")
-        self.assertEqual(child_name_logs[1].new_value, "Initial Child Name")
+        child_change_types = set(parent_view_logs.mapped("change_type"))
+        self.assertIn("i", child_change_types, "Parent should see the child insert (snapshot)")
+        self.assertIn("u", child_change_types, "Parent should see the child update")
 
     def test_multiple_writes_before_flush(self):
-        """Test that multiple writes before flush result in single update log"""
-        # Create a record
+        """Multiple writes without intermediate flush coalesce into a single update log."""
         parent = self.parent_model.create({"name": "Name 1"})
-
-        # Multiple writes without flush - only the last one will be logged
         parent.write({"name": "Name 2"})
         parent.write({"name": "Name 3"})
         parent.write({"name": "Name 4"})
-
-        # Now flush all changes
         parent.flush_recordset()
 
-        # Get all logs
         logs = self.log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
                 ("record_id", "=", parent.id),
-                ("field_name", "=", "name"),
             ],
             order="id ASC",
         )
 
-        # Should have 2 logs: 1 insert + 1 update (multiple writes coalesce into one)
-        self.assertEqual(len(logs), 2, "Should have 2 logs (1 insert + 1 final update)")
+        snapshot_logs = logs.filtered(lambda l: l.field_name == "__snapshot__")
+        self.assertEqual(len(snapshot_logs), 1, "Should have a single insert snapshot")
+        self.assertEqual(snapshot_logs.change_type, "i")
+        self.assertEqual(snapshot_logs.snapshot.get("name", {}).get("raw"), "Name 1")
 
-        # Verify the sequence
-        self.assertEqual(logs[0].change_type, "i", "First should be insert")
-        self.assertEqual(logs[0].new_value, "Name 1")
-
-        # Only the final write is logged (intermediate values are lost)
-        self.assertEqual(logs[1].change_type, "u", "Second should be update")
-        self.assertEqual(logs[1].old_value, "Name 1", "Old value should be initial")
-        self.assertEqual(logs[1].new_value, "Name 4", "New value should be final")
-
-        print(f"\nLog IDs in order: {logs.mapped('id')}")
-        print(
-            f"Multiple writes before flush coalesce into single update: Create (Name 1) -> Update (Name 1 -> Name 4)"
-        )
+        name_updates = logs.filtered(lambda l: l.field_name == "name" and l.change_type == "u")
+        self.assertEqual(len(name_updates), 1, "Multiple writes before flush coalesce to one update")
+        self.assertEqual(name_updates.old_value, "Name 1")
+        self.assertEqual(name_updates.new_value, "Name 4")
 
     def test_writes_with_intermediate_flushes(self):
-        """Test that writes with intermediate flushes create separate logs"""
-        # Create a record
+        """Writes with intermediate flushes create one update log per flushed transition."""
         parent = self.parent_model.create({"name": "Name 1"})
 
-        # Write and flush
         parent.write({"name": "Name 2"})
         parent.flush_recordset()
-
-        # Write and flush again
         parent.write({"name": "Name 3"})
         parent.flush_recordset()
-
-        # Write and flush once more
         parent.write({"name": "Name 4"})
         parent.flush_recordset()
 
-        # Get all logs
-        logs = self.log_model.search(
+        all_logs = self.log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
                 ("record_id", "=", parent.id),
-                ("field_name", "=", "name"),
             ],
             order="id ASC",
         )
 
-        # Should have 4 logs: 1 insert + 3 updates (each flush creates a log)
-        self.assertEqual(len(logs), 4, "Should have 4 logs (1 insert + 3 updates)")
+        # Insert snapshot first.
+        snapshot_logs = all_logs.filtered(lambda l: l.field_name == "__snapshot__")
+        self.assertEqual(len(snapshot_logs), 1)
+        self.assertEqual(snapshot_logs.change_type, "i")
+        self.assertEqual(snapshot_logs.snapshot.get("name", {}).get("raw"), "Name 1")
 
-        # Verify the sequence
-        self.assertEqual(logs[0].change_type, "i", "First should be insert")
-        self.assertEqual(logs[0].new_value, "Name 1")
+        # Three name updates, in order, each carrying its old/new transition.
+        name_updates = all_logs.filtered(
+            lambda l: l.field_name == "name" and l.change_type == "u"
+        ).sorted(key=lambda l: l.id)
+        self.assertEqual(len(name_updates), 3)
+        self.assertEqual(name_updates[0].old_value, "Name 1")
+        self.assertEqual(name_updates[0].new_value, "Name 2")
+        self.assertEqual(name_updates[1].old_value, "Name 2")
+        self.assertEqual(name_updates[1].new_value, "Name 3")
+        self.assertEqual(name_updates[2].old_value, "Name 3")
+        self.assertEqual(name_updates[2].new_value, "Name 4")
 
-        self.assertEqual(logs[1].change_type, "u", "Second should be update")
-        self.assertEqual(logs[1].old_value, "Name 1")
-        self.assertEqual(logs[1].new_value, "Name 2")
-
-        self.assertEqual(logs[2].change_type, "u", "Third should be update")
-        self.assertEqual(logs[2].old_value, "Name 2")
-        self.assertEqual(logs[2].new_value, "Name 3")
-
-        self.assertEqual(logs[3].change_type, "u", "Fourth should be update")
-        self.assertEqual(logs[3].old_value, "Name 3")
-        self.assertEqual(logs[3].new_value, "Name 4")
-
-        # Verify ordering: IDs should be in ascending order
-        log_ids = logs.mapped("id")
-        self.assertEqual(log_ids, sorted(log_ids), "Log IDs should be in ascending order")
-
-        print(f"\nLog IDs in order: {log_ids}")
-        print(f"Each flush creates a separate log: Create -> Update1 -> Update2 -> Update3")
+        # Snapshot precedes all updates.
+        self.assertLess(snapshot_logs.id, name_updates[0].id)
 
     def test_computed_field_during_create_ordering(self):
-        """Test that computed fields during creation should log as inserts, not updates appearing before inserts.
+        """Insert snapshot precedes any per-field update — even for late-arriving compute results.
 
-        This test reproduces the issue where computed fields (like company_id computed from employee_id)
-        trigger write operations during record creation, causing 'u' (update) logs to appear before 'i' (insert) logs.
+        Background: previously, computed fields (e.g. company_id derived from
+        employee_id) could write back during creation and produce 'u' rows
+        that appeared before the 'i' rows. With Measure 3, the create event
+        is a single tombstone snapshot row. Compute side-effects whose values
+        only flush after the snapshot read are recorded as ordinary post-create
+        update rows, never before the snapshot.
         """
-        # Create a parent record with a name that triggers the computed field
         parent = self.parent_model.create({"name": "Test Name"})
-
-        # Flush to ensure all operations are complete
         parent.flush_recordset()
 
-        # Get all audit logs for this parent record
         logs = self.log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
                 ("record_id", "=", parent.id),
             ],
-            order="id ASC",  # Order by ID ascending to see chronological order
+            order="id ASC",
         )
 
-        print(f"\nDebug: Found {len(logs)} logs for parent record {parent.id}")
-        print(f"Debug: Parent record values: name={parent.name}, computed_field={parent.computed_field}")
-        for i, log in enumerate(logs):
-            print(
-                f"Debug: Log {i} - field: {log.field_name}, type: {log.change_type}, "
-                f"old: '{log.old_value}', new: '{log.new_value}', id: {log.id}"
-            )
+        # The create event yields exactly one tombstone snapshot row.
+        snapshot_logs = logs.filtered(
+            lambda l: l.field_name == "__snapshot__" and l.change_type == "i"
+        )
+        self.assertEqual(len(snapshot_logs), 1, "Create should yield one tombstone snapshot row")
+        self.assertEqual(snapshot_logs.snapshot.get("name", {}).get("raw"), "Test Name")
 
-        # Should have at least 2 logs (name insert and computed_field)
-        self.assertGreaterEqual(len(logs), 2, "Should have at least 2 audit logs")
-
-        # Find the first update and last insert
-        first_update_index = -1
-        last_insert_index = -1
-
-        for i, log in enumerate(logs):
-            if log.change_type == "u" and first_update_index == -1:
-                first_update_index = i
-            if log.change_type == "i":
-                last_insert_index = i
-
-        # Key assertion: No update should come before any insert during creation
-        # This test SHOULD FAIL with current implementation where computed fields
-        # trigger updates that get logged before the inserts
-        if first_update_index != -1:
+        # No 'u' row may precede the snapshot 'i' row.
+        earliest_update = logs.filtered(lambda l: l.change_type == "u").sorted(key=lambda l: l.id)
+        if earliest_update:
             self.assertGreater(
-                first_update_index,
-                last_insert_index,
-                f"During creation, all inserts should be logged before any updates. "
-                f"Found update at index {first_update_index} but last insert at index {last_insert_index}. "
-                f"Log details: {[(log.field_name, log.change_type, log.id) for log in logs]}",
+                earliest_update[0].id,
+                snapshot_logs.id,
+                "No update row may precede the tombstone snapshot for a create event",
             )
 
-        # Check that computed_field was set
-        computed_field_logs = logs.filtered(lambda l: l.field_name == "computed_field")
-        self.assertTrue(computed_field_logs, "Should have log for computed_field")
-
-        # The computed field should ideally be logged as an insert, not an update
-        # This assertion will also fail with current implementation
-        self.assertEqual(
-            computed_field_logs[0].change_type,
-            "i",
-            f"Computed field during creation should be logged as insert, not '{computed_field_logs[0].change_type}'",
+        # The compute result may surface either inside the snapshot (if the
+        # ORM flushed it before patched_create's SQL read) or as a subsequent
+        # 'u' row. Either way the value must be reachable from the audit log.
+        computed_in_snapshot = (snapshot_logs.snapshot or {}).get("computed_field")
+        computed_update = logs.filtered(
+            lambda l: l.field_name == "computed_field"
+            and l.change_type == "u"
+            and l.new_value == "Computed: Test Name"
+        )
+        self.assertTrue(
+            (computed_in_snapshot and computed_in_snapshot.get("raw") == "Computed: Test Name")
+            or computed_update,
+            "Computed field result must be captured either in snapshot or as a subsequent update",
         )
 
-        # Verify the specific case: computed_field (if logged as 'u') should not have lower ID than name ('i')
-        name_log = logs.filtered(lambda l: l.field_name == "name" and l.change_type == "i")
-        if name_log and computed_field_logs:
-            self.assertLess(
-                name_log[0].id,
-                computed_field_logs[0].id,
-                f"Name insert (ID {name_log[0].id}) should have lower ID than computed_field "
-                f"(ID {computed_field_logs[0].id}, type {computed_field_logs[0].change_type})",
-            )
-
-        # Now test that subsequent writes to the newly created record are logged as updates, not inserts
-        print("\nTesting subsequent write to newly created record...")
-
-        # Write to the record after creation is complete
+        # Now write to the record after creation; subsequent changes are 'u'.
         parent.write({"name": "Updated After Creation"})
         parent.flush_recordset()
 
-        # Get all logs again
         all_logs_after_update = self.log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
@@ -332,44 +225,17 @@ class TestAuditLogOrdering(TransactionCase):
             order="id ASC",
         )
 
-        print(f"Debug: After update, found {len(all_logs_after_update)} total logs")
-        for i, log in enumerate(all_logs_after_update):
-            print(
-                f"Debug: Log {i} - field: {log.field_name}, type: {log.change_type}, "
-                f"old: '{log.old_value}', new: '{log.new_value}', id: {log.id}"
-            )
-
-        # Should have at least 3 logs now (original name insert, computed_field insert, and name update)
-        self.assertGreaterEqual(len(all_logs_after_update), 3, "Should have at least 3 logs after update")
-
-        # Find the update log for the name field
         name_update_logs = all_logs_after_update.filtered(
-            lambda l: l.field_name == "name" and l.new_value == "Updated After Creation"
+            lambda l: l.field_name == "name" and l.change_type == "u"
         )
-        self.assertEqual(len(name_update_logs), 1, "Should have exactly one update log for name")
+        self.assertEqual(len(name_update_logs), 1)
+        self.assertEqual(name_update_logs.old_value, "Test Name")
+        self.assertEqual(name_update_logs.new_value, "Updated After Creation")
 
-        # This should be logged as 'u' (update), not 'i' (insert)
-        self.assertEqual(
-            name_update_logs[0].change_type,
-            "u",
-            "Subsequent write to newly created record should be logged as update, not insert",
-        )
-
-        # The old value should be the initial value
-        self.assertEqual(
-            name_update_logs[0].old_value,
-            "Test Name",
-            "Update log should have the previous value as old_value",
-        )
-
-        # Also check that computed_field gets updated and logged as 'u' this time
+        # The cascading computed_field change is also logged as an update.
         computed_update_logs = all_logs_after_update.filtered(
-            lambda l: l.field_name == "computed_field" and l.new_value == "Computed: Updated After Creation"
+            lambda l: l.field_name == "computed_field"
+            and l.new_value == "Computed: Updated After Creation"
         )
         if computed_update_logs:
-            self.assertEqual(
-                computed_update_logs[0].change_type,
-                "u",
-                "Computed field update after creation should be logged as update, not insert",
-            )
-            print(f"Debug: Computed field update correctly logged as 'u'")
+            self.assertEqual(computed_update_logs.change_type, "u")

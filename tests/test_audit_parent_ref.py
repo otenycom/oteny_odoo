@@ -39,37 +39,43 @@ class TestAuditParentRef(TransactionCase):
         print("----------------------------------------------------\n")
 
     def test_parent_child_ref(self):
-        """Test that changes to a child record create parent references in the audit log."""
+        """Changes to a child record create parent references in the audit log.
+
+        With Measure 3, a child create produces ONE tombstone snapshot row for the
+        child, and that single row is the source of both the direct ref (to the
+        child) and the parent ref (to the parent). Subsequent updates remain
+        per-field and produce their own refs.
+        """
         # 1. Create a child record
         child_record = self.child_model.create({"name": "Test Child 1", "parent_id": self.parent_record.id})
 
-        # 2. Check if a log and a parent reference were created
-        log_entry = self.log_model.search(
+        # 2. The create produces a single snapshot insert log for the child.
+        snapshot_log = self.log_model.search(
             [
                 ("model_name", "=", self.child_model._name),
                 ("record_id", "=", child_record.id),
                 ("change_type", "=", "i"),
-                ("field_name", "=", "name"),
+                ("field_name", "=", "__snapshot__"),
             ]
         )
-        self.assertEqual(len(log_entry), 1, "Should find one insert log for the child.")
+        self.assertEqual(len(snapshot_log), 1, "Should find one tombstone snapshot for the child create.")
+        snapshot = snapshot_log.snapshot or {}
+        self.assertIn("name", snapshot)
+        self.assertEqual(snapshot["name"]["raw"], "Test Child 1")
+        self.assertIn("parent_id", snapshot)
 
-        # Should have both a direct ref and a parent ref for the child log
-        refs = self.ref_model.search([("audit_log_id", "=", log_entry.id)])
-        # Should have 2 refs: 1 direct (child to itself) and 1 parent (child to parent)
-        self.assertEqual(len(refs), 2, "Should find two references for the child log (direct + parent).")
-
-        # Check for parent reference (not direct)
+        # The snapshot row has both a direct ref (to child) and a parent ref (to parent).
+        refs = self.ref_model.search([("audit_log_id", "=", snapshot_log.id)])
+        self.assertEqual(len(refs), 2, "Snapshot should have direct + parent refs.")
         parent_ref = refs.filtered(lambda r: not r.is_direct)
         self.assertEqual(len(parent_ref), 1, "Should find one parent reference.")
         self.assertEqual(parent_ref.target_model_name, self.parent_model._name)
         self.assertEqual(parent_ref.target_record_id, self.parent_record.id)
 
-        # 3. Update the child record
+        # 3. Update the child record (per-field log)
         child_record.write({"name": "Test Child 1 Updated"})
         child_record.flush_recordset()
 
-        # 4. Check if a new log and parent ref were created for the update
         update_log_entry = self.log_model.search(
             [
                 ("model_name", "=", self.child_model._name),
@@ -80,14 +86,13 @@ class TestAuditParentRef(TransactionCase):
         )
         self.assertEqual(len(update_log_entry), 1, "Should find one update log for the child.")
 
-        # Check refs for update log
         update_refs = self.ref_model.search([("audit_log_id", "=", update_log_entry.id)])
-        # Should have 2 refs: 1 direct and 1 parent
-        self.assertEqual(len(update_refs), 2, "Should find two references for the update log.")
+        self.assertEqual(len(update_refs), 2, "Update log should have direct + parent refs.")
 
-        update_parent_ref = update_refs.filtered(lambda r: not r.is_direct)
-        self.assertEqual(len(update_parent_ref), 1, "Should find parent ref for the update log.")
-
+        # 4. Aggregated view: each captured field of the snapshot insert is
+        #    surfaced as its own virtual row (UNNESTed), plus the update for
+        #    'name'. So the parent sees 'name' insert + 'parent_id' insert +
+        #    'name' update as three child rows.
         aggregated_logs = self.aggregated_log_model.search(
             [
                 ("model_name", "=", self.parent_model._name),
@@ -97,30 +102,32 @@ class TestAuditParentRef(TransactionCase):
 
         self.dump_aggregated_log(self.parent_record)
 
-        # We expect to find 3 logs for the parent, as the parent_id set is also logged:
-        # - insert 'name' on child
-        # - insert 'parent_id' on child
-        # - update 'name' on child
         child_logs_in_aggregated = aggregated_logs.filtered(lambda r: r.is_child_log)
-        self.assertEqual(len(child_logs_in_aggregated), 3, "Aggregated log should show 3 child logs.")
+        # No row has the sentinel field_name in the aggregated view — snapshot
+        # rows are unnested so callers see real field names everywhere.
+        self.assertFalse(
+            child_logs_in_aggregated.filtered(lambda r: r.field_name == "__snapshot__"),
+            "Aggregated view must not expose the __snapshot__ sentinel — it is unnested.",
+        )
 
-        # Check the insert logs (name and parent_id)
-        insert_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "i")
-        self.assertEqual(len(insert_logs), 2, "Should have two insert logs for the child.")
+        # Insert side: one virtual row per captured field.
+        insert_rows = child_logs_in_aggregated.filtered(lambda r: r.change_type == "i")
+        insert_field_names = set(insert_rows.mapped("field_name"))
+        self.assertIn("name", insert_field_names)
+        self.assertIn("parent_id", insert_field_names)
+        # All insert rows are flagged as child of the right record.
+        for row in insert_rows:
+            self.assertEqual(row.child_model_name, self.child_model._name)
+            self.assertEqual(row.child_record_id, child_record.id)
 
-        insert_log_name = insert_logs.filtered(lambda r: r.field_name == "name")
-        self.assertEqual(len(insert_log_name), 1, "Should have one insert log for name.")
-        self.assertEqual(insert_log_name.new_value, "Test Child 1")
-        self.assertEqual(insert_log_name.child_model_name, self.child_model._name)
-        self.assertEqual(insert_log_name.child_record_id, child_record.id)
+        # The 'name' insert row carries the captured value in new_value.
+        name_insert = insert_rows.filtered(lambda r: r.field_name == "name")
+        self.assertEqual(len(name_insert), 1)
+        self.assertEqual(name_insert.new_value, "Test Child 1")
 
-        insert_log_parent = insert_logs.filtered(lambda r: r.field_name == "parent_id")
-        self.assertEqual(len(insert_log_parent), 1, "Should have one insert log for parent_id.")
-        self.assertEqual(insert_log_parent.new_value_display_name, self.parent_record.display_name)
-
-        # Check the update log (name)
+        # Update side: one row for 'name'.
         update_logs = child_logs_in_aggregated.filtered(lambda r: r.change_type == "u")
-        self.assertEqual(len(update_logs), 1, "Should have one update log for the child.")
+        self.assertEqual(len(update_logs), 1)
         self.assertEqual(update_logs.field_name, "name")
         self.assertEqual(update_logs.old_value, "Test Child 1")
         self.assertEqual(update_logs.new_value, "Test Child 1 Updated")

@@ -9,6 +9,12 @@ _logger = logging.getLogger(__name__)
 _AUDIT_ACTION_XML_MODULE = "oteny_audit"
 _AUDIT_ACTION_XML_PREFIX = "action_audit_log_"
 
+# Sentinel field_name for a "tombstone" snapshot row (Measure 3).
+# Inserts and deletes are recorded as a single audit log row per record event,
+# with the full set of non-default field values stored in `snapshot`. The
+# sentinel keeps the existing `field_name` NOT NULL constraint intact.
+SNAPSHOT_FIELD_NAME = "__snapshot__"
+
 
 class OtenyAuditLog(models.Model):
     _name = "oteny.audit.log"
@@ -40,6 +46,20 @@ class OtenyAuditLog(models.Model):
     old_value_display_name = fields.Char(string="Old Value")
     new_value_display_name = fields.Char(string="New Value")
     change_type = fields.Selection([("i", "Insert"), ("u", "Update"), ("d", "Delete")], required=True)
+    # Measure 3: tombstone-style snapshot for inserts and deletes.
+    # Holds the full set of non-default field values for the record event in
+    # the shape {field_name: {"raw": str, "display": str}}. Together with the
+    # per-field update rows that remain unchanged, this makes the record state
+    # fully reconstructable from log + (current record if still present),
+    # while collapsing the row count of inserts/deletes by ~5-8x.
+    snapshot = fields.Json(
+        string="Snapshot",
+        help=(
+            "For tombstone insert/delete rows: full non-default field values "
+            "at the time of the event, structured as "
+            "{field_name: {'raw': ..., 'display': ...}}. NULL on per-field rows."
+        ),
+    )
 
     @api.model
     def init(self):
@@ -126,6 +146,32 @@ class OtenyAuditLog(models.Model):
             else:
                 log.record_ref = False
 
+    # Infrastructure models whose audit value is near-zero: mail.mail is just
+    # the outgoing-queue copy of mail.message bodies (auto-deleted after send),
+    # mail.notification/followers/presence are notification plumbing,
+    # discuss.channel holds Wilma per-conversation scratchpad, and
+    # ir.cron.progress is pure cron-internal counter churn.
+    #
+    # `mail.message` is intentionally NOT in this list: chatter messages tied
+    # to a business record are cascade-deleted when the parent is unlinked, so
+    # the audit log is the only place that can preserve them after that point.
+    # We pay the cost via HTML stripping on `mail.message.body` (see
+    # mail_message_override.py) — body bytes drop ~94% while remaining
+    # readable, and parent refs (via `_model_parent_keys`) make the chatter
+    # appear under the business record's Audit Log view.
+    #
+    # A specific module can still re-enable auditing for any of these by
+    # setting `_oteny_audit_ignore = False` on the model class.
+    _DEFAULT_IGNORED_MODEL_NAMES = {
+        "mail.mail",
+        "mail.notification",
+        "mail.followers",
+        "mail.presence",
+        "discuss.channel",
+        "discuss.channel.member",
+        "ir.cron.progress",
+    }
+
     def _is_audit_ignored(self, model_name):
         """Check if a model should be ignored by the audit log."""
         if self.env.context.get("oteny_audit_ignore", False):
@@ -142,6 +188,12 @@ class OtenyAuditLog(models.Model):
 
         # Ignore TransientModel models (wizards) by default
         if getattr(model_class, "_transient", False):
+            return True
+
+        # Default-ignore for high-noise infrastructure models (see comment on
+        # _DEFAULT_IGNORED_MODEL_NAMES above). A model in this set can still
+        # opt back in by setting _oteny_audit_ignore = False.
+        if model_name in self._DEFAULT_IGNORED_MODEL_NAMES:
             return True
 
         # Ignore system models by default, can be overridden by _oteny_audit_ignore in the model

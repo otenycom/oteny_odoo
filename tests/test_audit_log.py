@@ -10,11 +10,33 @@ class TestAuditLog(TransactionCase):
     def setUp(self):
         super().setUp()
 
-    def test_create_logs_insert(self):
-        """Test that creating a record logs an insert"""
-        # Count existing logs
-        initial_count = self.env["oteny.audit.log"].search_count([])
+    def _enable_audit_for_default_ignored_model(self, model_name):
+        """Locally re-enable auditing for a model that is in
+        OtenyAuditLog._DEFAULT_IGNORED_MODEL_NAMES (see Measure 1).
 
+        Tests that exercise audit behavior on infra models (mail.message,
+        discuss.channel, etc.) call this in their body to opt back in.
+        Restores via addCleanup so other tests are unaffected.
+        """
+        model_class = type(self.env[model_name])
+        had_attr = "_oteny_audit_ignore" in model_class.__dict__
+        old_value = model_class._oteny_audit_ignore if had_attr else None
+        model_class._oteny_audit_ignore = False
+
+        def restore():
+            if had_attr:
+                model_class._oteny_audit_ignore = old_value
+            else:
+                del model_class._oteny_audit_ignore
+
+        self.addCleanup(restore)
+
+    def test_create_logs_insert(self):
+        """Test that creating a record logs an insert as a single tombstone snapshot row.
+
+        Measure 3: an insert produces ONE log row with field_name='__snapshot__'
+        and a `snapshot` dict containing every captured non-default field value.
+        """
         # Create a test partner
         partner = self.env["res.partner"].create(
             {
@@ -23,8 +45,8 @@ class TestAuditLog(TransactionCase):
             }
         )
 
-        # Check that logs were created
-        new_logs = self.env["oteny.audit.log"].search(
+        # Check that one insert snapshot log was created
+        insert_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
@@ -32,13 +54,19 @@ class TestAuditLog(TransactionCase):
             ]
         )
 
-        self.assertTrue(new_logs, "Insert logs should be created")
+        self.assertTrue(insert_logs, "Insert log should be created")
+        # All insert rows are snapshots (no per-field rows for create).
+        self.assertTrue(all(l.field_name == "__snapshot__" for l in insert_logs))
 
-        # Check that name field was logged
-        name_log = new_logs.filtered(lambda l: l.field_name == "name")
-        self.assertTrue(name_log, "Name field should be logged")
-        self.assertEqual(name_log.new_value, "Test Partner for Audit")
-        self.assertEqual(name_log.old_value, "")
+        # Snapshot of one of the rows should carry the non-default fields.
+        merged_snapshot = {}
+        for l in insert_logs:
+            merged_snapshot.update(l.snapshot or {})
+
+        self.assertIn("name", merged_snapshot, "Name field should be in the snapshot")
+        self.assertEqual(merged_snapshot["name"]["raw"], "Test Partner for Audit")
+        self.assertIn("email", merged_snapshot, "Email field should be in the snapshot")
+        self.assertEqual(merged_snapshot["email"]["raw"], "test@example.com")
 
     def test_write_logs_update(self):
         """Test that updating a record logs an update"""
@@ -87,7 +115,12 @@ class TestAuditLog(TransactionCase):
             self.assertEqual(name_log.new_value, "Updated Name")
 
     def test_unlink_logs_delete(self):
-        """Test that deleting a record logs a delete"""
+        """Test that deleting a record logs a tombstone snapshot of all non-default fields.
+
+        Measure 3: a delete must capture every non-default field value so the
+        record is reconstructable from log + (still-existing related records)
+        until log expiry.
+        """
         # Create a test partner
         partner = self.env["res.partner"].create(
             {
@@ -102,7 +135,7 @@ class TestAuditLog(TransactionCase):
         # Delete the partner
         partner.unlink()
 
-        # Check that delete logs were created
+        # Check that exactly one delete snapshot was created
         delete_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
@@ -111,13 +144,14 @@ class TestAuditLog(TransactionCase):
             ]
         )
 
-        self.assertTrue(delete_logs, "Delete logs should be created")
+        self.assertEqual(len(delete_logs), 1, "Delete should produce one snapshot log row")
+        self.assertEqual(delete_logs.field_name, "__snapshot__")
 
-        # Check that name field was logged
-        name_log = delete_logs.filtered(lambda l: l.field_name == "name")
-        if name_log:
-            self.assertEqual(name_log.old_value, partner_name)
-            self.assertEqual(name_log.new_value, "")
+        snapshot = delete_logs.snapshot or {}
+        self.assertIn("name", snapshot)
+        self.assertEqual(snapshot["name"]["raw"], partner_name)
+        self.assertIn("email", snapshot)
+        self.assertEqual(snapshot["email"]["raw"], "delete@example.com")
 
     def test_write_logs_m2m_group_add(self):
         """Test that adding a user to a group logs an update"""
@@ -206,6 +240,9 @@ class TestAuditLog(TransactionCase):
 
     def test_predefined_parent_keys_mail_message(self):
         """Test that predefined parent keys work for mail.message"""
+        # mail.message is default-ignored (Measure 1); locally re-enable to
+        # exercise the polymorphic _model_parent_keys "model,res_id" path.
+        self._enable_audit_for_default_ignored_model("mail.message")
         # Create a test partner as the parent record
         parent_partner = self.env["res.partner"].create(
             {
@@ -446,6 +483,8 @@ class TestAuditLog(TransactionCase):
 
     def test_recursive_parent_keys_message_to_grandparent(self):
         """Test recursive parent key resolution for mail.message pointing through partners to grandparent"""
+        # mail.message is default-ignored (Measure 1); locally re-enable.
+        self._enable_audit_for_default_ignored_model("mail.message")
         # Create a grandparent partner
         grandparent_partner = self.env["res.partner"].create(
             {
@@ -546,20 +585,17 @@ class TestAuditLog(TransactionCase):
         )
 
     def test_create_no_blank_values_logged(self):
-        """Test that creating records with blank values doesn't log those blank fields"""
-        # Create a test partner with some blank fields
+        """Test that the insert snapshot only contains non-blank field values."""
         partner = self.env["res.partner"].create(
             {
                 "name": "Test Partner With Blanks",
                 "email": "",  # Explicitly blank
                 "phone": "",  # Explicitly blank
                 "street": "Some Street",  # Non-blank
-                # Don't provide other fields like mobile, city, etc. - they should be None/blank
             }
         )
 
-        # Get all logs for this partner creation
-        logs = self.env["oteny.audit.log"].search(
+        insert_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner.id),
@@ -567,40 +603,32 @@ class TestAuditLog(TransactionCase):
             ]
         )
 
-        # Verify that only non-blank fields are logged
-        logged_fields = logs.mapped("field_name")
+        merged_snapshot = {}
+        for l in insert_logs:
+            merged_snapshot.update(l.snapshot or {})
 
-        # Name and street should be logged (they have values)
-        self.assertIn("name", logged_fields, "Name field should be logged (has value)")
-        self.assertIn("street", logged_fields, "Street field should be logged (has value)")
+        # Name and street should be in the snapshot (they have values)
+        self.assertIn("name", merged_snapshot, "Name should be in snapshot (has value)")
+        self.assertEqual(merged_snapshot["name"]["raw"], "Test Partner With Blanks")
+        self.assertIn("street", merged_snapshot, "Street should be in snapshot (has value)")
+        self.assertEqual(merged_snapshot["street"]["raw"], "Some Street")
 
-        # Blank fields should NOT be logged
-        self.assertNotIn("email", logged_fields, "Email field should not be logged (blank value)")
-        self.assertNotIn("phone", logged_fields, "Phone field should not be logged (blank value)")
+        # Blank fields should NOT appear in the snapshot.
+        self.assertNotIn("email", merged_snapshot, "Email should not be in snapshot (blank)")
+        self.assertNotIn("phone", merged_snapshot, "Phone should not be in snapshot (blank)")
 
-        # Fields that weren't provided (None values) should also not be logged
-        # Common partner fields that might be None
-        common_optional_fields = ["mobile", "city", "zip", "country_id", "state_id"]
-        for field_name in common_optional_fields:
-            if field_name in logged_fields:
-                # If it's logged, verify it has a non-blank value
-                log_entry = logs.filtered(lambda l: l.field_name == field_name)
+        # Optional fields not provided should not appear in the snapshot.
+        for field_name in ["mobile", "city", "zip", "country_id", "state_id"]:
+            if field_name in merged_snapshot:
                 self.assertNotEqual(
-                    log_entry.new_value, "", f"Field {field_name} should not be logged with blank value"
+                    merged_snapshot[field_name]["raw"],
+                    "",
+                    f"Field {field_name} should not be snapshotted with blank value",
                 )
 
-        # Verify specific field values
-        name_log = logs.filtered(lambda l: l.field_name == "name")
-        self.assertTrue(name_log, "Name field should be logged")
-        self.assertEqual(name_log.new_value, "Test Partner With Blanks")
-
-        street_log = logs.filtered(lambda l: l.field_name == "street")
-        self.assertTrue(street_log, "Street field should be logged")
-        self.assertEqual(street_log.new_value, "Some Street")
-
     def test_unlink_no_blank_values_logged(self):
-        """Test that unlinking records with blank values doesn't log those blank fields"""
-        # Create a test partner with some blank fields that will be deleted
+        """The delete tombstone only contains non-blank fields, but every non-blank
+        field at the time of deletion is captured (full reconstructability)."""
         partner = self.env["res.partner"].create(
             {
                 "name": "Partner To Delete",
@@ -608,7 +636,6 @@ class TestAuditLog(TransactionCase):
                 "phone": "",  # Explicitly blank
                 "street": "Street Address",  # Non-blank
                 "city": "",  # Explicitly blank
-                # Don't provide other fields like mobile - they should be None/blank
             }
         )
 
@@ -616,51 +643,37 @@ class TestAuditLog(TransactionCase):
         partner_name = partner.name
         partner_street = partner.street
 
-        # Delete the partner
         partner.unlink()
 
-        # Get all logs for this partner deletion
-        logs = self.env["oteny.audit.log"].search(
+        delete_logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "res.partner"),
                 ("record_id", "=", partner_id),
                 ("change_type", "=", "d"),
             ]
         )
+        self.assertEqual(len(delete_logs), 1)
+        snapshot = delete_logs.snapshot or {}
 
-        # Verify that only non-blank fields are logged
-        logged_fields = logs.mapped("field_name")
+        # Name and street had values: in the snapshot.
+        self.assertIn("name", snapshot)
+        self.assertEqual(snapshot["name"]["raw"], partner_name)
+        self.assertIn("street", snapshot)
+        self.assertEqual(snapshot["street"]["raw"], partner_street)
 
-        # Name and street should be logged (they had values)
-        self.assertIn("name", logged_fields, "Name field should be logged (had value)")
-        self.assertIn("street", logged_fields, "Street field should be logged (had value)")
+        # Blank fields are not in the snapshot.
+        self.assertNotIn("email", snapshot)
+        self.assertNotIn("phone", snapshot)
+        self.assertNotIn("city", snapshot)
 
-        # Blank fields should NOT be logged
-        self.assertNotIn("email", logged_fields, "Email field should not be logged (was blank)")
-        self.assertNotIn("phone", logged_fields, "Phone field should not be logged (was blank)")
-        self.assertNotIn("city", logged_fields, "City field should not be logged (was blank)")
-
-        # Fields that weren't provided (None values) should also not be logged
-        # Common partner fields that might be None
-        common_optional_fields = ["mobile", "zip", "country_id", "state_id"]
-        for field_name in common_optional_fields:
-            if field_name in logged_fields:
-                # If it's logged, verify it had a non-blank value
-                log_entry = logs.filtered(lambda l: l.field_name == field_name)
+        # Optional unset fields are not in the snapshot either.
+        for field_name in ["mobile", "zip", "country_id", "state_id"]:
+            if field_name in snapshot:
                 self.assertNotEqual(
-                    log_entry.old_value, "", f"Field {field_name} should not be logged with blank value"
+                    snapshot[field_name]["raw"],
+                    "",
+                    f"Field {field_name} should not be snapshotted with blank value",
                 )
-
-        # Verify specific field values
-        name_log = logs.filtered(lambda l: l.field_name == "name")
-        self.assertTrue(name_log, "Name field should be logged")
-        self.assertEqual(name_log.old_value, partner_name)
-        self.assertEqual(name_log.new_value, "")  # Delete logs have empty new_value
-
-        street_log = logs.filtered(lambda l: l.field_name == "street")
-        self.assertTrue(street_log, "Street field should be logged")
-        self.assertEqual(street_log.old_value, partner_street)
-        self.assertEqual(street_log.new_value, "")  # Delete logs have empty new_value
 
     def test_is_audit_ignored_stale_ir_model(self):
         """Stale ir.model records (model dropped from code but row still in DB)
@@ -700,12 +713,15 @@ class TestAuditLog(TransactionCase):
             log._audit_log_action_xml_id(m1).startswith("oteny_audit.action_audit_log_"),
         )
 
-    def test_create_all_defaults_or_empty_logs_placeholder(self):
-        """Test that creating record with only defaults/empty values logs at least one placeholder"""
-        # Use test models that allow empty records
+    def test_create_all_defaults_or_empty_logs_snapshot(self):
+        """Even when a record has only default/empty values, an insert tombstone snapshot is recorded.
+
+        Measure 3: a snapshot row is always emitted for a create event, with
+        an empty `snapshot` dict when there are no non-default values to
+        capture. The row itself is the tombstone proof of the create.
+        """
         test_parent = self.env["oteny.audit.test.parent"].create({})
 
-        # Get all logs for this record creation
         logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "oteny.audit.test.parent"),
@@ -714,30 +730,20 @@ class TestAuditLog(TransactionCase):
             ]
         )
 
-        # Should create at least one log entry as placeholder to ensure operation is recorded
-        self.assertGreater(
-            len(logs),
-            0,
-            "Should create at least one placeholder log for records with only defaults/empty values",
-        )
+        # Exactly one snapshot row is emitted per created record.
+        self.assertGreaterEqual(len(logs), 1, "Should create at least one snapshot log row")
+        snapshot_logs = logs.filtered(lambda l: l.field_name == "__snapshot__")
+        self.assertTrue(snapshot_logs, "Should have a tombstone snapshot row")
+        # Snapshot may be empty (no non-default values) but the row exists.
+        self.assertIsNotNone(snapshot_logs[0].snapshot)
 
-        # The placeholder log should indicate it's a placeholder
-        placeholder_log = logs.filtered(lambda l: "(placeholder)" in l.field_display_name)
-        if placeholder_log:
-            self.assertTrue(placeholder_log, "Should have a placeholder log entry")
-            self.assertEqual(placeholder_log.change_type, "i", "Placeholder should be for insert operation")
-
-    def test_unlink_all_defaults_or_empty_logs_placeholder(self):
-        """Test that deleting record with only defaults/empty values logs at least one placeholder"""
-        # Use test models that allow empty records
+    def test_unlink_all_defaults_or_empty_logs_snapshot(self):
+        """Even a delete of a record with only defaults emits a tombstone snapshot row."""
         test_parent = self.env["oteny.audit.test.parent"].create({})
-
         test_parent_id = test_parent.id
 
-        # Delete the record
         test_parent.unlink()
 
-        # Get all logs for this record deletion
         logs = self.env["oteny.audit.log"].search(
             [
                 ("model_name", "=", "oteny.audit.test.parent"),
@@ -746,15 +752,5 @@ class TestAuditLog(TransactionCase):
             ]
         )
 
-        # Should create at least one log entry as placeholder to ensure operation is recorded
-        self.assertGreater(
-            len(logs),
-            0,
-            "Should create at least one placeholder log for deletion of records with only defaults/empty values",
-        )
-
-        # The placeholder log should indicate it's a placeholder
-        placeholder_log = logs.filtered(lambda l: "(placeholder)" in l.field_display_name)
-        if placeholder_log:
-            self.assertTrue(placeholder_log, "Should have a placeholder log entry")
-            self.assertEqual(placeholder_log.change_type, "d", "Placeholder should be for delete operation")
+        self.assertEqual(len(logs), 1, "Should create exactly one snapshot log row for delete")
+        self.assertEqual(logs.field_name, "__snapshot__")

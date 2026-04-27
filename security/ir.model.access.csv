@@ -4,3 +4,4 @@ access_oteny_audit_log_ref_user,oteny.audit.log.ref user,model_oteny_audit_log_r
 access_oteny_audit_log_aggregated_user,oteny.audit.log.aggregated user,model_oteny_audit_log_aggregated,base.group_user,1,0,0,0
 access_oteny_audit_test_parent,access_oteny_audit_test_parent,oteny_audit.model_oteny_audit_test_parent,base.group_user,1,1,1,1
 access_oteny_audit_test_child,access_oteny_audit_test_child,oteny_audit.model_oteny_audit_test_child,base.group_user,1,1,1,1
+access_oteny_audit_test_html,access_oteny_audit_test_html,oteny_audit.model_oteny_audit_test_html,base.group_user,1,1,1,1

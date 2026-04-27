@@ -41,3 +41,22 @@ class OtenyAuditTestChild(models.Model):
 
     name = fields.Char()
     parent_id = fields.Many2one("oteny.audit.test.parent", ondelete="cascade")
+
+
+class OtenyAuditTestHtml(models.Model):
+    """Test model exercising Measure 2: HTML stripping for selected fields.
+
+    `body` is listed in `_oteny_audit_html_strip_fields` so audit logs store a
+    plain-text projection. `note` is a regular Html field that retains its
+    full markup in audit logs (acts as a control to prove stripping is opt-in
+    and per-field).
+    """
+
+    _name = "oteny.audit.test.html"
+    _description = "Oteny Audit Test HTML Strip Model"
+    _oteny_audit_ignore = False
+    _oteny_audit_html_strip_fields = {"body"}
+
+    name = fields.Char()
+    body = fields.Html(string="Body (stripped)")
+    note = fields.Html(string="Note (unstripped)")
