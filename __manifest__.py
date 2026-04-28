@@ -1,6 +1,6 @@
 {
     "name": "View Shortcuts",
-    "version": "19.0.1.133",
+    "version": "19.0.1.134",
     "depends": ["web"],
     "author": "Oteny",
     "category": "Tools",
@@ -13,6 +13,7 @@
         "security/ir.model.access.csv",
         "wizard/store_layout_wizard_views.xml",
         "views/ir_filters_views.xml",
+        "data/ir_config_parameter_data.xml",
     ],
     "assets": {
         "web.assets_backend": [

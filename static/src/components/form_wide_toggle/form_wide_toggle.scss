@@ -1,0 +1,80 @@
+// Wide mode reshapes the XXL form layout into the legacy "narrow XL"
+// behavior, where the chatter sits BELOW the sheet and the sheet uses
+// the full row width.
+//
+// At XXL stock Odoo emits on the renderer `d-flex flex-nowrap h-100`
+// (a flex ROW) and inside `.o_form_view.o_xxl_form_view` it sets
+// `display: flex; flex-direction: column; flex: 2 1 990px;` on the
+// sheet bg. Together with `o-mail-Form-chatter.o-aside` (fixed ~530px
+// width, flex-grow), the sheet ends up squeezed alongside the chatter.
+//
+// To put the chatter back below:
+//   1. Switch the renderer to `flex-direction: column` so its children
+//      stack vertically.
+//   2. Reset the sheet bg's flex rule (`flex: 2 1 990px`) -- in a
+//      column container that 990px would be interpreted as HEIGHT and
+//      stretch the sheet vertically.
+//   3. Drop the 1400px `max-width` cap on the sheet bg so it can fill
+//      the now full-width row.
+// Combined with the FormRenderer.mailLayout patch (which makes
+// `mailLayout()` return BOTTOM_CHATTER instead of SIDE_CHATTER), the
+// chatter container also loses its `o-aside` class and grows to full
+// width below the sheet.
+.o_form_view.o_form_wide .o_form_renderer {
+    flex-direction: column;
+}
+
+.o_form_view.o_form_wide .o_form_sheet_bg {
+    max-width: none;
+    flex: none;
+}
+
+// Hide the attachment-preview sidebar in wide mode. Forms like the
+// rivercreds credential form declare `<div class="o_attachment_preview"/>`
+// unconditionally, so without this rule the renderer's flex-direction:
+// column above stacks the preview as a full-width band below the sheet,
+// which looks bad. Stock invoice forms guard the preview with an
+// `invisible="..."` expression so they were already coincidentally fine
+// on posted records, but credentials and any other always-on preview
+// form need an explicit hide. The user keeps the toggle visible in
+// wide mode -- flipping back to narrow restores the preview.
+.o_form_view.o_form_wide .o_attachment_preview {
+    display: none;
+}
+
+// Square bordered icon button anchored to the top-right of the form
+// sheet. `.o_form_sheet` already has `position: relative`, so absolute
+// positioning here lands inside the sheet without disturbing layout.
+// The button is intentionally compact and low-contrast at rest so it
+// does not compete with the form content, but the border + square
+// shape make it discoverable as a clickable affordance.
+.o_form_wide_toggle {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-sm, 0.25rem);
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    opacity: 0.6;
+    transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+
+    &:hover,
+    &:focus {
+        opacity: 1;
+        background-color: var(--bs-tertiary-bg, var(--bs-light));
+        border-color: var(--bs-secondary);
+    }
+
+    >i {
+        font-size: 0.875rem;
+        line-height: 1;
+    }
+}
