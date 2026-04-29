@@ -160,6 +160,11 @@ class TransitionWizard(models.AbstractModel):
                     # this child has transitioned (e.g. all sibling tasks done).
                     if hasattr(record, "_check_parent_auto_progress"):
                         record._check_parent_auto_progress()
+                    # Cascade Done to children if this record entered a state
+                    # flagged with auto_done_children_on_enter (mirror of the
+                    # parent auto-progress check, opposite direction).
+                    if hasattr(record, "_cascade_done_to_children"):
+                        record._cascade_done_to_children()
                 else:
                     # Merge write_vals into create_vals
                     create_vals.update(write_vals)

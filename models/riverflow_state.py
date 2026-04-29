@@ -121,6 +121,16 @@ class RiverflowWorkflowState(models.Model):
         "complete when those tasks finish.",
         default=False,
     )
+    auto_done_children_on_enter = fields.Boolean(
+        "Auto-Done Children When Entered",
+        help="When set, entering this state moves all active non-end-state "
+        "child services to the first non-cancelled end state of their own "
+        "workflow (by sequence). Mirror of auto_progress_on_children_done in "
+        "the opposite direction. Used on parent terminal states whose "
+        "semantics imply child tasks are also complete (e.g. AUV Done means "
+        "the OPS Review-AUV child task is moot).",
+        default=False,
+    )
 
     from_transition_ids = fields.One2many(
         "riverflow.transition",
