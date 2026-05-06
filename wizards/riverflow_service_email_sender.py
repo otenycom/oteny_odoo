@@ -301,12 +301,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
         write_vals = {}
         self.update_write_values(service, write_vals)
         if write_vals:
-            # #region agent log
-            import json as _json, time as _time
-            _log_vals = {k: str(v) if not isinstance(v, (int, float, bool, type(None))) else v for k, v in write_vals.items()}
-            with open("/Users/thijsvanwaaij/oteny/radar/.cursor/debug-2eb149.log", "a") as _f:
-                _f.write(_json.dumps({"sessionId": "2eb149", "hypothesisId": "H3", "location": "riverflow_service_email_sender.py:_get_render_context", "message": "HACK write_vals to service", "data": {"service_id": service.id, "state_id_in_vals": "state_id" in write_vals, "write_keys": list(write_vals.keys()), "state_before_write": service.state_id.name if service.state_id else None}, "timestamp": int(_time.time() * 1000)}) + "\n")
-            # #endregion
             # HACK: writing to the record to make sure the template has the latest data
             service.write(write_vals)
 
