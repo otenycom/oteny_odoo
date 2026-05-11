@@ -29,6 +29,7 @@
                             <field name="hide_in_statusbar" />
                             <field name="show_state_in_crew_planning" />
                             <field name="auto_progress_on_children_done" />
+                            <field name="auto_done_children_on_enter" />
                         </group>
                     </group>
                     <notebook>
@@ -74,6 +75,7 @@
                 <field name="hide_in_statusbar" />
                 <field name="show_state_in_crew_planning" />
                 <field name="auto_progress_on_children_done" optional="hide" />
+                <field name="auto_done_children_on_enter" optional="hide" />
             </list>
         </field>
     </record>

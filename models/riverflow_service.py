@@ -1483,6 +1483,38 @@ class Service(models.Model):
             if active_children and all(child.is_end_state for child in active_children):
                 parent._auto_progress_to_next_state()
 
+    def _cascade_done_to_children(self):
+        """Cascade Done to active non-end-state children when this service entered
+        a state flagged with ``auto_done_children_on_enter``.
+
+        Mirror of ``_check_parent_auto_progress`` in the opposite direction.
+        Called from the transition wizard after this service reaches a new
+        state. For each active child still in a non-end state, finds the
+        first non-cancelled end state of the child's workflow (by sequence)
+        and writes it.
+
+        Idempotent: children already in any end state (Cancelled or Done)
+        are left untouched.
+        """
+        for service in self:
+            if not service.state_id.auto_done_children_on_enter:
+                continue
+            active_children = service.child_ids.filtered(
+                lambda c: c.active and not c.state_id.is_end_state
+            )
+            for child in active_children:
+                done_state = self.env["riverflow.state"].search(
+                    [
+                        ("workflow_id", "=", child.state_id.workflow_id.id),
+                        ("is_end_state", "=", True),
+                        ("is_cancelled_state", "=", False),
+                    ],
+                    order="sequence",
+                    limit=1,
+                )
+                if done_state:
+                    child.state_id = done_state
+
     def _auto_progress_to_next_state(self):
         """Progress to the next visible workflow state by sequence.
 

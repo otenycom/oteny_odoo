@@ -6,6 +6,12 @@
         <field name="priority">1</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="reset_workflow_to_xml" type="object"
+                        string="Reset to XML" icon="fa-refresh"
+                        confirm="Reset all states and transitions to their XML definitions? Manual changes will be lost and manually-added records will be archived."
+                        class="oe_highlight" />
+                </header>
                 <sheet>
                     <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
                         invisible="active" />
