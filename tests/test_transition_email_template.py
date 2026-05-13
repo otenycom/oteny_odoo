@@ -429,3 +429,96 @@ class TestFollowupInDays(TransactionCase):
             defaults.get("project_deadline_invisible"),
             "project_deadline should be hidden for normal email transitions",
         )
+
+
+@tagged("post_install", "-at_install", "riverflow", "test_email_sender_snooze")
+class TestEmailSenderSnooze(TransactionCase):
+    """Generic deadline-snooze for reminder / chase transitions.
+
+    The base email sender wizard reads two action_context keys:
+      - snooze_deadline_days (int): push project_deadline to today + N
+      - snooze_deadline_cap_field (str): dotted path on the service
+        whose value caps the snooze (e.g. log_entry_id.start_date)
+
+    Used by the AUV Send Reminder transition; documented as a generic
+    primitive so future chase transitions (A1 reminder, work permit
+    reminder) can opt in via action_context alone.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _create_email_test_data(cls)
+
+        cls.recipient = cls.env["res.partner"].create({
+            "name": "Snooze Recipient",
+            "email": "snooze@example.com",
+        })
+
+    def _open_snooze_wizard(self, service, snooze_ctx):
+        ctx = {
+            "transition_id": self.trans_with_template.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **snooze_ctx,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        defaults["recipient_partner_ids"] = [(6, 0, [self.recipient.id])]
+        return Wizard.create(defaults)
+
+    def test_snooze_pushes_deadline_by_n_days(self):
+        """snooze_deadline_days=3 with no cap → project_deadline = today + 3."""
+        service = self.env["riverflow.service"].create({
+            "name": "Snooze Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        wizard = self._open_snooze_wizard(service, {"snooze_deadline_days": 3})
+        vals = {}
+        wizard.update_write_values(service, vals)
+        self.assertEqual(
+            vals.get("project_deadline"),
+            fields.Date.today() + timedelta(days=3),
+            "Snooze must override the default 'tomorrow' to today + N",
+        )
+
+    def test_snooze_noop_when_no_context(self):
+        """Without snooze_deadline_days, project_deadline stays at the
+        existing email-sender default of tomorrow."""
+        service = self.env["riverflow.service"].create({
+            "name": "Snooze Service No Ctx",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        wizard = self._open_snooze_wizard(service, {})
+        vals = {}
+        wizard.update_write_values(service, vals)
+        self.assertEqual(
+            vals.get("project_deadline"),
+            fields.Date.today() + timedelta(days=1),
+            "Without snooze context, project_deadline stays at tomorrow",
+        )
+
+    def test_snooze_skips_cap_when_field_unresolvable(self):
+        """When snooze_deadline_cap_field points at a non-existent path
+        on the service, the cap silently no-ops — snooze still applies."""
+        service = self.env["riverflow.service"].create({
+            "name": "Snooze No Cap Field",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        wizard = self._open_snooze_wizard(
+            service,
+            {
+                "snooze_deadline_days": 3,
+                "snooze_deadline_cap_field": "nonexistent_field_id.start_date",
+            },
+        )
+        vals = {}
+        # Must not raise.
+        wizard.update_write_values(service, vals)
+        self.assertEqual(
+            vals.get("project_deadline"),
+            fields.Date.today() + timedelta(days=3),
+        )

@@ -337,6 +337,26 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             # default deadline for the reply to a normal email is tomorrow
             vals["project_deadline"] = date.today() + timedelta(days=1)
 
+        # Optional snooze override for chase / reminder transitions. Set via
+        # transition action_context: {'snooze_deadline_days': N} pushes the
+        # service deadline to today + N. An optional 'snooze_deadline_cap_field'
+        # (dotted path on the service) caps the snooze at that field's value —
+        # e.g. AUV reminders cap at log_entry_id.start_date so the deadline
+        # never slips past the crew change. Missing/unresolvable cap paths
+        # silently fall through — the snooze still applies without a cap.
+        snooze_days = self.env.context.get("snooze_deadline_days")
+        if snooze_days:
+            new_deadline = date.today() + timedelta(days=snooze_days)
+            cap_field = self.env.context.get("snooze_deadline_cap_field")
+            if cap_field:
+                try:
+                    cap_values = service.mapped(cap_field)
+                except (KeyError, AttributeError):
+                    cap_values = []
+                if cap_values and cap_values[0]:
+                    new_deadline = min(new_deadline, cap_values[0])
+            vals["project_deadline"] = new_deadline
+
         # TODO: add ship contact names to the service
         # vals["ship_contact_names"] = service.log_entry.ship_contact_names
 
