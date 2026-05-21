@@ -153,3 +153,43 @@ class TestDeferredChildrenContextIsolation(TransactionCase):
             self.subject.id,
             "Deferred child should inherit res_id from parent",
         )
+
+    def test_deferred_clone_recurses_into_great_grandchildren(self):
+        """Cloning a deferred subtree must walk the full template descendant
+        tree, not just one level of grandchildren.
+
+        Before this was fixed, `_create_deferred_children` cloned only the
+        immediate children of the deferred template. Any template node living
+        two or more levels below the deferred root was silently dropped on
+        materialisation — making patterns like
+        "AB Appointment (deferred) → AB Arrange Transport → Inform Employee
+        Travel Plan" impossible to express.
+
+        Setup: add a grandchild template under the existing deferred child,
+        fire the booking transition, and assert the grandchild materialised.
+        """
+        Service = self.env["riverflow.service"]
+        grandchild_template = Service.create(
+            {
+                "name": "Deferred Grandchild Template",
+                "parent_id": self.child_template.id,
+                "workflow_id": self.child_workflow.id,
+                "state_id": self.child_state.id,
+                "company_id": self.env.company.id,
+            }
+        )
+
+        service = self._create_service_from_template()
+        self._fire_transition(service, self.trans_book)
+
+        children = service.child_ids.filtered("active")
+        self.assertEqual(len(children), 1, "Deferred child should be cloned")
+        grandchildren = children.child_ids.filtered("active")
+        self.assertEqual(
+            len(grandchildren),
+            1,
+            "Deferred grandchild template must clone recursively under the "
+            "deferred child — recursive _clone_template_children is required",
+        )
+        self.assertEqual(grandchildren.name, grandchild_template.name)
+        self.assertFalse(grandchildren.is_this_a_template)

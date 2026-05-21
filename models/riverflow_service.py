@@ -1363,31 +1363,44 @@ class Service(models.Model):
         if not template_service:
             raise UserError(_("No template service selected."))
 
-        # Clone children recursively, skipping deferred children (create_on_state_id set)
-        def clone_children(template, parent, include_deferred=False):
-            for child in template.child_ids:
-                if child.create_on_state_id and not include_deferred:
-                    continue
-                new_child = self._create_service_member_from_template(child, parent.id)
-                clone_children(child, new_child, include_deferred=include_deferred)
-
         newly_created_services = self.env["riverflow.service"]
         if template_service.only_add_children:
             for child_template in template_service.child_ids:
                 new_service = self._create_service_member_from_template(
                     child_template, deadline=project_deadline
                 )
-                clone_children(child_template, new_service)
+                self._clone_template_children(child_template, new_service)
                 newly_created_services += new_service
         else:
             # Create main service from template
             new_service = self._create_service_member_from_template(
                 template_service, deadline=project_deadline
             )
-            clone_children(template_service, new_service)
+            self._clone_template_children(template_service, new_service)
             newly_created_services += new_service
 
         return newly_created_services
+
+    def _clone_template_children(self, template, parent, include_deferred=False):
+        """Recursively clone the children of `template` under `parent`.
+
+        Walks the template tree depth-first; for each non-deferred child it
+        creates a runtime service via `_create_service_member_from_template`
+        and recurses into that child's own descendants. Deferred children
+        (those with `create_on_state_id` set) are skipped unless
+        `include_deferred=True` — in that mode the caller is materialising a
+        deferred subtree, so the root of the subtree was already created and
+        its descendants must be cloned regardless of their own
+        `create_on_state_id` flags.
+        """
+        for child in template.child_ids:
+            if child.create_on_state_id and not include_deferred:
+                continue
+            new_child = self._create_service_member_from_template(child, parent.id)
+            # Once we're inside a deferred subtree the descendants are
+            # ordinary non-deferred children, so reset include_deferred to
+            # avoid re-cloning further deferred siblings at deeper levels.
+            self._clone_template_children(child, new_child, include_deferred=False)
 
     def _create_deferred_children(self, target_state):
         """Clone deferred template children that match the target state.
@@ -1458,14 +1471,13 @@ class Service(models.Model):
             new_child = Service._create_service_member_from_template(
                 child_template, self.id
             )
-            # Clone grandchildren of the deferred child (these are immediate,
-            # not deferred themselves)
-            for grandchild in child_template.child_ids:
-                if grandchild.create_on_state_id:
-                    continue
-                Service._create_service_member_from_template(
-                    grandchild, new_child.id
-                )
+            # Recursively clone the full descendant tree of the deferred
+            # child. Without this, great-grandchildren and deeper levels
+            # (e.g. an "Inform Employee" task under "AB Arrange Transport"
+            # under the deferred "AB Appointment" marker) would silently
+            # be skipped — the initial template instantiation uses the
+            # same helper, so the deferred path should mirror it.
+            Service._clone_template_children(child_template, new_child)
 
     def _check_parent_auto_progress(self):
         """Check if this service's parent should auto-progress after a child transition.
