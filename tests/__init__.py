@@ -10,3 +10,4 @@ from . import test_project_deadline
 from . import test_wizard_selection_sync
 from . import test_reset_workflow
 from . import test_service_template_placement
+from . import test_subject_cascade

@@ -187,6 +187,22 @@ class Service(models.Model):
         default="self",
     )
 
+    subject_from = fields.Selection(
+        [
+            ("inherit", "Inherit from parent"),
+            ("self", "Manual"),
+        ],
+        string="Subject From",
+        required=True,
+        tracking=True,
+        default="inherit",
+        help="Where this service derives its subject (res_model/res_id) from. "
+        "'inherit' cascades from the parent service (top-down). "
+        "'self' keeps whatever subject the service was created with. "
+        "Higher-layer modules can add more options (e.g. derive from a related "
+        "record).",
+    )
+
     use_project_deadline_from_options = fields.Json(compute="_compute_use_project_deadline_from_options")
 
     is_days_relative_to_project_applicable = fields.Boolean(
@@ -321,18 +337,34 @@ class Service(models.Model):
     )
 
     # the container of the service (log_entry, employee, etc)
+    # res_model and res_id are stored compute fields driven by _compute_subject,
+    # which cascades the subject from the parent based on subject_from.
+    # readonly=False (rather than a no-op inverse) keeps them writable, so
+    # business logic (resource_ref inverse, template clone vals, migrations,
+    # tests) can assign res_id/res_model directly; the compute's "self" branch
+    # then preserves the written value on the next recompute.
     res_model = fields.Char(
         string="Subject of Service Model Name",
+        compute="_compute_subject",
+        store=True,
+        readonly=False,
+        recursive=True,
+        precompute=True,
     )
     res_id = fields.Integer(
-        string="Subject of Service ID", required=True, default=0
-    )  # prevent null vs 0 sorting differences
-    res_id_computed = fields.Integer(
-        "Computed Service Subject ID",
-        compute="_compute_res_id_computed",
-        store=False,
+        string="Subject of Service ID",
+        required=True,
+        compute="_compute_subject",
+        store=True,
+        readonly=False,
         recursive=True,
-        help="Syncs the service's subject reference (ref_id) with the Top-level service. All decendending services reference the same subject.",
+        precompute=True,
+        # Note: no explicit default. A literal default kicks in during
+        # _add_missing_default_values BEFORE precompute, which would make the
+        # precompute loop skip the field (it's already "in vals") and the
+        # cascade would silently fail. With no default, the precompute path
+        # owns the initial value: it falls back to the Integer column default
+        # (0) when subject_from='self' and the caller didn't pass res_id.
     )
     res_name = fields.Char(
         string="Subject of Service",
@@ -540,15 +572,36 @@ class Service(models.Model):
                 service.res_id = False
                 service.res_model = False
 
-    @api.depends("root_id.res_id", "root_id.res_model")
-    def _compute_res_id_computed(self):
+    @api.depends(
+        "subject_from",
+        "parent_id.res_id",
+        "parent_id.res_model",
+    )
+    def _compute_subject(self):
+        # Subject cascade keyed off subject_from:
+        # "inherit" pulls from the immediate parent (so a mid-chain service
+        # with subject_from='self' can introduce a different subject and its
+        # descendants inherit that, not the root's). "self" leaves the service
+        # alone. Other modes are dispatched to _apply_custom_subject_from.
+        # The parent_id guard in the inherit branch protects roots: a service
+        # with no parent never gets its subject clobbered to (False, 0) -- this
+        # covers orphaning a child (clearing parent_id) and the edge case of
+        # someone explicitly setting subject_from='inherit' on a root.
         for service in self:
-            service.res_id_computed = service.root_id.res_id
+            mode = service.subject_from
+            if mode == "inherit":
+                if service.parent_id:
+                    service.res_id = service.parent_id.res_id
+                    service.res_model = service.parent_id.res_model
+            elif mode == "self":
+                pass  # keep whatever was set via direct write / create vals
+            else:
+                service._apply_custom_subject_from(mode)
 
-            isRootService = service.id == service.root_id.id
-            if not isRootService:
-                service.res_id = service.root_id.res_id
-                service.res_model = service.root_id.res_model
+    def _apply_custom_subject_from(self, mode):
+        """Hook: higher-layer modules override to handle custom subject_from
+        values they added via selection_add. Base implementation is a no-op."""
+        return
 
     @api.depends("front_office_workflow_id.is_supply_order")
     def _compute_is_supply_order(self):
@@ -851,6 +904,15 @@ class Service(models.Model):
         if any(isinstance(record.id, api.NewId) for record in self):
             return
 
+        # The sibling-discovery SQL below bypasses the ORM cache, so the
+        # stored compute fields it queries (root_id, res_id, res_model) must
+        # already be materialised in the database. Flush them first --
+        # otherwise children just-created in the same transaction look
+        # orphaned (their root_id column is still NULL while only the cache
+        # holds the computed value), the sibling set comes back empty, and
+        # display_order stays at its default.
+        self.env["riverflow.service"].flush_model(["root_id", "res_id", "res_model", "parent_path"])
+
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()
 
         for record in self:
@@ -989,14 +1051,15 @@ class Service(models.Model):
             "target": "new",
         }
 
-    @api.onchange("parent_id")
-    def _onchange_parent_id(self):
-        if self.parent_id:
-            self.res_model = self.parent_id.res_model
-            self.res_id = self.parent_id.res_id
-
     @api.model_create_multi
     def create(self, vals_list):
+        # Context-aware default for subject_from: a service with no parent
+        # is its own subject anchor ('self'); a child cascades from its
+        # parent ('inherit'). Roots default to 'self' so the cascade in
+        # _compute_subject never clobbers a root's own subject.
+        for vals in vals_list:
+            if "subject_from" not in vals:
+                vals["subject_from"] = "inherit" if vals.get("parent_id") else "self"
         # current user is not subscribed to the chatter, because we have the radar-view, the review-count and top-3 external messages
         # this way, a team can keep track of the external messages instead of a single user
         # Also, the user eventually sending messages in the chatter will be subscribed to the record thread; the
@@ -1009,38 +1072,26 @@ class Service(models.Model):
             ),
         ).create(vals_list)
         for record in records:
-            if record.parent_id and not record.res_id:
-                record.res_id = record.parent_id.res_id
-                record.res_model = record.parent_id.res_model
-            elif not record.parent_id and record.res_model == self._name and record.res_id:
-                # for auto-adding a child service, they set the parent via res_id
-                # Invalidate the recordset to ensure fresh data
+            if not record.parent_id and record.res_model == self._name and record.res_id:
+                # Auto-add reparenting hack: the caller passed res_id pointing
+                # to the parent service. Convert to a real parent_id assignment
+                # and let _compute_subject cascade res_id / res_model from the
+                # new parent (subject_from='inherit' ensures the cascade fires).
                 record.parent_id = record.res_id
-                record.root_id = record.parent_id.root_id
-                record.res_model = record.parent_id.res_model
-                record.res_id = record.parent_id.res_id
-                # recalculate the parent_id dependent fields
-                record.invalidate_recordset(["parent_id", "parent_path", "root_id", "res_model", "res_id"])
+                record.subject_from = "inherit"
+                record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                 record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
     def write(self, vals):
         result = super(Service, self).write(vals)
-        if "parent_id" in vals:
-            for record in self:
-                if record.parent_id and not record.res_id:
-                    record.res_id = record.parent_id.res_id
-                    record.res_model = record.parent_id.res_model
-        elif "res_model" in vals and "res_id" in vals:
+        if "res_model" in vals and "res_id" in vals:
             for record in self:
                 if record.res_model == self._name:
+                    # Auto-add reparenting hack (see create() comment)
                     record.parent_id = record.res_id
-                    record.root_id = record.parent_id.root_id
-                    record.res_model = record.parent_id.res_model
-                    record.res_id = record.parent_id.res_id
-                    record.invalidate_recordset(
-                        ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
-                    )
+                    record.subject_from = "inherit"
+                    record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                     record.parent_id.invalidate_recordset(["child_ids"])
 
         # When a supply order service changes state, trigger recomputation of related info services
@@ -1248,6 +1299,7 @@ class Service(models.Model):
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
             "daily_prio": template_service.daily_prio,
             "weekend_deadline_rule": template_service.weekend_deadline_rule,
+            "subject_from": template_service.subject_from,
         }
 
         if deadline:
@@ -1651,6 +1703,23 @@ class Service(models.Model):
             "view_mode": "list,form",
             "domain": [("record_id", "=", self.id), ("model_name", "=", self._name)],
         }
+
+    def action_recompute_subject_debug(self):
+        """Developer tool: force a recompute of res_id/res_model on these
+        services so the subject cascade can be profiled in isolation.
+
+        Exposed only in developer mode (base.group_no_one) via the
+        "Recompute Subject (debug)" server action in the list/form Action
+        menu. To profile: enable the UI profiler (debug menu), select some
+        services, run this action, then inspect the captured trace. We mark
+        the fields to-compute and flush so the run goes through Odoo's normal
+        recompute machinery (dependency resolution + recursive compute +
+        write), matching what happens during an upgrade.
+        """
+        self.invalidate_recordset(["res_id", "res_model"])
+        self.env.add_to_compute(self._fields["res_id"], self)
+        self.env.add_to_compute(self._fields["res_model"], self)
+        self.flush_recordset(["res_id", "res_model"])
 
     def handle_journey_drop(self, target_service_id, position, journey_service_ids=None):
         """
