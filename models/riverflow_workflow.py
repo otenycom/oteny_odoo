@@ -40,6 +40,16 @@ class RiverflowWorkflow(models.Model):
         "becomes 'issued'. Set to 'Not Needed' or similar end state.",
     )
 
+    enforce_single_open = fields.Boolean(
+        "Enforce Single Open Service",
+        default=False,
+        help="When set, auto-add creates at most one OPEN (active, non-end-state) "
+        "service per subject for this workflow, and a partial-unique index makes a "
+        "second open service structurally impossible. Used for credential-renewal "
+        "workflows like the DE Work Permit, where the golden rule is exactly one "
+        "live service per employee.",
+    )
+
     workflow_start_transition_ids = fields.One2many(
         "riverflow.transition",
         "workflow_id",

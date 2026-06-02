@@ -105,6 +105,17 @@ class RiverflowWorkflowState(models.Model):
         "ship states where ship documents are needed (e.g. Onboarding, Active).",
         default=False,
     )
+    counts_as_active_employment = fields.Boolean(
+        "Counts as Active Employment",
+        help="If true, an employee in this state is treated as actively/possibly "
+        "employed for credential-holder eligibility, so their credential plan "
+        "slots (and the employment-contract ground-layer slot) are generated even "
+        "before a contract record exists. This catches newly onboarding crew "
+        "(e.g. Agreement Signed) who do not yet have a contract row. Set on "
+        "employment states such as Agreement Signed, Employed and Offboarding; "
+        "leave off end states (Terminated, Cancelled) and pre-employment states.",
+        default=False,
+    )
     show_state_in_crew_planning = fields.Boolean(
         "Show in Crew Planning",
         help="If true, this state is shown as a badge on the slot label in the crew planning view. "

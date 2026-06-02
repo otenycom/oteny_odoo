@@ -167,6 +167,26 @@ class Service(models.Model):
         tracking=True,
     )
 
+    is_open = fields.Boolean(
+        "Open",
+        compute="_compute_is_open",
+        store=True,
+        help="True when the service is a live, in-progress service: active, not "
+        "a template, and not in an end state. Backs the one-open-service-per-"
+        "subject invariant (see riverflow.workflow.enforce_single_open) and the "
+        "partial-unique index on enforcing workflows.",
+    )
+
+    @api.depends("active", "is_this_a_template", "state_id", "state_id.is_end_state")
+    def _compute_is_open(self):
+        for service in self:
+            service.is_open = bool(
+                service.active
+                and not service.is_this_a_template
+                and service.state_id
+                and not service.state_id.is_end_state
+            )
+
     days_relative_to_project = fields.Integer(
         "Day",
         help="Number of days before or after the project deadline for this service to be completed, e.g. -1 for the day before",

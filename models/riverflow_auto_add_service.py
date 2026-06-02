@@ -180,11 +180,67 @@ class AutoAddService(models.Model):
             not in current_services_dict
         ]
 
+        # Single-open guard: for workflows that enforce one open service per
+        # subject, drop any candidate whose subject already has an open service
+        # for that workflow, and collapse duplicate candidates within this batch.
+        # This is the application layer of the invariant; a partial-unique index
+        # on enforcing workflows is the structural backstop against races.
+        to_create = self._filter_single_open(to_create, model, subjects)
+
         if to_create:
             for service_vals in to_create:
                 ctx = self._get_service_creation_context(service_vals)
                 service_context = self.env["riverflow.service"].with_context(**ctx)
                 service_context._create_services_from_template(service_vals["template_id"])
+
+    def _filter_single_open(self, to_create, model, subjects):
+        """Drop candidates that would create a second OPEN service for a
+        subject on a workflow that enforces single-open, and collapse duplicate
+        candidates within this batch (same workflow + subject).
+
+        Keyed on workflow open-ness (riverflow.service.is_open), not the
+        occasion ref, so a renewal cycle never stacks a second service on an
+        already-open one, and a manually-created open service equally blocks
+        auto-creation. Non-enforcing workflows are returned unchanged.
+        """
+        if not to_create:
+            return to_create
+        Service = self.env["riverflow.service"]
+        template_ids = {c["template_id"] for c in to_create}
+        workflow_by_template = {
+            t.id: t.workflow_id for t in Service.browse(template_ids)
+        }
+        enforcing = {
+            wf.id
+            for wf in workflow_by_template.values()
+            if wf and wf.enforce_single_open
+        }
+        if not enforcing:
+            return to_create
+
+        open_existing = {
+            (s.workflow_id.id, s.res_id)
+            for s in Service.with_context(active_test=False).search(
+                [
+                    ("res_id", "in", subjects.ids),
+                    ("res_model", "=", model),
+                    ("workflow_id", "in", list(enforcing)),
+                    ("is_open", "=", True),
+                ]
+            )
+        }
+
+        result = []
+        seen = set()
+        for c in to_create:
+            wf = workflow_by_template.get(c["template_id"])
+            if wf and wf.id in enforcing:
+                key = (wf.id, c["res_id"])
+                if key in open_existing or key in seen:
+                    continue
+                seen.add(key)
+            result.append(c)
+        return result
 
     def _get_service_creation_context(self, service_vals):
         """Build context dict for creating a service from auto-add vals.
