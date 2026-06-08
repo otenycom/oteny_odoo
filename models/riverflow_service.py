@@ -209,18 +209,16 @@ class Service(models.Model):
 
     subject_from = fields.Selection(
         [
-            ("inherit", "Inherit from parent"),
-            ("self", "Manual"),
+            ("default", "Default"),
         ],
         string="Subject From",
         required=True,
         tracking=True,
-        default="inherit",
+        default="default",
         help="Where this service derives its subject (res_model/res_id) from. "
-        "'inherit' cascades from the parent service (top-down). "
-        "'self' keeps whatever subject the service was created with. "
-        "Higher-layer modules can add more options (e.g. derive from a related "
-        "record).",
+        "'Default' cascades from the parent service (top-down); a service with no "
+        "parent keeps the subject it was created with. Higher-layer modules can "
+        "add more options (e.g. derive from a related record).",
     )
 
     use_project_deadline_from_options = fields.Json(compute="_compute_use_project_deadline_from_options")
@@ -384,7 +382,8 @@ class Service(models.Model):
         # precompute loop skip the field (it's already "in vals") and the
         # cascade would silently fail. With no default, the precompute path
         # owns the initial value: it falls back to the Integer column default
-        # (0) when subject_from='self' and the caller didn't pass res_id.
+        # (0) when subject_from='default' and the service has no parent and the
+        # caller didn't pass res_id.
     )
     res_name = fields.Char(
         string="Subject of Service",
@@ -599,22 +598,20 @@ class Service(models.Model):
     )
     def _compute_subject(self):
         # Subject cascade keyed off subject_from:
-        # "inherit" pulls from the immediate parent (so a mid-chain service
-        # with subject_from='self' can introduce a different subject and its
-        # descendants inherit that, not the root's). "self" leaves the service
-        # alone. Other modes are dispatched to _apply_custom_subject_from.
-        # The parent_id guard in the inherit branch protects roots: a service
-        # with no parent never gets its subject clobbered to (False, 0) -- this
-        # covers orphaning a child (clearing parent_id) and the edge case of
-        # someone explicitly setting subject_from='inherit' on a root.
+        # "default" cascades the subject top-down: a service with a parent pulls
+        # the parent's subject (so a mid-chain change propagates to descendants),
+        # while a service with no parent keeps whatever subject it was created
+        # with. Other modes are dispatched to _apply_custom_subject_from.
+        # The parent_id guard protects roots: a service with no parent never
+        # gets its subject clobbered to (False, 0) -- this covers a root keeping
+        # its own subject and orphaning a child (clearing parent_id).
         for service in self:
             mode = service.subject_from
-            if mode == "inherit":
+            if mode == "default":
                 if service.parent_id:
                     service.res_id = service.parent_id.res_id
                     service.res_model = service.parent_id.res_model
-            elif mode == "self":
-                pass  # keep whatever was set via direct write / create vals
+                # root (no parent): keep own subject -- no-op
             else:
                 service._apply_custom_subject_from(mode)
 
@@ -1073,13 +1070,9 @@ class Service(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        # Context-aware default for subject_from: a service with no parent
-        # is its own subject anchor ('self'); a child cascades from its
-        # parent ('inherit'). Roots default to 'self' so the cascade in
-        # _compute_subject never clobbers a root's own subject.
-        for vals in vals_list:
-            if "subject_from" not in vals:
-                vals["subject_from"] = "inherit" if vals.get("parent_id") else "self"
+        # subject_from defaults to 'default' (the field default), which is
+        # parent-aware in _compute_subject: a root keeps its own subject while
+        # a child cascades from its parent. No per-record juggling needed here.
         # current user is not subscribed to the chatter, because we have the radar-view, the review-count and top-3 external messages
         # this way, a team can keep track of the external messages instead of a single user
         # Also, the user eventually sending messages in the chatter will be subscribed to the record thread; the
@@ -1096,21 +1089,39 @@ class Service(models.Model):
                 # Auto-add reparenting hack: the caller passed res_id pointing
                 # to the parent service. Convert to a real parent_id assignment
                 # and let _compute_subject cascade res_id / res_model from the
-                # new parent (subject_from='inherit' ensures the cascade fires).
+                # new parent (subject_from='default' ensures the cascade fires).
                 record.parent_id = record.res_id
-                record.subject_from = "inherit"
+                record.subject_from = "default"
                 record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                 record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
     def write(self, vals):
+        # Guard manual archive (active=False) of a protected single-open service,
+        # the archive counterpart of the unlink guard. Scoped to a manual archive
+        # while the subject is still active, so a legitimate subject-cascade
+        # archive (subject_active already False) is never blocked.
+        if vals.get("active") is False and not self.env.context.get(
+            "bypass_user_unlink_check"
+        ):
+            blocked = self.filtered(
+                lambda s: s.subject_active and s._single_open_removal_blocked()
+            )
+            if blocked:
+                raise UserError(
+                    _(
+                        "Cannot archive %s: it is in progress or still has active "
+                        "sub-services. Close it through its workflow instead.",
+                        ", ".join(blocked.mapped("display_name")),
+                    )
+                )
         result = super(Service, self).write(vals)
         if "res_model" in vals and "res_id" in vals:
             for record in self:
                 if record.res_model == self._name:
                     # Auto-add reparenting hack (see create() comment)
                     record.parent_id = record.res_id
-                    record.subject_from = "inherit"
+                    record.subject_from = "default"
                     record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                     record.parent_id.invalidate_recordset(["child_ids"])
 
@@ -1684,12 +1695,43 @@ class Service(models.Model):
         # This is a flag method that allows the field to be written
         pass
 
+    def _single_open_removal_blocked(self):
+        """True when this OPEN service must not be deleted/archived by hand.
+
+        On a workflow that enforces single-open, a service that is **past its
+        initial state** or still holds **live child services** (active,
+        non-end-state — e.g. a booked AB appointment) is closed through its
+        workflow, never destroyed: destroying it would lose the in-progress work
+        and silently drop the single-open guarantee. A childless service still at
+        its initial state (a plain monitoring task) stays freely removable — it
+        self-heals (see crewradar_creds).
+        """
+        self.ensure_one()
+        if not (self.is_open and self.workflow_id.enforce_single_open):
+            return False
+        initial = self.workflow_id.state_ids.sorted("sequence")[:1]
+        past_initial = bool(initial and self.state_id.sequence > initial.sequence)
+        live_children = self.child_ids.filtered(
+            lambda c: c.active and not c.state_id.is_end_state
+        )
+        return past_initial or bool(live_children)
+
     def unlink(self):
         if not self.env.context.get("bypass_user_unlink_check"):
             if self.supply_leg_id.ids and not self.env.user.has_group("base.group_no_one"):
                 raise UserError(
                     _(
                         "Cannot delete info-service linked to a supply order leg. Delete the leg from the supply order instead."
+                    )
+                )
+            blocked = self.filtered(lambda s: s._single_open_removal_blocked())
+            if blocked:
+                raise UserError(
+                    _(
+                        "Cannot delete %s: it is in progress or still has active "
+                        "sub-services (e.g. a booked appointment). Close it through "
+                        "its workflow instead of deleting it.",
+                        ", ".join(blocked.mapped("display_name")),
                     )
                 )
 
