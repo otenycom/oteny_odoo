@@ -119,6 +119,19 @@ class OtenyAuditLog(models.Model):
         else:
             _logger.info("Index oteny_audit_log_model_record_date_id_idx already exists")
 
+        # Composite index serving field_name= equality + create_date range
+        # lookups in the audit search (no existing index here leads with field_name).
+        if not self._index_exists("oteny_audit_log_field_name_create_date_idx"):
+            _logger.info("Creating index oteny_audit_log_field_name_create_date_idx")
+            cr.execute(
+                """
+                CREATE INDEX oteny_audit_log_field_name_create_date_idx
+                ON oteny_audit_log (field_name, create_date DESC)
+            """
+            )
+        else:
+            _logger.info("Index oteny_audit_log_field_name_create_date_idx already exists")
+
         _logger.info("OtenyAuditLog indexes initialization completed")
 
     def _index_exists(self, index_name):

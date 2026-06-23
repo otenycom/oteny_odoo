@@ -257,11 +257,34 @@ class OtenyAuditLogAggregated(models.Model):
 
         # GIN index on the snapshot column for `?` and `@>` operators. Cheap
         # to maintain (~50-80 bytes/row) and makes targeted "find inserts that
-        # captured field X" queries into index seeks.
+        # captured field X" queries into index seeks. PARTIAL on
+        # field_name = '__snapshot__' to match its btree sibling below: only
+        # snapshot rows carry a non-null snapshot, and UPDATE rows (~7/8 of the
+        # table) have snapshot IS NULL — yet a non-partial GIN still churns the
+        # fastupdate pending list on every insert. Restricting the index to
+        # snapshot rows removes that insert-time churn without losing coverage.
+        #
+        # CREATE INDEX IF NOT EXISTS will NOT replace a differently-defined
+        # existing index, so we drop-then-recreate — but only when the live
+        # index is the old non-partial definition (indexdef lacks "field_name").
+        # This guard keeps a multi-GB rebuild from running on every -u.
+        self.env.cr.execute(
+            """
+            SELECT indexdef FROM pg_indexes
+            WHERE indexname = 'oteny_audit_log_snapshot_gin_idx'
+            """
+        )
+        row = self.env.cr.fetchone()
+        if row and "field_name" not in row[0]:
+            _logger.info(
+                "Dropping non-partial oteny_audit_log_snapshot_gin_idx to recreate it partial"
+            )
+            self.env.cr.execute("DROP INDEX oteny_audit_log_snapshot_gin_idx")
         self.env.cr.execute(
             """
             CREATE INDEX IF NOT EXISTS oteny_audit_log_snapshot_gin_idx
             ON oteny_audit_log USING GIN (snapshot jsonb_path_ops)
+            WHERE field_name = '__snapshot__'
             """
         )
 
@@ -281,21 +304,46 @@ class OtenyAuditLogAggregated(models.Model):
             """
         )
 
-        # Single-SELECT view (no UNION, no window function). Snapshot rows
-        # produce N virtual rows via LEFT JOIN LATERAL ... WITH ORDINALITY;
-        # non-snapshot rows produce one row with jek=NULL. The unique id is
-        # `ref.id * 1000 + COALESCE(jek.idx, 0)` — collision-free because
-        # non-snapshot rows always end in 0 and snapshot rows always end in
-        # 1..N. Critically, this shape lets PG push the outer `create_date`
-        # filter down to the underlying log seq/index scan: a UNION ALL with
-        # ROW_NUMBER blocks that push-down (window functions are an opaque
-        # planner barrier), causing the entire 4M-row view to materialize
-        # before the filter runs.
+        # UNION ALL of two disjoint branches, partitioned on whether the log
+        # row is a non-empty snapshot tombstone. This is a performance rewrite
+        # of what used to be a single SELECT with a LATERAL + CASE machinery
+        # for every row.
+        #
+        # WHY: a value search (`unaccent(new_value_display_name) ILIKE '%x%'`)
+        # against the old single-SELECT could not be pushed into the log scan,
+        # because new_value_display_name was a CASE coupling `log` with the
+        # snapshot LATERAL (`jek`). The planner estimated rows=1 over that
+        # opaque expression, chose a nested loop, and seq-scanned the multi-
+        # million-row oteny_audit_log_ref table once per matching log row — a
+        # ~36s, 400M-row join explosion on production data.
+        #
+        # THE SPLIT: update rows (the ~7/8 majority) NEVER carry a snapshot, so
+        # the non-snapshot branch (A) can expose PLAIN log columns
+        # (new_value_display_name = log.new_value_display_name, etc.). With a
+        # plain column the planner pushes the value filter straight into the
+        # log scan (create_date index + filter), then index-joins ref via
+        # oteny_audit_log_ref(audit_log_id). Measured 36s -> ~100ms.
+        #
+        # The two branch predicates are exact negations, so the union is total
+        # and disjoint; UNION ALL (no dedup) is correct. The synthetic id
+        # encoding is preserved: branch A always ends in 0
+        # (ref.id*1000 + 0), branch B ends in 1..N (ref.id*1000 + ord), so ids
+        # stay collision-free and JS-safe. No window function is used, so the
+        # outer `create_date` filter still pushes into each Append child
+        # (the historical UNION-pushdown hazard was ROW_NUMBER specifically).
+        #
+        # Branch A also catches the empty-snapshot tombstone rows (snapshot
+        # IS NULL or '{}'): they surface as a single row with the sentinel
+        # field_name='__snapshot__' and empty values, exactly as before.
         self.env.cr.execute(
             """
             CREATE OR REPLACE VIEW %s AS (
+                -- Branch A: non-snapshot rows (updates, legacy per-field
+                -- inserts/deletes, and empty-snapshot tombstones). Plain log
+                -- columns only — no jsonb, no LATERAL — so value searches push
+                -- into the log scan.
                 SELECT
-                    (ref.id::bigint * 1000) + COALESCE(jek.idx, 0) AS id,
+                    (ref.id::bigint * 1000) + 0 AS id,
                     ref.audit_log_id,
                     log.create_date,
                     log.create_uid,
@@ -308,36 +356,18 @@ class OtenyAuditLogAggregated(models.Model):
 
                     COALESCE(ref.parent_display_name, log.record_display_name) AS parent_record_display_name,
 
-                    -- Snapshot rows: field_name is the snapshot dict key.
-                    -- Non-snapshot rows: field_name is the log's own field_name.
-                    COALESCE(jek.key, log.field_name) AS field_name,
-                    COALESCE(jek.value->>'label', log.field_display_name) AS field_display_name,
+                    -- Cast to text so the column types match the snapshot
+                    -- branch (jek.key / COALESCE are text) and the pre-rewrite
+                    -- view, keeping CREATE OR REPLACE VIEW type-compatible.
+                    log.field_name::text AS field_name,
+                    log.field_display_name::text AS field_display_name,
                     log.model_name AS field_model_name,
                     COALESCE(im_field.name->>'en_US', log.model_name) AS field_model_display_name,
 
-                    -- Snapshot values map onto old/new based on change_type:
-                    -- inserts → new_value, deletes → old_value. Non-snapshot
-                    -- rows pass through their own old/new values.
-                    CASE
-                        WHEN jek.key IS NULL THEN log.old_value
-                        WHEN log.change_type = 'd' THEN jek.value->>'raw'
-                        ELSE ''
-                    END AS old_value,
-                    CASE
-                        WHEN jek.key IS NULL THEN log.new_value
-                        WHEN log.change_type = 'i' THEN jek.value->>'raw'
-                        ELSE ''
-                    END AS new_value,
-                    CASE
-                        WHEN jek.key IS NULL THEN log.old_value_display_name
-                        WHEN log.change_type = 'd' THEN jek.value->>'display'
-                        ELSE ''
-                    END AS old_value_display_name,
-                    CASE
-                        WHEN jek.key IS NULL THEN log.new_value_display_name
-                        WHEN log.change_type = 'i' THEN jek.value->>'display'
-                        ELSE ''
-                    END AS new_value_display_name,
+                    log.old_value AS old_value,
+                    log.new_value AS new_value,
+                    log.old_value_display_name AS old_value_display_name,
+                    log.new_value_display_name AS new_value_display_name,
                     log.change_type,
 
                     NOT ref.is_direct AS is_child_log,
@@ -353,24 +383,63 @@ class OtenyAuditLogAggregated(models.Model):
                 LEFT JOIN ir_model im_target ON ref.target_model_name = im_target.model
                 LEFT JOIN ir_model im_field ON log.model_name = im_field.model
                 LEFT JOIN ir_model im_child ON (NOT ref.is_direct AND log.model_name = im_child.model)
-                -- LATERAL with ORDINALITY: produces N rows for snapshot logs
-                -- (one per JSON key, with `idx` 1..N) and 0 rows for
-                -- non-snapshot logs. LEFT JOIN ON TRUE keeps non-snapshot
-                -- logs as a single jek=NULL row.
-                LEFT JOIN LATERAL (
-                    SELECT key, value, ord AS idx
-                    FROM jsonb_each(log.snapshot) WITH ORDINALITY AS s(key, value, ord)
-                    WHERE log.field_name = '__snapshot__' AND log.snapshot IS NOT NULL
-                ) jek ON TRUE
-                -- Drop synthetic NULL row for snapshot logs that have no
-                -- captured fields (empty snapshot dict): keep them visible
-                -- via the log row but represent them as a single per-field
-                -- line with empty key — handled by COALESCE above.
                 WHERE
                     log.field_name <> '__snapshot__'
-                    OR jek.key IS NOT NULL
                     OR log.snapshot IS NULL
                     OR log.snapshot = '{}'::jsonb
+
+                UNION ALL
+
+                -- Branch B: snapshot tombstone rows with a non-empty snapshot
+                -- (inserts/deletes). UNNEST each captured field via LATERAL
+                -- jsonb_each WITH ORDINALITY; map the value onto old/new by
+                -- change_type (insert -> new_value, delete -> old_value).
+                SELECT
+                    (ref.id::bigint * 1000) + jek.idx AS id,
+                    ref.audit_log_id,
+                    log.create_date,
+                    log.create_uid,
+                    log.transaction_id,
+
+                    ref.target_model_name AS model_name,
+                    COALESCE(im_target.name->>'en_US', ref.target_model_name) AS model_display_name,
+                    ref.target_record_id AS record_id,
+                    ref.target_display_name AS record_display_name,
+
+                    COALESCE(ref.parent_display_name, log.record_display_name) AS parent_record_display_name,
+
+                    jek.key AS field_name,
+                    COALESCE(jek.value->>'label', log.field_display_name) AS field_display_name,
+                    log.model_name AS field_model_name,
+                    COALESCE(im_field.name->>'en_US', log.model_name) AS field_model_display_name,
+
+                    CASE WHEN log.change_type = 'd' THEN jek.value->>'raw' ELSE '' END AS old_value,
+                    CASE WHEN log.change_type = 'i' THEN jek.value->>'raw' ELSE '' END AS new_value,
+                    CASE WHEN log.change_type = 'd' THEN jek.value->>'display' ELSE '' END AS old_value_display_name,
+                    CASE WHEN log.change_type = 'i' THEN jek.value->>'display' ELSE '' END AS new_value_display_name,
+                    log.change_type,
+
+                    NOT ref.is_direct AS is_child_log,
+                    CASE WHEN NOT ref.is_direct THEN log.model_name ELSE NULL END AS child_model_name,
+                    CASE WHEN NOT ref.is_direct
+                         THEN COALESCE(im_child.name->>'en_US', log.model_name)
+                         ELSE NULL
+                    END AS child_model_display_name,
+                    CASE WHEN NOT ref.is_direct THEN log.record_id ELSE NULL END AS child_record_id
+
+                FROM oteny_audit_log_ref ref
+                JOIN oteny_audit_log log ON ref.audit_log_id = log.id
+                LEFT JOIN ir_model im_target ON ref.target_model_name = im_target.model
+                LEFT JOIN ir_model im_field ON log.model_name = im_field.model
+                LEFT JOIN ir_model im_child ON (NOT ref.is_direct AND log.model_name = im_child.model)
+                CROSS JOIN LATERAL (
+                    SELECT key, value, ord AS idx
+                    FROM jsonb_each(log.snapshot) WITH ORDINALITY AS s(key, value, ord)
+                ) jek
+                WHERE
+                    log.field_name = '__snapshot__'
+                    AND log.snapshot IS NOT NULL
+                    AND log.snapshot <> '{}'::jsonb
             )
             """
             % self._table

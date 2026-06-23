@@ -1,6 +1,8 @@
 {
     "name": "oteny_audit",
-    "version": "19.0.1.472",
+    # 19.0.1.474: perf: split aggregated audit view into UNION ALL (push value-search into log scan; 36s->~100ms)
+    # 19.0.1.473: perf: partial snapshot GIN + (field_name, create_date) base index
+    "version": "19.0.1.474",
     "depends": ["base", "mail"],
     "author": "Oteny.com",
     "category": "Extra Tools",
