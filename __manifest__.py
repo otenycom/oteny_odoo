@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "19.0.1.1186",  # 19.0.1.1182: WP renewal waiver (Phase C / R1+R5a) — generic delete/archive guard on riverflow.service: `_single_open_removal_blocked()` refuses unlink (and manual archive) of an `is_open` service on an `enforce_single_open` workflow that is past its initial state OR still has live (active, non-end-state) child services. A childless initial-state monitoring service stays removable (self-heals in crewradar_creds). See rivercreds/references/golden-rules-and-waivers.md R1.
+    "version": "19.0.1.1187",  # 19.0.1.1182: WP renewal waiver (Phase C / R1+R5a) — generic delete/archive guard on riverflow.service: `_single_open_removal_blocked()` refuses unlink (and manual archive) of an `is_open` service on an `enforce_single_open` workflow that is past its initial state OR still has live (active, non-end-state) child services. A childless initial-state monitoring service stays removable (self-heals in crewradar_creds). See rivercreds/references/golden-rules-and-waivers.md R1.
     "depends": ["base", "mail", "documents", "oteny_shortcut"],
     "author": "Vriend Studio",
     "category": "Workflow",
