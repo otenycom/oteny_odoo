@@ -921,6 +921,25 @@ class Service(models.Model):
         if any(isinstance(record.id, api.NewId) for record in self):
             return
 
+        # Bulk migrations / imports re-anchor or re-home hundreds of services in
+        # a Python loop, and every write touches a display_order dependency.
+        # Without this guard the costly per-record sibling scan + tree rebuild
+        # below runs once per write -- the dominant cost of those migrations (an
+        # N+1 query storm). When the caller opts in with `defer_display_order`,
+        # keep the current stored value and skip the rebuild; the caller does one
+        # batched, flag-free rebuild of every touched tree at the end.
+        #
+        # We re-assign the *current* value rather than bare-`return`: this is a
+        # STORED field, so a bare return would flush NULL. compute_value() has
+        # already cleared these records from `tocompute` and protects the field
+        # (see odoo/orm/fields.py), so reading the old value is safe and does not
+        # recurse, and assigning it marks the field computed -- a flush inside the
+        # deferred scope then converges instead of re-deferring forever.
+        if self.env.context.get("defer_display_order"):
+            for service in self:
+                service.display_order = service.display_order
+            return
+
         # The sibling-discovery SQL below bypasses the ORM cache, so the
         # stored compute fields it queries (root_id, res_id, res_model) must
         # already be materialised in the database. Flush them first --
