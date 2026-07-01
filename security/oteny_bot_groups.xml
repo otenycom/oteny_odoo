@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Power users / admins who may review a bot's activity log (every exchange it had with
+         this Odoo). Assignable to a client's own admin; system users get it out of the box. -->
+    <record id="group_oteny_bot_manager" model="res.groups">
+        <field name="name">Oteny Bot Manager</field>
+        <field name="comment">Review Oteny business-bot activity — every request/response exchange a bot had with this Odoo.</field>
+    </record>
+
+    <record id="base.group_system" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('oteny_bot.group_oteny_bot_manager'))]"/>
+    </record>
+</odoo>
