@@ -151,3 +151,37 @@ class RiverflowStateBotMixin(models.AbstractModel):
                 if self.bot_claim(record.id, timeout_transition.id).get("ok"):
                     reaped += 1
         return reaped
+
+    @api.model
+    def bot_dispatch_queue(self):
+        """Push each queued bot-owned record to its bot as an isolated turn (the Odoo-driven trigger
+        that replaces the Oteny-side harness poll: the owner's Odoo asks the bot to act, and the bot's
+        own channel poll picks it up — no external sweep, no webhook). Per queued record, build a THIN
+        anchored prompt and hand it to the domain ``_bot_dispatch`` hook. Idempotent: the hook claims
+        the record (→ its in-progress state), so it leaves the queue and is never re-dispatched.
+        Returns the number dispatched. Run by an ir.cron on each concrete workflow-bearing model."""
+        queue_states = self.env["riverflow.state"].search([("bot_stage", "=", "queue")])
+        if not queue_states:
+            return 0
+        dispatched = 0
+        for record in self.search([("state_id", "in", queue_states.ids)]):
+            item = record._bot_work_item()
+            if item and record._bot_dispatch(item, record._bot_dispatch_prompt(item)):
+                dispatched += 1
+        return dispatched
+
+    def _bot_dispatch_prompt(self, item):
+        """The THIN isolated-turn instruction for one queued record — names the skill + the record,
+        NEVER the DTO (the bot fetches that itself over its uplink, so no PII rides the channel)."""
+        self.ensure_one()
+        return (f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
+                f"#{self.id}. Load the skill, fetch this record's details over your uplink, complete "
+                "the work, and advance the record. Act only on this one record.")
+
+    def _bot_dispatch(self, item, prompt):
+        """Domain hook: dispatch ONE isolated turn for this record (its work ``item`` + a thin
+        ``prompt``) to its bot. Base is a no-op (returns False) — an app that wires a bot (e.g.
+        crewradar → the oteny_bot Discuss seam) overrides it to CLAIM the record (via
+        ``item['claim_transition_id']``) and post the flagged message to the bot's channel; a truthy
+        return counts it dispatched. Kept off ``oteny_bot`` here so riverflow stays a pure engine."""
+        return False
