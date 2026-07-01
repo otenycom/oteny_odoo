@@ -6,6 +6,8 @@ is a soft ``(model, res_id)`` reference so a workflow engine or an app module ca
 to its own record without this addon depending on it.
 """
 
+from psycopg2 import IntegrityError
+
 from odoo import api, fields, models
 
 
@@ -13,6 +15,13 @@ class OtenyBot(models.Model):
     _name = "oteny.bot"
     _description = "Oteny Business Bot"
     _order = "name"
+    # one bot per tenant reference — the write-back's ensure_bot relies on this to be a true upsert
+    # (a check-then-create alone races under overlapping sweeps). NULL uplink_ref may repeat (a
+    # manually-created bot without an uplink), per Postgres NULL semantics. Odoo 19 constraint style.
+    _uplink_ref_uniq = models.Constraint(
+        "unique(uplink_ref)",
+        "An Oteny bot's uplink reference must be unique.",
+    )
 
     name = fields.Char(required=True)
     bot_user_id = fields.Many2one(
@@ -40,7 +49,12 @@ class OtenyBot(models.Model):
 
         Creates an ``oteny.bot.session`` (+ optional child ``turns``) for the bot identified by
         ``uplink_ref``. ``sudo`` internally — the bot's least-privilege key need not carry write
-        on the log models — but scoped to the bot's OWN record, so a bot can only log for itself.
+        on the log models. The security boundary is ``bot_id``: a caller can only ever log under the
+        bot its OWN ``uplink_ref`` resolves to (an uplink reaches only its own owner's Odoo), never
+        another bot's. The ``origin`` (``origin_model`` + ``origin_res_id``) is an ADVISORY soft
+        reference the bot self-reports — it is not validated here (this addon is domain-agnostic and
+        the record may since be gone), and a bot that can log is one that already has write access to
+        those records, so a mis-stated origin is a self-report artefact, not a privilege escalation.
         ``session`` is the session vals ({name, kind, request, response, outcome, outcome_detail,
         origin_model, origin_res_id, started_at, duration_s}); ``turns`` an optional list of turn
         vals. Kwargs are never named ``ids`` (the /json/2/ recordset selector). Returns
@@ -57,6 +71,33 @@ class OtenyBot(models.Model):
                 (0, 0, {k: v for k, v in (t or {}).items() if k in tallowed}) for t in turns]
         rec = self.env["oteny.bot.session"].sudo().create(vals)
         return {"ok": True, "session_id": rec.id}
+
+    @api.model
+    def ensure_bot(self, uplink_ref, name=None):
+        """Idempotently ensure an ``oteny.bot`` exists for ``uplink_ref`` (owner-visibility, generic).
+
+        The bot lives outside this Odoo (its own machine); it has no way to pre-seed its own record
+        here, so the uplink calls this the first time the bot acts — the "Barney" record then simply
+        appears in the owner's Odoo, ready to accrue activity. ``sudo`` internally (the bot's
+        least-privilege key need not carry create on ``oteny.bot``); a true upsert on ``uplink_ref``,
+        never renamed on a re-call (the owner may have relabelled it). The ``unique(uplink_ref)``
+        constraint makes it race-safe: two overlapping sweeps that both miss the search collide on
+        create, and the loser returns the winner's record rather than forking the log. Kwargs are
+        never named ``ids`` (the /json/2/ recordset selector). Returns ``{ok, bot_id, created}``."""
+        bot = self.sudo().search([("uplink_ref", "=", uplink_ref)], limit=1)
+        if bot:
+            return {"ok": True, "bot_id": bot.id, "created": False}
+        try:
+            with self.env.cr.savepoint():
+                bot = self.sudo().create({"uplink_ref": uplink_ref, "name": name or uplink_ref})
+                bot.flush_recordset()   # force the INSERT so a unique-violation fires in the savepoint
+            return {"ok": True, "bot_id": bot.id, "created": True}
+        except IntegrityError:
+            # a concurrent ensure_bot won the create race (unique(uplink_ref)); return its record.
+            bot = self.sudo().search([("uplink_ref", "=", uplink_ref)], limit=1)
+            if bot:
+                return {"ok": True, "bot_id": bot.id, "created": False}
+            return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
 
     def action_open_sessions(self):
         self.ensure_one()
