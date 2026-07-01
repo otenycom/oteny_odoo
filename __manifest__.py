@@ -45,6 +45,7 @@
         "data/riverflow_taxi_leg_workflow.xml",
         "data/riverflow_train_ticket_workflow.xml",
         "data/ir_config_parameter_data.xml",
+        "data/riverflow_bot_cron.xml",
     ],
     "assets": {
         "web.assets_backend": [

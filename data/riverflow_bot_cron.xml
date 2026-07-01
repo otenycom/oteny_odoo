@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The bot timeout reaper (D173/D174): a backstop for a harness that died mid-run. It escalates
+         any record stuck in a bot `in_progress` state past its state's bot_timeout_minutes SLA,
+         through the state's is_bot_timeout transition. Runs on riverflow.service (the concrete
+         workflow-bearing model today); the logic itself is generic on riverflow.state.mixin, so a
+         future non-service bot model gets its own cron pointed at the same method. noupdate so ops
+         can tune the interval without a -u reverting it. -->
+    <data noupdate="1">
+        <record id="ir_cron_bot_reap_timeouts" model="ir.cron">
+            <field name="name">Riverflow: reap timed-out bot work</field>
+            <field name="model_id" ref="model_riverflow_service" />
+            <field name="state">code</field>
+            <field name="code">model._bot_reap_timeouts()</field>
+            <field name="interval_number">10</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True" />
+        </record>
+    </data>
+</odoo>

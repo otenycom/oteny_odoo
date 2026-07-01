@@ -25,6 +25,24 @@ class RiverflowWorkflowState(models.Model):
         "transition buttons stay meaningful. Drives the bot's work poll and lets a human "
         "review filter exclude the bot's in-flight queue (is_owned_by_bot = False).",
     )
+    bot_stage = fields.Selection(
+        [("queue", "Queue — the bot should act"),
+         ("in_progress", "In progress — claimed, the bot is working"),
+         ("watch", "Watch — the bot monitors, no action")],
+        string="Bot Stage",
+        help="The generic role of a bot-owned state in the transition harness (D173): a service in "
+        "a `queue` state is picked up (claimed → the `in_progress` state → an isolated agent run); "
+        "`watch` states the bot monitors without firing. Read by the generic bot_work_queue so an "
+        "app sets these on its workflow instead of hard-coding transition xml-ids.",
+    )
+    bot_timeout_minutes = fields.Integer(
+        "Bot Timeout (minutes)",
+        default=0,
+        help="SLA for a bot `in_progress` state: a record that has sat here longer than this is "
+        "escalated by the timeout reaper (ir.cron → _bot_reap_timeouts) through the state's "
+        "is_bot_timeout transition. 0 disables the reaper for this state (the backstop for a dead "
+        "harness that never reported back — set it comfortably above the harness's own poll window).",
+    )
 
     """
     SERVICE STATE COLORS

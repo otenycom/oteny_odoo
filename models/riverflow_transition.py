@@ -20,6 +20,24 @@ class RiverflowTransition(models.Model):
         help="Combination of Icon and name",
     )
     active = fields.Boolean("Active", default=True)
+    bot_role = fields.Selection(
+        [("claim", "Claim — queue → in-progress (the harness claim)"),
+         ("work", "Work — the agent's success advance out of in-progress"),
+         ("escalate", "Escalate — in-progress → a human state on failure")],
+        string="Bot Role",
+        help="The generic role of a transition in the bot transition harness (D173). The generic "
+        "bot_work_queue resolves the claim/work/escalate transitions from these roles + the state "
+        "bot_stage, so an app configures its workflow declaratively instead of the harness "
+        "hard-coding xml-ids.",
+    )
+    is_bot_timeout = fields.Boolean(
+        "Bot Timeout Exit",
+        default=False,
+        help="When set, the timeout reaper (_bot_reap_timeouts) follows this transition out of a "
+        "bot in-progress state whose bot_timeout_minutes SLA has been exceeded. Distinct from "
+        "bot_role='escalate' (the agent's own failure hand-back); this is the external 'you took "
+        "too long' exit, though a workflow may point both at the same human state.",
+    )
     from_state_id = fields.Many2one(
         "riverflow.state",
         "From",
