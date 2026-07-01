@@ -2,6 +2,7 @@
 
 from psycopg2 import IntegrityError
 
+from odoo.addons.oteny_bot.models.oteny_bot import ISOLATED_TURN_SENTINEL
 from odoo.tests import TransactionCase, tagged
 
 
@@ -66,3 +67,30 @@ class TestOtenyBot(TransactionCase):
         self.env["oteny.bot"].create({"name": "A", "uplink_ref": "dup"})
         with self.assertRaises(IntegrityError), self.env.cr.savepoint():
             self.env["oteny.bot"].create({"name": "B", "uplink_ref": "dup"}).flush_recordset()
+
+    def test_ensure_bot_adopts_a_seeded_channel_bound_bot(self):
+        # a business app seeds the bot (with its channel) but no uplink_ref; the write-back,
+        # authenticated as the bot user, adopts it rather than forking a second record.
+        seeded = self.env["oteny.bot"].create({"name": "Barney", "bot_user_id": self.env.uid})
+        res = self.env["oteny.bot"].ensure_bot("hh00140", name="ignored")
+        self.assertTrue(res["ok"] and res.get("adopted") and not res["created"])
+        self.assertEqual(res["bot_id"], seeded.id)
+        self.assertEqual(seeded.uplink_ref, "hh00140")
+        self.assertEqual(seeded.name, "Barney")           # not renamed on adoption
+
+    # --- the Discuss-flag dispatch (the trigger that replaces the harness poll) --- #
+
+    def test_dispatch_isolated_turn_posts_a_flagged_message(self):
+        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": "hh5", "discuss_channel_id": channel.id})
+        res = bot.dispatch_isolated_turn("File the MFNL for placement 42")
+        self.assertTrue(res["ok"])
+        msg = self.env["mail.message"].browse(res["message_id"])
+        self.assertEqual(msg.res_id, channel.id)
+        self.assertIn(ISOLATED_TURN_SENTINEL, msg.body)   # the isolation flag the gateway parses
+        self.assertIn("placement 42", msg.body)
+
+    def test_dispatch_isolated_turn_needs_a_channel(self):
+        bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hh6"})
+        self.assertFalse(bot.dispatch_isolated_turn("x")["ok"])

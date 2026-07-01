@@ -10,6 +10,12 @@ from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
 
+# The leading marker that tells the bot's gateway to run a Discuss message as a FRESH, isolated
+# agent turn (its own session) instead of a turn in the accumulating channel chat — the Discuss
+# trigger that replaces the Oteny-side harness poll. WIRE CONTRACT: this string MUST match the
+# hh-discuss adapter's ISOLATED_SENTINEL (hermeshost catalog/plugins/hh-discuss/discuss_wire.py).
+ISOLATED_TURN_SENTINEL = "[oteny:isolated]"
+
 
 class OtenyBot(models.Model):
     _name = "oteny.bot"
@@ -87,6 +93,15 @@ class OtenyBot(models.Model):
         bot = self.sudo().search([("uplink_ref", "=", uplink_ref)], limit=1)
         if bot:
             return {"ok": True, "bot_id": bot.id, "created": False}
+        # Adopt a pre-seeded bot: a business app (e.g. crewradar) seeds the oteny.bot with its
+        # discuss_channel_id + bot_user_id but no uplink_ref (it can't know the Oteny tenant ref).
+        # The first write-back — authenticated AS that bot user — claims the seeded record by
+        # setting its ref, so the channel-bound record is reused (the dispatch needs it), not forked.
+        seeded = self.sudo().search(
+            [("bot_user_id", "=", self.env.uid), ("uplink_ref", "in", (False, ""))], limit=1)
+        if seeded:
+            seeded.uplink_ref = uplink_ref
+            return {"ok": True, "bot_id": seeded.id, "created": False, "adopted": True}
         try:
             with self.env.cr.savepoint():
                 bot = self.sudo().create({"uplink_ref": uplink_ref, "name": name or uplink_ref})
@@ -98,6 +113,20 @@ class OtenyBot(models.Model):
             if bot:
                 return {"ok": True, "bot_id": bot.id, "created": False}
             return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
+
+    def dispatch_isolated_turn(self, prompt):
+        """Dispatch ONE isolated agent turn to this bot over Discuss (the trigger that replaces the
+        Oteny-side harness poll). Posts ``<sentinel> {prompt}`` into the bot's channel; the bot's
+        gateway poll picks it up and runs it as a FRESH, isolated session — not a turn in the
+        accumulating team chat. The dispatch is a real channel message, so the owner sees it.
+        Requires ``discuss_channel_id``. Returns ``{ok, message_id}`` (``{ok: False}`` if unbound)."""
+        self.ensure_one()
+        if not self.discuss_channel_id:
+            return {"ok": False, "reason": "bot has no discuss_channel_id"}
+        body = f"{ISOLATED_TURN_SENTINEL} {(prompt or '').strip()}".strip()
+        msg = self.discuss_channel_id.sudo().message_post(
+            body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
+        return {"ok": True, "message_id": msg.id}
 
     def action_open_sessions(self):
         self.ensure_one()
