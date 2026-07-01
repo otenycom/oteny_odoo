@@ -1242,7 +1242,14 @@ class Service(models.Model):
         if not is_child_add and not template_service.can_be_root_service:
             return False
         allowed_models = template_service.allowed_subject_model_ids
-        if allowed_models:
+        # A child whose template derives its own subject via a custom
+        # subject_from mode (e.g. crewradar's "most_fitting_log_entry" picks a
+        # log entry off the parent's employee) does not take the parent's
+        # subject. The parent/context res_model is only the derivation source,
+        # not the child's eventual subject, so the allowed-subject gate must not
+        # apply to it -- the mode owns the subject model.
+        derives_own_subject = is_child_add and template_service.subject_from != "default"
+        if allowed_models and not derives_own_subject:
             # Template is restricted to specific subjects: reject if no subject
             # is provided or if the subject model is not in the allowed list.
             if not res_model or res_model not in allowed_models.mapped("model"):
