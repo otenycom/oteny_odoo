@@ -30,10 +30,13 @@ the state machine enforces AT MOST ONE live agent run per claim epoch with three
    activity, so a replayed dispatch message can never start a second agent run.
 """
 
+import logging
 import secrets
 from datetime import timedelta
 
 from odoo import api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class RiverflowStateBotMixin(models.AbstractModel):
@@ -81,6 +84,43 @@ class RiverflowStateBotMixin(models.AbstractModel):
             vals["bot_work_started_at"] = fields.Datetime.now() if in_progress else False
             vals["bot_claim_token"] = secrets.token_urlsafe(9) if in_progress else False
             vals["bot_run_started_at"] = False
+
+    def write(self, vals):
+        """Extend write to dispatch INLINE when a record enters a bot ``queue`` state: the
+        hand-off (e.g. Kirsten's *Hand to Barney* wizard) triggers the bot in the same
+        transaction — real time, not on the next cron tick (on odoo.sh cron workers run out of
+        band and slowly). The 3-min dispatch cron stays as the catch-up belt for records whose
+        inline dispatch failed (bot unbound, post error) or that were queued before activation."""
+        res = super().write(vals)
+        if "state_id" in vals:
+            self._bot_dispatch_inline()
+        return res
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._bot_dispatch_inline()
+        return records
+
+    def _bot_dispatch_inline(self):
+        """Dispatch every record of ``self`` that now sits in a bot ``queue`` state, inline in
+        the caller's transaction — claim + flagged message + activity session commit (or roll
+        back) WITH the hand-off write. Each record dispatches under its own savepoint: a failed
+        dispatch rolls back cleanly and NEVER breaks the user's hand-off (the record stays
+        queued; the cron belt retries). Runs sudo — the dispatch is system machinery (message
+        post to the bot's channel + the activity session), not something the handing user needs
+        rights for; parity with the cron, which runs as superuser. Opt out with context
+        ``bot_no_inline_dispatch`` (tests exercising the raw queue/claim primitives)."""
+        if self.env.context.get("bot_no_inline_dispatch"):
+            return
+        for record in self.filtered(lambda r: r.state_id.bot_stage == "queue"):
+            try:
+                with self.env.cr.savepoint():
+                    record.sudo()._bot_dispatch_one()
+            except Exception:  # noqa: BLE001 — never break the hand-off; the cron belt retries
+                _logger.exception(
+                    "inline bot dispatch failed for %s(%s) — record stays queued for the "
+                    "dispatch cron belt", record._name, record.id)
 
     @api.model
     def bot_work_queue(self):
@@ -282,19 +322,27 @@ class RiverflowStateBotMixin(models.AbstractModel):
     def bot_dispatch_queue(self):
         """Push each queued bot-owned record to its bot as an isolated turn (the Odoo-driven trigger
         that replaces the Oteny-side harness poll: the owner's Odoo asks the bot to act, and the bot's
-        own channel poll picks it up — no external sweep, no webhook). Per queued record, build a THIN
-        anchored prompt and hand it to the domain ``_bot_dispatch`` hook. Idempotent: the hook claims
-        the record (→ its in-progress state), so it leaves the queue and is never re-dispatched.
-        Returns the number dispatched. Run by an ir.cron on each concrete workflow-bearing model."""
+        own channel poll picks it up — no external sweep, no webhook). The PRIMARY dispatch is the
+        inline one on the hand-off write (``_bot_dispatch_inline`` — real time); this cron is the
+        catch-up belt for records whose inline dispatch failed and for work queued before
+        activation. Idempotent: the dispatch claims the record (→ its in-progress state), so it
+        leaves the queue and is never re-dispatched. Returns the number dispatched. Run by an
+        ir.cron on each concrete workflow-bearing model."""
         queue_states = self.env["riverflow.state"].search([("bot_stage", "=", "queue")])
         if not queue_states:
             return 0
         dispatched = 0
         for record in self.search([("state_id", "in", queue_states.ids)]):
-            item = record._bot_work_item()
-            if item and record._bot_dispatch(item, record._bot_dispatch_prompt(item)):
+            if record._bot_dispatch_one():
                 dispatched += 1
         return dispatched
+
+    def _bot_dispatch_one(self):
+        """Resolve THIS queued record's work item and hand it to the domain ``_bot_dispatch``
+        hook (the shared leg of the inline dispatch and the cron belt). True when dispatched."""
+        self.ensure_one()
+        item = self._bot_work_item()
+        return bool(item and self._bot_dispatch(item, self._bot_dispatch_prompt(item)))
 
     def _bot_dispatch_prompt(self, item):
         """The THIN isolated-turn instruction for one queued record — names the skill + the record
