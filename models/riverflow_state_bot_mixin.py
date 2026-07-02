@@ -175,12 +175,18 @@ class RiverflowStateBotMixin(models.AbstractModel):
         return dispatched
 
     def _bot_dispatch_prompt(self, item):
-        """The THIN isolated-turn instruction for one queued record — names the skill + the record,
-        NEVER the DTO (the bot fetches that itself over its uplink, so no PII rides the channel)."""
+        """The THIN isolated-turn instruction for one queued record — names the skill + the record
+        + the transition's declared task instruction (``bot_prompt``, a static instruction — no
+        record data), NEVER the DTO (the bot fetches that itself over its uplink, so no PII rides
+        the channel). Without the declared prompt the workflow's per-transition instruction (e.g.
+        the MFNL unattended contract) would reach only the webhook escape hatch, not the primary
+        Discuss dispatch."""
         self.ensure_one()
-        return (f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
+        thin = (f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
                 f"#{self.id}. Load the skill, fetch this record's details over your uplink, complete "
                 "the work, and advance the record. Act only on this one record.")
+        declared = (item.get("prompt") or "").strip()
+        return f"{thin}\n{declared}" if declared else thin
 
     def _bot_dispatch(self, item, prompt):
         """Domain hook: dispatch ONE isolated turn for this record (its work ``item`` + a thin
