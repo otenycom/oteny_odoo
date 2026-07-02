@@ -14,8 +14,23 @@ The mixin also owns the SAFETY BELT for a dead harness: it stamps ``bot_work_sta
 record enters a bot ``in_progress`` state, and ``_bot_reap_timeouts`` (an ir.cron) escalates any
 record stuck past its state's ``bot_timeout_minutes`` SLA through the state's ``is_bot_timeout``
 transition — so a crashed run that never reports back still hands the work back to a human.
+
+TOKEN-FENCED CLAIM (the anti-double-file mechanism). A government filing is not idempotent, so
+the state machine enforces AT MOST ONE live agent run per claim epoch with three primitives:
+
+1. **CAS claim** — ``bot_claim`` locks the row (``FOR NO KEY UPDATE``), re-reads committed truth,
+   and only then advances — two concurrent claimants can never both win.
+2. **Dispatch token** — ``bot_claim_token`` is minted on EVERY entry into a bot ``in_progress``
+   state and cleared on every exit, in the same vals/transaction as the state change. Only the
+   claim winner holds the token; every exit from in-progress (work advance, escalate, reaper
+   timeout) requires the current token, so a reaped-then-re-handed record's stale token is
+   rejected everywhere — a zombie run cannot advance, escalate, or refile.
+3. **Turn-start consume** — ``bot_run_claim`` stamps ``bot_run_started_at`` exactly once per
+   token; the dispatcher (hh-discuss adapter / webhook harness) consumes it BEFORE any LLM
+   activity, so a replayed dispatch message can never start a second agent run.
 """
 
+import secrets
 from datetime import timedelta
 
 from odoo import api, fields, models
@@ -31,29 +46,52 @@ class RiverflowStateBotMixin(models.AbstractModel):
         "state change; cleared on leaving). The timeout reaper escalates a record whose dwell here "
         "exceeds the state's bot_timeout_minutes.",
     )
+    bot_claim_token = fields.Char(
+        "Bot Claim Token",
+        copy=False,
+        help="The epoch of ONE claim: minted on every entry into a bot `in_progress` state (same "
+        "vals/transaction as the state change), cleared on every exit. Only the claim winner holds "
+        "it; every bot_claim exit from in-progress requires it, so a stale (reaped/re-handed) run "
+        "is rejected server-side. Rides the dispatch message so the isolated run can prove its "
+        "epoch (bot_run_claim / bot_token_check).",
+    )
+    bot_run_started_at = fields.Datetime(
+        "Bot Run Started",
+        copy=False,
+        help="Stamped by bot_run_claim when the dispatcher consumes this claim's ONE agent run "
+        "(before any LLM activity). Unset = the run for the current token has not started; a "
+        "replayed dispatch message finds it set and is dropped. Cleared with the token on every "
+        "state change.",
+    )
 
     def _sync_workflow_with_state(self, vals):
-        """Extend the mixin's state-change hook to stamp/clear the bot in-progress clock: entering a
-        bot `in_progress` state stamps ``bot_work_started_at`` (for the timeout reaper), any other
-        state change clears it. Runs inside write() and create() before the DB write."""
+        """Extend the mixin's state-change hook to stamp/clear the bot in-progress clock AND the
+        claim-token epoch: entering a bot `in_progress` state stamps ``bot_work_started_at`` (for
+        the timeout reaper) and mints a fresh ``bot_claim_token`` (the epoch of this one claim);
+        any other state change clears both. ``bot_run_started_at`` resets on every state change
+        (a fresh epoch's run has not been consumed). Minting here — inside write()/create(), same
+        vals as the state change — makes claim + token (+ the app's flagged dispatch message)
+        commit or roll back atomically."""
         super()._sync_workflow_with_state(vals)
         if "state_id" in vals:
             new_state = (
                 self.env["riverflow.state"].browse(vals["state_id"]) if vals["state_id"] else False
             )
-            vals["bot_work_started_at"] = (
-                fields.Datetime.now() if new_state and new_state.bot_stage == "in_progress" else False
-            )
+            in_progress = bool(new_state and new_state.bot_stage == "in_progress")
+            vals["bot_work_started_at"] = fields.Datetime.now() if in_progress else False
+            vals["bot_claim_token"] = secrets.token_urlsafe(9) if in_progress else False
+            vals["bot_run_started_at"] = False
 
     @api.model
     def bot_work_queue(self):
         """The bot-owned work waiting for an isolated agent run (the harness contract, generic).
 
-        One dict per record in a ``queue`` bot-stage state, resolved to {service_id, state,
-        claim_transition_id, in_progress_state, escalate_transition_id, expect_state_in} from the
-        workflow shape + {skill, prompt, dto} from the domain ``_bot_task_spec()`` hook. A record
-        whose workflow isn't bot-configured (no ``claim`` transition) is skipped. No sudo — the
-        caller is the bot user; kwargs are never named ``ids`` (the /json/2/ recordset selector)."""
+        One dict per record in a ``queue`` bot-stage state, resolved to {res_model, res_id, state,
+        claim_transition_id, in_progress_state, escalate_transition_id, expect_state_in,
+        max_tool_turns} from the workflow shape + {skill, prompt, dto} from the domain
+        ``_bot_task_spec()`` hook. A record whose workflow isn't bot-configured (no ``claim``
+        transition) is skipped. No sudo — the caller is the bot user; kwargs are never named
+        ``ids`` (the /json/2/ recordset selector)."""
         queue_states = self.env["riverflow.state"].search([("bot_stage", "=", "queue")])
         if not queue_states:
             return []
@@ -67,10 +105,13 @@ class RiverflowStateBotMixin(models.AbstractModel):
     def _bot_work_item(self):
         """Resolve ONE queued record to the harness work item from the workflow shape + the generic
         roles + the ``_bot_task_spec`` hook. ``None`` when the workflow isn't bot-configured (no
-        ``claim`` transition out of the queue state). The skill + prompt come DECLARATIVELY from
-        the claim transition (``bot_skill``/``bot_prompt`` — the workflow states what the run
-        does, beside the ``bot_role`` that states when), falling back to the ``_bot_task_spec``
-        hook; the bot-safe DTO always comes from the hook (it is computed record data)."""
+        ``claim`` transition out of the queue state). The skill + prompt + max tool turns come
+        DECLARATIVELY from the claim transition (``bot_skill``/``bot_prompt``/``bot_max_tool_turns``
+        — the workflow states what the run does, beside the ``bot_role`` that states when), falling
+        back to the ``_bot_task_spec`` hook; the bot-safe DTO always comes from the hook (it is
+        computed record data). ``res_model``/``res_id`` name the WORKFLOW record itself — distinct
+        from ``riverflow.service``'s own ``res_model``/``res_id`` fields, which point at the
+        service's *subject* (e.g. a log entry)."""
         self.ensure_one()
         state = self.state_id
         claim = state.from_transition_ids.filtered(lambda t: t.bot_role == "claim")[:1]
@@ -83,7 +124,8 @@ class RiverflowStateBotMixin(models.AbstractModel):
         expect = outgoing.filtered(lambda t: t.bot_role == "work").mapped("to_state_id")
         spec = self._bot_task_spec()
         return {
-            "service_id": self.id,
+            "res_model": self._name,
+            "res_id": self.id,
             "state": state.name,
             "claim_transition_id": claim.id,
             "in_progress_state": in_progress.name,
@@ -91,6 +133,7 @@ class RiverflowStateBotMixin(models.AbstractModel):
             "expect_state_in": expect.mapped("name"),
             "skill": claim.bot_skill or spec.get("skill"),
             "prompt": claim.bot_prompt or spec.get("prompt", ""),
+            "max_tool_turns": claim.bot_max_tool_turns or spec.get("max_tool_turns") or 0,
             "dto": spec.get("dto") or {},
         }
 
@@ -102,29 +145,103 @@ class RiverflowStateBotMixin(models.AbstractModel):
         self.ensure_one()
         return {"skill": False, "prompt": "", "dto": {}}
 
+    def _bot_lock_row(self):
+        """Serialize concurrent claimants on THIS row: flush pending ORM writes, take the row lock
+        (``FOR NO KEY UPDATE`` — the strength Odoo's own UPDATE takes, blocking, so the loser waits
+        and then re-reads the winner's committed truth; unlike FOR UPDATE it doesn't block FK
+        inserts referencing the row), then invalidate the cache so every re-check below reads the
+        committed values, not a stale snapshot. The ORDER is load-bearing: flush → lock →
+        invalidate."""
+        self.ensure_one()
+        self.env.cr.flush()  # flush ALL pending ORM writes so the lock sees current data
+        self.env.cr.execute(
+            f'SELECT id FROM "{self._table}" WHERE id = %s FOR NO KEY UPDATE', [self.id]
+        )
+        self.invalidate_recordset()
+
     @api.model
-    def bot_claim(self, service_id, transition_id):
-        """Idempotently advance ONE record through ``transition_id`` — the harness claim (→ the
-        in-progress state before running), escalate (→ a human state on failure) and the reaper's
-        timeout exit. Returns ``{ok, state, already?}``: a no-op when already in the target state (a
-        re-poll after a crash — never double-advance), a clean advance from the transition's source
-        state, else ``{ok: False}`` (the state moved under us). A direct state write (the engine
-        force-couples workflow_id to state_id). The ``service_id`` param name is kept for the stable
-        /json/2/ harness contract though the record may be any workflow-bearing model."""
-        record = self.browse(service_id).exists()
+    def bot_claim(self, res_id, transition_id, work_token=None):
+        """Advance ONE record through ``transition_id`` under the row lock — the single choke
+        point for the harness claim (→ in-progress before running), the agent's work advance,
+        the escalate (→ a human state on failure) and the reaper's timeout exit.
+
+        CAS + token fence (checked against COMMITTED truth, in this order):
+
+        * record/transition gone → ``{ok: False}``;
+        * already in the target state → ``{ok: True, already: True}`` — NO token: a re-poll /
+          replay must never be handed a live epoch (the running claim owns the record);
+        * state ≠ the transition's source state → ``{ok: False}`` (CAS loss — someone advanced
+          it under us);
+        * exiting a bot ``in_progress`` state whose stored ``bot_claim_token`` doesn't match
+          ``work_token`` → ``{ok: False, reason: 'stale work token'}`` — the zombie-run fence;
+        * else the normal ORM ``record.write()`` (keeps ``_sync_workflow_with_state``, mail
+          tracking, oteny_audit) → ``{ok: True, state}`` + ``token`` when the target is a bot
+          ``in_progress`` state (the freshly minted epoch — only the claim WINNER sees it).
+
+        Kwargs are never named ``ids`` (the /json/2/ recordset selector); ``res_id`` names the
+        record on THIS model (the model is implied by the /json/2/<model>/bot_claim endpoint)."""
+        record = self.browse(res_id).exists()
         transition = self.env["riverflow.transition"].browse(transition_id).exists()
         if not record or not transition:
             return {"ok": False, "reason": "unknown record or transition"}
+        record._bot_lock_row()
+        if not record.exists():
+            return {"ok": False, "reason": "record deleted"}
         if record.state_id == transition.to_state_id:
             return {"ok": True, "already": True, "state": record.state_id.name}
         if transition.from_state_id and record.state_id != transition.from_state_id:
             return {"ok": False, "state": record.state_id.name,
                     "reason": f"record is in {record.state_id.name!r}, not "
                     f"{transition.from_state_id.name!r}"}
+        if (record.state_id.bot_stage == "in_progress" and record.bot_claim_token
+                and work_token != record.bot_claim_token):
+            return {"ok": False, "state": record.state_id.name, "reason": "stale work token"}
         vals = {"state_id": transition.to_state_id.id}
         if transition.to_responsible_team_id:
             vals["responsible_team_id"] = transition.to_responsible_team_id.id
         record.write(vals)
+        result = {"ok": True, "state": record.state_id.name}
+        if record.bot_claim_token:
+            # the target is a bot in_progress state — hand the WINNER its fresh epoch
+            result["token"] = record.bot_claim_token
+        return result
+
+    @api.model
+    def bot_run_claim(self, res_id, work_token):
+        """Consume the ONE agent run of the current claim epoch — called by deterministic
+        dispatcher code (the hh-discuss adapter / the webhook harness) BEFORE any LLM/session
+        activity. Under the row lock: require a bot ``in_progress`` state + a matching
+        ``work_token`` + ``bot_run_started_at`` unset, then stamp it. A second consume, a
+        wrong/stale token, or a post-reap replay all return ``{ok: False}`` — at most one agent
+        run per dispatch, across message replays and multiple gateway processes."""
+        record = self.browse(res_id).exists()
+        if not record:
+            return {"ok": False, "reason": "unknown record"}
+        record._bot_lock_row()
+        if not record.exists():
+            return {"ok": False, "reason": "record deleted"}
+        if record.state_id.bot_stage != "in_progress":
+            return {"ok": False, "state": record.state_id.name, "reason": "not in progress"}
+        if not work_token or work_token != record.bot_claim_token:
+            return {"ok": False, "reason": "stale work token"}
+        if record.bot_run_started_at:
+            return {"ok": False, "reason": "run already consumed"}
+        record.bot_run_started_at = fields.Datetime.now()
+        return {"ok": True, "state": record.state_id.name}
+
+    @api.model
+    def bot_token_check(self, res_id, work_token):
+        """Read-only epoch probe for the RUNNING agent: ``{ok: True}`` iff the record is still in
+        a bot ``in_progress`` state and ``work_token`` is its current ``bot_claim_token``. The
+        skill runs this immediately before any irreversible action (portal submit) — not ok means
+        the run was timed out/reaped and the work re-assigned, so it must STOP."""
+        record = self.browse(res_id).exists()
+        if not record:
+            return {"ok": False, "reason": "unknown record"}
+        if record.state_id.bot_stage != "in_progress":
+            return {"ok": False, "state": record.state_id.name, "reason": "not in progress"}
+        if not work_token or work_token != record.bot_claim_token:
+            return {"ok": False, "reason": "stale work token"}
         return {"ok": True, "state": record.state_id.name}
 
     @api.model
@@ -133,8 +250,11 @@ class RiverflowStateBotMixin(models.AbstractModel):
         an ir.cron on each concrete workflow-bearing model. For every ``in_progress`` state with a
         positive ``bot_timeout_minutes``, any record whose ``bot_work_started_at`` is older than the
         SLA is advanced through that state's ``is_bot_timeout`` transition (the reaper's exit,
-        distinct from the agent's own escalate). Idempotent via ``bot_claim``. Returns the count
-        reaped. This is the backstop for a harness that died mid-run and never reported back."""
+        distinct from the agent's own escalate). The reaper passes the token it READS as its
+        ``work_token``: ``bot_claim`` re-checks it under the row lock, so a record whose run
+        completed (or whose token rotated) between the read and the lock is a clean no-op — the
+        reaper can never revert a just-completed record. Returns the count reaped. This is the
+        backstop for a harness that died mid-run and never reported back."""
         now = fields.Datetime.now()
         states = self.env["riverflow.state"].search([
             ("bot_stage", "=", "in_progress"),
@@ -152,7 +272,9 @@ class RiverflowStateBotMixin(models.AbstractModel):
                 ("bot_work_started_at", "<", deadline),
             ])
             for record in stuck:
-                if self.bot_claim(record.id, timeout_transition.id).get("ok"):
+                claim = self.with_context(bot_reap=True).bot_claim(
+                    record.id, timeout_transition.id, work_token=record.bot_claim_token)
+                if claim.get("ok") and not claim.get("already"):
                     reaped += 1
         return reaped
 
@@ -193,5 +315,7 @@ class RiverflowStateBotMixin(models.AbstractModel):
         ``prompt``) to its bot. Base is a no-op (returns False) — an app that wires a bot (e.g.
         crewradar → the oteny_bot Discuss seam) overrides it to CLAIM the record (via
         ``item['claim_transition_id']``) and post the flagged message to the bot's channel; a truthy
-        return counts it dispatched. Kept off ``oteny_bot`` here so riverflow stays a pure engine."""
+        return counts it dispatched. The claim's fresh ``token`` MUST ride the flagged message (the
+        oteny_bot work header) — no token, no dispatch. Kept off ``oteny_bot`` here so riverflow
+        stays a pure engine."""
         return False

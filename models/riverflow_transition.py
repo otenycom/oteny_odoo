@@ -53,6 +53,15 @@ class RiverflowTransition(models.Model):
         "bot-safe DTO. Set on the bot_role='claim' transition; empty falls back to the app's "
         "_bot_task_spec() prompt.",
     )
+    bot_max_tool_turns = fields.Integer(
+        "Bot Max Tool Turns",
+        default=0,
+        help="The tool-turn (iteration) budget the isolated bot run this transition claims needs "
+        "(set on the bot_role='claim' transition, e.g. 200 for the field-by-field MFNL browser "
+        "filing). Rides the work item as max_tool_turns; the platform sizes the bot's agent "
+        "budget to the max over its transitions' declared budgets. 0 = undeclared (the "
+        "platform default applies).",
+    )
     from_state_id = fields.Many2one(
         "riverflow.state",
         "From",
