@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.0",
+    "version": "19.0.1.1",
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",

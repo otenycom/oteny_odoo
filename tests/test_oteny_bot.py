@@ -2,7 +2,7 @@
 
 from psycopg2 import IntegrityError
 
-from odoo.addons.oteny_bot.models.oteny_bot import ISOLATED_TURN_SENTINEL
+from odoo.addons.oteny_bot.models.oteny_bot import ISOLATED_TURN_SENTINEL, WORK_HEADER_FMT
 from odoo.tests import TransactionCase, tagged
 
 
@@ -94,3 +94,31 @@ class TestOtenyBot(TransactionCase):
     def test_dispatch_isolated_turn_needs_a_channel(self):
         bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hh6"})
         self.assertFalse(bot.dispatch_isolated_turn("x")["ok"])
+
+    def test_dispatch_with_work_renders_the_header_and_token_trailer(self):
+        # The WP1 wire: a token-fenced dispatch carries the machine-readable work header
+        # (sentinel-adjacent, parsed by the hh-discuss adapter's WORK_HEADER_RE) plus the
+        # token instructions the run needs for its bot_claim advances.
+        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": "hh7", "discuss_channel_id": channel.id})
+        res = bot.dispatch_isolated_turn(
+            "File the MFNL for record 42",
+            work={"res_model": "riverflow.service", "res_id": 42, "token": "tok_ABC-x9"})
+        self.assertTrue(res["ok"])
+        body = self.env["mail.message"].browse(res["message_id"]).body
+        self.assertIn(ISOLATED_TURN_SENTINEL, body)
+        self.assertIn(WORK_HEADER_FMT.format(
+            res_model="riverflow.service", res_id=42, token="tok_ABC-x9"), body)
+        self.assertIn("Your work token is tok_ABC-x9", body)
+        self.assertIn("bot_token_check", body)
+
+    def test_dispatch_without_work_stays_headerless(self):
+        # tokenless isolated messages remain the plain legacy shape (scenario driver / chat)
+        channel = self.env["discuss.channel"].create({"name": "Plain"})
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": "hh8", "discuss_channel_id": channel.id})
+        body = self.env["mail.message"].browse(
+            bot.dispatch_isolated_turn("hello")["message_id"]).body
+        self.assertNotIn("[oteny:work:", body)
+        self.assertNotIn("work token", body)

@@ -16,6 +16,24 @@ from odoo import api, fields, models
 # hh-discuss adapter's ISOLATED_SENTINEL (hermeshost catalog/plugins/hh-discuss/discuss_wire.py).
 ISOLATED_TURN_SENTINEL = "[oteny:isolated]"
 
+# The machine-readable work header a WORK-carrying dispatch places right after the sentinel:
+# names the workflow record + the claim epoch's dispatch token. WIRE CONTRACT: the format MUST
+# stay parseable by the hh-discuss adapter's WORK_HEADER_RE (hermeshost discuss_wire.py) —
+# `\[oteny:work:([\w.]+):(\d+):([A-Za-z0-9_-]+)\]`. The adapter consumes the token
+# (bot_run_claim) BEFORE starting the agent run, so a replayed message can never run twice;
+# an old adapter sees the header as prose (harmless), and a headerless isolated message keeps
+# working (plain conversation / scenario driver).
+WORK_HEADER_FMT = "[oteny:work:{res_model}:{res_id}:{token}]"
+
+# The human/agent-readable token instructions appended to a work-carrying dispatch. The token is
+# the run's proof of its claim epoch: it must ride every bot_claim advance/escalate, and the
+# skill must probe bot_token_check before anything irreversible.
+WORK_TOKEN_TRAILER = (
+    "\nYour work token is {token}. Pass work_token={token} on every bot_claim "
+    "advance/escalate. Run bot_token_check immediately before any irreversible action "
+    "(portal submit) — if not ok, STOP: you were timed out and the work re-assigned."
+)
+
 
 class OtenyBot(models.Model):
     _name = "oteny.bot"
@@ -114,16 +132,26 @@ class OtenyBot(models.Model):
                 return {"ok": True, "bot_id": bot.id, "created": False}
             return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
 
-    def dispatch_isolated_turn(self, prompt):
+    def dispatch_isolated_turn(self, prompt, work=None):
         """Dispatch ONE isolated agent turn to this bot over Discuss (the trigger that replaces the
-        Oteny-side harness poll). Posts ``<sentinel> {prompt}`` into the bot's channel; the bot's
-        gateway poll picks it up and runs it as a FRESH, isolated session — not a turn in the
-        accumulating team chat. The dispatch is a real channel message, so the owner sees it.
-        Requires ``discuss_channel_id``. Returns ``{ok, message_id}`` (``{ok: False}`` if unbound)."""
+        Oteny-side harness poll). Posts ``<sentinel> [work header] {prompt} [token trailer]`` into
+        the bot's channel; the bot's gateway poll picks it up and runs it as a FRESH, isolated
+        session — not a turn in the accumulating team chat. The dispatch is a real channel message,
+        so the owner sees it. ``work`` (optional) is the token-fenced work reference
+        ``{res_model, res_id, token}`` from a winning ``bot_claim``: it renders the machine
+        header the adapter consumes (bot_run_claim — at most one run per dispatch) plus the token
+        trailer the run needs for its advances. Requires ``discuss_channel_id``. Returns
+        ``{ok, message_id}`` (``{ok: False}`` if unbound)."""
         self.ensure_one()
         if not self.discuss_channel_id:
             return {"ok": False, "reason": "bot has no discuss_channel_id"}
-        body = f"{ISOLATED_TURN_SENTINEL} {(prompt or '').strip()}".strip()
+        head = ISOLATED_TURN_SENTINEL
+        tail = ""
+        if work:
+            head += " " + WORK_HEADER_FMT.format(
+                res_model=work["res_model"], res_id=work["res_id"], token=work["token"])
+            tail = WORK_TOKEN_TRAILER.format(token=work["token"])
+        body = f"{head} {(prompt or '').strip()}{tail}".strip()
         msg = self.discuss_channel_id.sudo().message_post(
             body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
         return {"ok": True, "message_id": msg.id}
@@ -155,9 +183,18 @@ class OtenyBotSession(models.Model):
     request = fields.Text("Request / anchored task", readonly=True)
     response = fields.Text("Response", readonly=True)
     outcome = fields.Selection(
-        [("ok", "OK"), ("halted", "Halted / handed back"), ("escalated", "Escalated"),
-         ("error", "Error")], index=True, readonly=True)
+        [("dispatched", "Dispatched"), ("ok", "OK"), ("halted", "Halted / handed back"),
+         ("escalated", "Escalated"), ("timeout", "Timed out"), ("error", "Error")],
+        index=True, readonly=True,
+        help="dispatched = the isolated turn was posted and is (presumed) running; the workflow "
+        "layer closes it deterministically to ok / escalated / timeout when the record exits its "
+        "bot in-progress state.")
     outcome_detail = fields.Char(readonly=True)
+    work_token = fields.Char(
+        "Work Token", index=True, readonly=True, copy=False,
+        help="The dispatch token of the claim epoch this session records (D174 write-back). Set "
+        "at dispatch; the workflow layer matches on it to close the session when the record "
+        "exits the bot in-progress state — exact correlation, no LLM self-report needed.")
     # Generic origin — the Odoo record this exchange is about (e.g. a riverflow.service). A SOFT
     # reference (model name + id), not a Many2one, so this generic addon never depends on the
     # consuming module's models; the workflow/app layer sets these + renders an embedded view.
