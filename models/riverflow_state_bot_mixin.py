@@ -67,7 +67,10 @@ class RiverflowStateBotMixin(models.AbstractModel):
     def _bot_work_item(self):
         """Resolve ONE queued record to the harness work item from the workflow shape + the generic
         roles + the ``_bot_task_spec`` hook. ``None`` when the workflow isn't bot-configured (no
-        ``claim`` transition out of the queue state)."""
+        ``claim`` transition out of the queue state). The skill + prompt come DECLARATIVELY from
+        the claim transition (``bot_skill``/``bot_prompt`` — the workflow states what the run
+        does, beside the ``bot_role`` that states when), falling back to the ``_bot_task_spec``
+        hook; the bot-safe DTO always comes from the hook (it is computed record data)."""
         self.ensure_one()
         state = self.state_id
         claim = state.from_transition_ids.filtered(lambda t: t.bot_role == "claim")[:1]
@@ -86,15 +89,16 @@ class RiverflowStateBotMixin(models.AbstractModel):
             "in_progress_state": in_progress.name,
             "escalate_transition_id": escalate.id if escalate else False,
             "expect_state_in": expect.mapped("name"),
-            "skill": spec.get("skill"),
-            "prompt": spec.get("prompt", ""),
+            "skill": claim.bot_skill or spec.get("skill"),
+            "prompt": claim.bot_prompt or spec.get("prompt", ""),
             "dto": spec.get("dto") or {},
         }
 
     def _bot_task_spec(self):
         """Domain hook: the {skill, prompt, dto} for one record's isolated agent run. Base is
         generic/empty; an app module (e.g. crewradar_cuneus_sign for MFNL) overrides per record
-        type to name the Talent skill, the anchored task, and the bot-safe DTO."""
+        type to supply the bot-safe DTO (and, when the workflow doesn't declare them on the
+        claim transition via ``bot_skill``/``bot_prompt``, the skill + anchored prompt)."""
         self.ensure_one()
         return {"skill": False, "prompt": "", "dto": {}}
 

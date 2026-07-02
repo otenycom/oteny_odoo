@@ -38,6 +38,21 @@ class RiverflowTransition(models.Model):
         "bot_role='escalate' (the agent's own failure hand-back); this is the external 'you took "
         "too long' exit, though a workflow may point both at the same human state.",
     )
+    bot_skill = fields.Char(
+        "Bot Skill",
+        help="The Talent skill the isolated bot run loads for the work this transition claims "
+        "(set on the bot_role='claim' transition, e.g. 'postedworkers-filing'). _bot_work_item "
+        "reads it so the WORKFLOW declares the skill instead of an app model hard-coding it; "
+        "empty falls back to the app's _bot_task_spec() hook. A multi-task bot preloads the "
+        "union of its transitions' bot skills.",
+    )
+    bot_prompt = fields.Text(
+        "Bot Prompt",
+        help="The anchored instruction for the isolated bot run this transition claims — the "
+        "per-transition task/persona override passed to the run alongside the skill and the "
+        "bot-safe DTO. Set on the bot_role='claim' transition; empty falls back to the app's "
+        "_bot_task_spec() prompt.",
+    )
     from_state_id = fields.Many2one(
         "riverflow.state",
         "From",
