@@ -2,7 +2,11 @@
 
 from psycopg2 import IntegrityError
 
-from odoo.addons.oteny_bot.models.oteny_bot import ISOLATED_TURN_SENTINEL, WORK_HEADER_FMT
+from odoo.addons.oteny_bot.models.oteny_bot import (
+    ISOLATED_TURN_SENTINEL,
+    VERBOSE_SENTINEL,
+    WORK_HEADER_FMT,
+)
 from odoo.tests import TransactionCase, tagged
 
 
@@ -122,3 +126,73 @@ class TestOtenyBot(TransactionCase):
             bot.dispatch_isolated_turn("hello")["message_id"]).body
         self.assertNotIn("[oteny:work:", body)
         self.assertNotIn("work token", body)
+
+    def test_dispatch_verbose_flag_rides_the_body(self):
+        # opt-in live-narration flag — off by default, present only when asked
+        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": "hh9", "discuss_channel_id": channel.id})
+        plain = self.env["mail.message"].browse(
+            bot.dispatch_isolated_turn("run it")["message_id"]).body
+        self.assertNotIn(VERBOSE_SENTINEL, plain)
+        loud = self.env["mail.message"].browse(
+            bot.dispatch_isolated_turn("run it", verbose=True)["message_id"]).body
+        self.assertIn(VERBOSE_SENTINEL, loud)
+
+    # --- record_run: the end-of-run write-back that ends the "silence" (D174 hybrid) --- #
+
+    def _open_session(self, token="tokRUN", origin_id=17143):
+        """Simulate the dispatch-time open session the state machine creates."""
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": "hh00140"})
+        return self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "MFNL filing", "kind": "isolated_turn",
+            "request": "File the MFNL for #%s" % origin_id, "outcome": "dispatched",
+            "work_token": token, "origin_model": "riverflow.service", "origin_res_id": origin_id})
+
+    def test_record_run_adopts_the_token_matched_session_with_failure_reason(self):
+        # THE regression: a 403-spiral run that used to sit silent as 'Dispatched' for 120 min
+        # now lands as 'error' + the exact tool-failure breakdown, on the SAME session row.
+        session = self._open_session(token="tokRUN")
+        res = self.env["oteny.bot"].record_run(
+            "tokRUN",
+            run={"response": "()", "duration_s": 232.9, "outcome": "error",
+                 "outcome_detail": "68/71 uplink calls failed: 55×403 access-denied "
+                                   "(crewradar.site.type); empty final response"},
+            turns=[{"sequence": 10, "tool_call_count": 71, "llm_response": "()",
+                    "tool_calls": [{"name": "crewradar_json2", "result": "403"}]}])
+        self.assertTrue(res["ok"])
+        self.assertEqual(res["session_id"], session.id)   # ADOPTED, not forked
+        session.invalidate_recordset()
+        self.assertEqual(session.outcome, "error")
+        self.assertIn("crewradar.site.type", session.outcome_detail)
+        self.assertEqual(session.response, "()")
+        self.assertEqual(session.turn_count, 1)
+        self.assertEqual(session.tool_call_count, 71)
+
+    def test_record_run_never_downgrades_a_terminal_state_machine_outcome(self):
+        # if the workflow already closed the session (ok/escalated), a softer self-report fills
+        # only forensics — the state machine keeps authority over the verdict.
+        session = self._open_session(token="tokOK")
+        session.outcome = "ok"
+        self.env["oteny.bot"].record_run(
+            "tokOK", run={"response": "Filed.", "outcome": "error", "outcome_detail": "guess"})
+        session.invalidate_recordset()
+        self.assertEqual(session.outcome, "ok")           # not clobbered
+        self.assertFalse(session.outcome_detail)          # the soft detail was dropped too
+        self.assertEqual(session.response, "Filed.")      # forensics still attached
+
+    def test_record_run_healthy_run_leaves_outcome_to_the_state_machine(self):
+        # a healthy run reports no outcome (outcome key absent) → session stays 'dispatched'
+        # so the deterministic close can still set ok/escalated/timeout.
+        session = self._open_session(token="tokH")
+        self.env["oteny.bot"].record_run("tokH", run={"response": "Filed NL-MFNL-42."})
+        session.invalidate_recordset()
+        self.assertEqual(session.outcome, "dispatched")
+        self.assertEqual(session.response, "Filed NL-MFNL-42.")
+
+    def test_record_run_unknown_token_fails_cleanly(self):
+        res = self.env["oteny.bot"].record_run("nope", run={"response": "x"})
+        self.assertFalse(res["ok"])
+        self.assertIn("no session", res["reason"])
+        self.assertFalse(self.env["oteny.bot"].record_run("", run={})["ok"])

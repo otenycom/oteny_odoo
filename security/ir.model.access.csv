@@ -1,5 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_oteny_bot_user,oteny.bot user read,model_oteny_bot,base.group_user,1,0,0,0
 access_oteny_bot_manager,oteny.bot manager,model_oteny_bot,oteny_bot.group_oteny_bot_manager,1,1,1,1
+access_oteny_bot_session_user,oteny.bot.session user read,model_oteny_bot_session,base.group_user,1,0,0,0
 access_oteny_bot_session_manager,oteny.bot.session manager,model_oteny_bot_session,oteny_bot.group_oteny_bot_manager,1,1,1,1
+access_oteny_bot_turn_user,oteny.bot.turn user read,model_oteny_bot_turn,base.group_user,1,0,0,0
 access_oteny_bot_turn_manager,oteny.bot.turn manager,model_oteny_bot_turn,oteny_bot.group_oteny_bot_manager,1,1,1,1

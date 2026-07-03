@@ -8,7 +8,7 @@ to its own record without this addon depending on it.
 
 from psycopg2 import IntegrityError
 
-from odoo import api, fields, models
+from odoo import Command, api, fields, models
 
 # The leading marker that tells the bot's gateway to run a Discuss message as a FRESH, isolated
 # agent turn (its own session) instead of a turn in the accumulating channel chat — the Discuss
@@ -24,6 +24,13 @@ ISOLATED_TURN_SENTINEL = "[oteny:isolated]"
 # an old adapter sees the header as prose (harmless), and a headerless isolated message keeps
 # working (plain conversation / scenario driver).
 WORK_HEADER_FMT = "[oteny:work:{res_model}:{res_id}:{token}]"
+
+# An OPTIONAL flag a dispatch may carry (right after the isolated sentinel) to ask the run to
+# STREAM per-tool narration into the channel live — a noisy debug trace only wanted while a Talent
+# author is diagnosing a run. Off by default (the end-of-run summary always lands regardless).
+# WIRE CONTRACT: must match the hh-discuss adapter's VERBOSE_SENTINEL (hermeshost discuss_wire.py),
+# parity-pinned in that repo's tests/test_discuss_adapter.py.
+VERBOSE_SENTINEL = "[oteny:verbose]"
 
 # The human/agent-readable token instructions appended to a work-carrying dispatch. The token is
 # the run's proof of its claim epoch: it must ride every bot_claim advance/escalate, and the
@@ -97,6 +104,44 @@ class OtenyBot(models.Model):
         return {"ok": True, "session_id": rec.id}
 
     @api.model
+    def record_run(self, work_token, run=None, turns=None):
+        """The seam the bot calls at the END of an isolated dispatch run to fill the open,
+        token-matched session with its verdict + forensics (D174 hybrid — "a run must never be
+        silent"). It ADOPTS the ``dispatched`` session opened at dispatch (correlated by the claim
+        epoch's ``work_token``) instead of forking a new one, so the customer sees ONE row that
+        goes from *Dispatched* → its real outcome + reason seconds after the run — no 120-min
+        timeout wait, no SSH.
+
+        Field policy: forensic fields (``response``, ``duration_s``) always attach; the run's
+        SELF-ASSESSED ``outcome``/``outcome_detail`` are written only while the session is still
+        ``dispatched`` — i.e. the workflow state machine has not already closed it. So a hard
+        failure (403 spiral, empty reply → ``error`` + the tool-failure breakdown) lands its
+        reason, but a state-machine ``ok``/``escalated`` (the record advanced) is never downgraded
+        by a softer bot guess. Possessing ``work_token`` proves the claim epoch (same trust model
+        as ``bot_claim``); ``sudo`` internally (the bot's least-privilege key need not carry write
+        on the log models). Kwargs are never named ``ids``. Returns ``{ok, session_id}``."""
+        if not work_token:
+            return {"ok": False, "reason": "record_run needs a work_token"}
+        Session = self.env["oteny.bot.session"].sudo()
+        session = Session.search([("work_token", "=", work_token)], order="id desc", limit=1)
+        if not session:
+            return {"ok": False, "reason": f"no session for work_token {work_token!r}"}
+        allowed = set(Session._fields)
+        vals = {k: v for k, v in (run or {}).items() if k in allowed}
+        # Never let a soft self-report clobber a terminal outcome the state machine already proved.
+        if session.outcome not in ("dispatched", False):
+            vals.pop("outcome", None)
+            vals.pop("outcome_detail", None)
+        if turns:
+            tallowed = set(self.env["oteny.bot.turn"]._fields)
+            # Replace any prior turns (a re-report is idempotent, not additive).
+            vals["turn_ids"] = [Command.clear()] + [
+                Command.create({k: v for k, v in (t or {}).items() if k in tallowed})
+                for t in turns]
+        session.write(vals)
+        return {"ok": True, "session_id": session.id}
+
+    @api.model
     def ensure_bot(self, uplink_ref, name=None):
         """Idempotently ensure an ``oteny.bot`` exists for ``uplink_ref`` (owner-visibility, generic).
 
@@ -132,7 +177,7 @@ class OtenyBot(models.Model):
                 return {"ok": True, "bot_id": bot.id, "created": False}
             return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
 
-    def dispatch_isolated_turn(self, prompt, work=None):
+    def dispatch_isolated_turn(self, prompt, work=None, verbose=False):
         """Dispatch ONE isolated agent turn to this bot over Discuss (the trigger that replaces the
         Oteny-side harness poll). Posts ``<sentinel> [work header] {prompt} [token trailer]`` into
         the bot's channel; the bot's gateway poll picks it up and runs it as a FRESH, isolated
@@ -146,6 +191,9 @@ class OtenyBot(models.Model):
         if not self.discuss_channel_id:
             return {"ok": False, "reason": "bot has no discuss_channel_id"}
         head = ISOLATED_TURN_SENTINEL
+        if verbose:
+            # opt-in: ask the run to narrate each uplink tool call into the channel live
+            head += " " + VERBOSE_SENTINEL
         tail = ""
         if work:
             head += " " + WORK_HEADER_FMT.format(

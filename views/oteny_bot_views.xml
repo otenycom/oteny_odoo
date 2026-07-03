@@ -58,7 +58,8 @@
                 <field name="outcome" widget="badge"
                        decoration-success="outcome == 'ok'"
                        decoration-warning="outcome == 'halted' or outcome == 'escalated'"
-                       decoration-danger="outcome == 'error'"/>
+                       decoration-danger="outcome == 'error' or outcome == 'timeout'"/>
+                <field name="outcome_detail" optional="show"/>
                 <field name="turn_count"/>
                 <field name="tool_call_count"/>
                 <field name="duration_s"/>
@@ -85,6 +86,7 @@
                             <field name="duration_s"/>
                             <field name="origin_model"/>
                             <field name="origin_res_id"/>
+                            <field name="work_token" groups="base.group_no_one"/>
                         </group>
                     </group>
                     <notebook>
