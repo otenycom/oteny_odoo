@@ -128,7 +128,7 @@ class RiverflowStateBotMixin(models.AbstractModel):
 
         One dict per record in a ``queue`` bot-stage state, resolved to {res_model, res_id, state,
         claim_transition_id, in_progress_state, escalate_transition_id, expect_state_in,
-        max_tool_turns} from the workflow shape + {skill, prompt, dto} from the domain
+        max_tool_turns, verbose} from the workflow shape + {skill, prompt, dto} from the domain
         ``_bot_task_spec()`` hook. A record whose workflow isn't bot-configured (no ``claim``
         transition) is skipped. No sudo — the caller is the bot user; kwargs are never named
         ``ids`` (the /json/2/ recordset selector)."""
@@ -174,6 +174,7 @@ class RiverflowStateBotMixin(models.AbstractModel):
             "skill": claim.bot_skill or spec.get("skill"),
             "prompt": claim.bot_prompt or spec.get("prompt", ""),
             "max_tool_turns": claim.bot_max_tool_turns or spec.get("max_tool_turns") or 0,
+            "verbose": claim.bot_verbose,
             "dto": spec.get("dto") or {},
         }
 

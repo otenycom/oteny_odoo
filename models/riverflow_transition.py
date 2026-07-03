@@ -62,6 +62,14 @@ class RiverflowTransition(models.Model):
         "budget to the max over its transitions' declared budgets. 0 = undeclared (the "
         "platform default applies).",
     )
+    bot_verbose = fields.Boolean(
+        "Bot Verbose Trace",
+        default=False,
+        help="When set on the bot_role='claim' transition, the isolated bot run this transition "
+        "claims streams a per-tool-call narration line into the bot's channel (the [oteny:verbose] "
+        "flag on the dispatch). A debugging aid for a run that otherwise answers silently — leave "
+        "off in normal operation (it is chatty and costs channel writes).",
+    )
     from_state_id = fields.Many2one(
         "riverflow.state",
         "From",
