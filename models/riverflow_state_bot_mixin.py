@@ -237,6 +237,12 @@ class RiverflowStateBotMixin(models.AbstractModel):
         if (record.state_id.bot_stage == "in_progress" and record.bot_claim_token
                 and work_token != record.bot_claim_token):
             return {"ok": False, "state": record.state_id.name, "reason": "stale work token"}
+        # Domain precondition: a real-world invariant the CAS/token fence can't express (e.g.
+        # MFNL: no *Filed* without a captured filing proof). Runs under the row lock, so it is
+        # model-independent — a weak agent that TRIES the advance is refused here, not trusted.
+        guard = record._bot_claim_guard(transition)
+        if guard:
+            return {"ok": False, "state": record.state_id.name, "reason": guard}
         vals = {"state_id": transition.to_state_id.id}
         if transition.to_responsible_team_id:
             vals["responsible_team_id"] = transition.to_responsible_team_id.id
@@ -246,6 +252,16 @@ class RiverflowStateBotMixin(models.AbstractModel):
             # the target is a bot in_progress state — hand the WINNER its fresh epoch
             result["token"] = record.bot_claim_token
         return result
+
+    def _bot_claim_guard(self, transition):
+        """Server-side precondition for a bot advance — the ONE place a domain layer can REFUSE
+        a ``bot_claim`` transition even when the CAS/token fence would allow it. Base: no guard
+        (falsy). An app overrides it to enforce an invariant the workflow STATE alone can't — MFNL
+        makes a *File* → *Filed* advance require a captured filing proof, so a fabricated/skipped
+        "Filed" is structurally impossible regardless of which model drives the run. Return a short
+        reason string to REFUSE (``bot_claim`` then returns ``{ok: False, reason}`` and does not
+        advance); return a falsy value to allow."""
+        return None
 
     @api.model
     def bot_run_claim(self, res_id, work_token):
