@@ -1016,3 +1016,56 @@ class ServiceDeadlineTestCase(TransactionCase):
                 child_3_2.display_order,
                 f"{grandchild.name} should have display_order after its parent",
             )
+
+    def test_display_order_large_tree_no_recursion_error(self):
+        """A root deadline change dirties display_order on the whole tree at
+        once. display_order is recursive=True, so the ORM recomputes it record
+        by record; the compute's tree walk must not READ display_order on a
+        still-pending sibling, or each read nests another per-record compute
+        (~10 stack frames per dirty sibling) and trees of ~100+ services
+        overflow Python's recursion limit (production RecursionError when
+        editing planned_end_date on a log entry with a large service tree)."""
+        self.cleanup_test_services()
+        child_count = 150  # > recursion limit (1000) / ~10 frames per nesting level
+
+        root = self.env["riverflow.service"].create(
+            {
+                "name": f"{self.TEST_PREFIX}Big Root",
+                "project_deadline": date(2026, 6, 1),
+            }
+        )
+        children = self.env["riverflow.service"].create(
+            [
+                {
+                    "name": f"{self.TEST_PREFIX}Big Child {i:03d}",
+                    "parent_id": root.id,
+                    "use_project_deadline_from": "root",
+                    "days_relative_to_project": -i,
+                }
+                for i in range(1, child_count + 1)
+            ]
+        )
+
+        # Settle: the first read triggers the pending per-record recompute
+        # for the entire freshly created tree.
+        children[0].display_order
+
+        # Dirty the whole tree at once, as production does: the root's
+        # project_deadline feeds every child's deadline, root_name and
+        # display_order via root_id (@api.depends triggers only).
+        root.project_deadline = date(2026, 7, 1)
+
+        # Trigger the recompute the way production does: a plain read on one
+        # child while all its siblings are still pending.
+        children[0].display_order
+
+        # Root first, then children sequential in deadline-sorted order. The
+        # sort key mirrors assign_sequence's own key, so the assertion stays
+        # valid even if the weekend deadline rule collapses some deadlines.
+        self.assertEqual(root.display_order, 0, "Root should be first in its tree")
+        by_deadline = children.sorted(key=lambda s: (s.deadline, s.daily_prio, s.name, s.id))
+        self.assertEqual(
+            [s.display_order for s in by_deadline],
+            list(range(1, child_count + 1)),
+            "display_order must be sequential following deadline-sorted order",
+        )

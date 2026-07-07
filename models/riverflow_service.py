@@ -951,6 +951,8 @@ class Service(models.Model):
 
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()
 
+        order_field = self._fields["display_order"]
+
         for record in self:
 
             # Retrieve all service records with the same root_id as the current record
@@ -1018,9 +1020,17 @@ class Service(models.Model):
                 # Retrieve the service object using its ID
                 service = service_dict[service_id]
 
-                # Only write display_order if the value is different from the current value
-                # This optimization avoids unnecessary database writes and ORM overhead
-                if service.display_order != display_order:
+                # Never READ display_order on a record whose recompute is still
+                # pending: display_order is recursive=True, so the ORM computes
+                # it record by record, and the read would re-enter this compute
+                # for `service`, nesting one Python stack level per dirty
+                # sibling. A root deadline change dirties the whole tree at
+                # once, so large trees overflow the stack (RecursionError).
+                # Assigning without reading is safe: Field.write() first calls
+                # env.remove_to_compute(), clearing the pending computation.
+                # For settled records, keep the read-and-compare to avoid
+                # unnecessary database writes and ORM overhead.
+                if self.env.is_to_compute(order_field, service) or service.display_order != display_order:
                     service.display_order = display_order
 
                 # Increment the display_order number for the next service
