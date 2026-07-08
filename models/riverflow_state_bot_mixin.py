@@ -38,6 +38,16 @@ from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
+# Fast re-dispatch window (the belt for a dispatch that never reached a live agent). A claim
+# whose isolated run was NEVER consumed (``bot_run_started_at`` unset) past ``GRACE`` minutes is
+# an orphan — the flagged dispatch was lost while the bot's gateway was down/reconnecting (its
+# poll marker seeds PAST history on reconnect, so it never picks the old message up on its own).
+# The dispatch cron re-posts it (same claim epoch) until ``CEILING`` minutes, after which the
+# in-progress SLA reaper takes over. Re-fire is safe: ``bot_run_claim`` admits at most one run
+# per epoch, so a re-post that races a live pickup is dropped (never a double side effect).
+_BOT_REDISPATCH_GRACE_MINUTES = 3
+_BOT_REDISPATCH_CEILING_MINUTES = 30
+
 
 class RiverflowStateBotMixin(models.AbstractModel):
     _inherit = "riverflow.state.mixin"
@@ -346,13 +356,95 @@ class RiverflowStateBotMixin(models.AbstractModel):
         leaves the queue and is never re-dispatched. Returns the number dispatched. Run by an
         ir.cron on each concrete workflow-bearing model."""
         queue_states = self.env["riverflow.state"].search([("bot_stage", "=", "queue")])
-        if not queue_states:
-            return 0
         dispatched = 0
-        for record in self.search([("state_id", "in", queue_states.ids)]):
-            if record._bot_dispatch_one():
-                dispatched += 1
+        if queue_states:
+            for record in self.search([("state_id", "in", queue_states.ids)]):
+                if record._bot_dispatch_one():
+                    dispatched += 1
+        # The belt for a lost dispatch: re-post an already-claimed record whose isolated run was
+        # never consumed (the orphan a gateway-down window leaves) — same tick, safe by the fence.
+        dispatched += self._bot_redispatch_stalled()
         return dispatched
+
+    @api.model
+    def _bot_redispatch_stalled(self):
+        """Re-post the flagged dispatch for a claimed record whose isolated run was NEVER consumed
+        (``bot_run_started_at`` unset) between the grace and the ceiling — the fast recovery for a
+        dispatch lost while the bot's gateway was down (its poll marker seeds past the flagged
+        message on reconnect, so it never self-recovers). Re-uses the STANDING claim epoch (no
+        re-claim — the token holds). A run that DID start then died (``bot_run_started_at`` set) is
+        NOT re-fired here — the consume fence would drop it — so the in-progress SLA reaper escalates
+        it instead. Returns the count re-dispatched."""
+        inprog = self.env["riverflow.state"].search([("bot_stage", "=", "in_progress")])
+        if not inprog:
+            return 0
+        now = fields.Datetime.now()
+        floor = now - timedelta(minutes=_BOT_REDISPATCH_CEILING_MINUTES)
+        deadline = now - timedelta(minutes=_BOT_REDISPATCH_GRACE_MINUTES)
+        stalled = self.search([
+            ("state_id", "in", inprog.ids),
+            ("bot_run_started_at", "=", False),          # the run was never consumed …
+            ("bot_work_started_at", "!=", False),
+            ("bot_work_started_at", "<", deadline),      # … and it has sat past the grace …
+            ("bot_work_started_at", ">", floor),         # … but not so long the SLA reaper owns it
+        ])
+        count = 0
+        for record in stalled:
+            if record._bot_redispatch_one():
+                count += 1
+        return count
+
+    def _bot_redispatch_one(self):
+        """Re-post the flagged dispatch for THIS already-claimed, never-consumed in-progress record.
+        Resolves the work item from the claim transition INTO the current state (reusing the standing
+        ``bot_claim_token``) and hands it to the domain ``_bot_redispatch`` hook. True when re-fired."""
+        self.ensure_one()
+        item = self._bot_inprogress_work_item()
+        if not item:
+            return False
+        return bool(self._bot_redispatch(item, self._bot_dispatch_prompt(item)))
+
+    def _bot_inprogress_work_item(self):
+        """The harness work item for a record ALREADY in its bot ``in_progress`` state (for a
+        re-dispatch): the same shape as ``_bot_work_item`` but resolved from the claim transition
+        INTO the current state, and carrying the STANDING ``bot_claim_token`` (no new claim). None
+        when the current state isn't a bot in-progress state reachable by a claim transition, or the
+        token is missing (nothing to re-fire)."""
+        self.ensure_one()
+        state = self.state_id
+        if state.bot_stage != "in_progress" or not self.bot_claim_token:
+            return None
+        claim = self.env["riverflow.transition"].search(
+            [("to_state_id", "=", state.id), ("bot_role", "=", "claim")], limit=1)
+        if not claim:
+            return None
+        outgoing = state.from_transition_ids
+        escalate = outgoing.filtered(lambda t: t.bot_role == "escalate")[:1]
+        expect = outgoing.filtered(lambda t: t.bot_role == "work").mapped("to_state_id")
+        spec = self._bot_task_spec()
+        return {
+            "res_model": self._name,
+            "res_id": self.id,
+            "state": state.name,
+            "claim_transition_id": claim.id,
+            "in_progress_state": state.name,
+            "escalate_transition_id": escalate.id if escalate else False,
+            "expect_state_in": expect.mapped("name"),
+            "skill": claim.bot_skill or spec.get("skill"),
+            "prompt": claim.bot_prompt or spec.get("prompt", ""),
+            "max_tool_turns": claim.bot_max_tool_turns or spec.get("max_tool_turns") or 0,
+            "verbose": claim.bot_verbose,
+            "token": self.bot_claim_token,
+            "dto": spec.get("dto") or {},
+        }
+
+    def _bot_redispatch(self, item, prompt):
+        """Domain hook: RE-post the flagged dispatch for an already-claimed record using the
+        standing token in ``item['token']`` — NO re-claim (the record is already in-progress; only
+        the isolated run was lost). Base is a no-op (returns False); an app that wires a bot
+        overrides it to re-post the flagged message to the bot's channel with that token. Kept off
+        ``oteny_bot`` here so riverflow stays a pure engine."""
+        return False
 
     def _bot_dispatch_one(self):
         """Resolve THIS queued record's work item and hand it to the domain ``_bot_dispatch``
