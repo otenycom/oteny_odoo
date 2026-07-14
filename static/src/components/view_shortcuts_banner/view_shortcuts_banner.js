@@ -2,6 +2,7 @@
 
 import { Component, onWillStart, useState } from "@odoo/owl";
 import { useBus, useService } from "@web/core/utils/hooks";
+import { session } from "@web/session";
 
 export class ViewShortcutsBanner extends Component {
     static template = "oteny_shortcut.ViewShortcutsBanner";
@@ -114,6 +115,20 @@ export class ViewShortcutsBanner extends Component {
 
     isActive(shortcut) {
         return this.state.activeIds.has(shortcut.id);
+    }
+
+    /**
+     * Icon class for the shortcut's target view type, read from the same
+     * server-provided per-view-type icon map Odoo's own view switcher uses
+     * (session.view_info, populated from ir.ui.view._get_view_info). This
+     * covers list and calendar as well as any custom view type (e.g. the
+     * credential planning timeline) without a hardcoded mapping here.
+     * Returns "" when the shortcut targets no view type or the type is
+     * unknown, so the template can skip rendering the icon.
+     */
+    viewTypeIcon(shortcut) {
+        const viewType = shortcut.shortcut_view_type;
+        return (viewType && session.view_info?.[viewType]?.icon) || "";
     }
 
     /**

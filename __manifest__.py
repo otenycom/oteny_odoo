@@ -1,6 +1,6 @@
 {
     "name": "View Shortcuts",
-    "version": "19.0.1.160",
+    "version": "19.0.1.161",  # 19.0.1.161: shortcut banner view-type icon now resolved from session.view_info (the server-side ir.ui.view._get_view_info map the view switcher uses) instead of a hardcoded list/calendar t-if, so custom view types (e.g. rivercreds_plan_timeline) get their registered icon automatically.
     "depends": ["web"],
     "author": "Oteny",
     "category": "Tools",
