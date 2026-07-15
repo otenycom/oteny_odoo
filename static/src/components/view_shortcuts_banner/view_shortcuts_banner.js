@@ -188,11 +188,26 @@ export class ViewShortcutsBanner extends Component {
             this.env.searchModel.toggleSearchItem(searchItemId);
         }
 
+        const targetView = shortcut.shortcut_view_type;
         if (
-            shortcut.shortcut_view_type &&
-            shortcut.shortcut_view_type !== this.env.config.viewType
+            targetView &&
+            targetView !== this.env.config.viewType &&
+            this._actionHasView(targetView)
         ) {
-            this.actionService.switchView(shortcut.shortcut_view_type);
+            this.actionService.switchView(targetView);
         }
+    }
+
+    /**
+     * Whether the current action can switch to the given view type. A shortcut's
+     * preferred view type may point at a view the current action does not expose
+     * — e.g. a favorite saved on a model whose action lacks that view — in which
+     * case switchView() would throw ViewNotFoundError. viewSwitcherEntries lists
+     * the (multi-record) views this action actually offers, so we only switch
+     * when the target is among them; otherwise we just apply the filter in place.
+     */
+    _actionHasView(viewType) {
+        const entries = this.env.config.viewSwitcherEntries || [];
+        return entries.some((v) => v.type === viewType);
     }
 }

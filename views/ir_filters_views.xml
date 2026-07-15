@@ -10,7 +10,9 @@
             <xpath expr="//group/group[last()]" position="after">
                 <group string="Shortcut Banner">
                     <field name="shortcut_sequence" />
-                    <field name="shortcut_view_type" />
+                    <field name="shortcut_view_type_whitelist" invisible="1" />
+                    <field name="shortcut_view_type" widget="filterable_selection"
+                           options="{'whitelist_fname': 'shortcut_view_type_whitelist'}" />
                     <field name="shortcut_icon" placeholder="e.g. fa-clock-o" />
                     <field name="shortcut_layout" readonly="1" />
                 </group>
