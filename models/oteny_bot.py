@@ -6,6 +6,9 @@ is a soft ``(model, res_id)`` reference so a workflow engine or an app module ca
 to its own record without this addon depending on it.
 """
 
+import secrets
+from datetime import timedelta
+
 from psycopg2 import IntegrityError
 
 from odoo import Command, api, fields, models
@@ -41,6 +44,13 @@ WORK_TOKEN_TRAILER = (
     "(portal submit) — if not ok, STOP: you were timed out and the work re-assigned."
 )
 
+# How long a started attended-login DANCE latches the bot's dispatch path before it expires by
+# itself. 15 min mirrors the Oteny broker's own handoff window (browser_handoff_minutes) — a
+# dance that outlives the browser session it minted is over regardless of what the human does.
+# The TTL is what makes the latch LIVENESS-SAFE: no OK, no cancel, a closed laptop, a crashed
+# browser — the bot resumes dispatching on wall clock alone, with no cron and no operator.
+LOGIN_DANCE_MINUTES = 15
+
 
 class OtenyBot(models.Model):
     _name = "oteny.bot"
@@ -68,11 +78,142 @@ class OtenyBot(models.Model):
     active = fields.Boolean(default=True)
     session_ids = fields.One2many("oteny.bot.session", "bot_id", string="Activity")
     session_count = fields.Integer(compute="_compute_session_count")
+    login_dance_until = fields.Datetime(
+        "Login Dance Until", copy=False,
+        help="Set while a human is completing an attended sign-in for this bot (the 'open a "
+        "login browser → sign in → save' dance). While it is in the FUTURE the bot's dispatch "
+        "path is latched: no new isolated run is dispatched and no dispatched run may start, so "
+        "the human's browser session and the bot's never overlap. Cleared on save/cancel and "
+        "EXPIRES BY ITSELF — an abandoned dance unlatches the bot on wall clock alone, with no "
+        "cron and no operator.")
+    login_dance_user_id = fields.Many2one(
+        "res.users", string="Login Dance By", copy=False,
+        help="Who started the login dance currently holding the latch — so a second person is "
+        "told WHO is signing in rather than just 'busy'.")
+    login_dance_token = fields.Char(
+        "Login Dance Token", copy=False,
+        help="The epoch of ONE dance: minted on every login_dance_start and required by "
+        "login_dance_stop, which is a COMPARE-and-clear. The latch is per-BOT but the screens "
+        "that release it are per-user and per-record, so 'stop the dance' must mean 'stop MY "
+        "dance' — without the epoch, anyone's Cancel would release whoever's dance was live and "
+        "re-open the run/login overlap the latch exists to close. Same fence as bot_claim_token.")
 
     @api.depends("session_ids")
     def _compute_session_count(self):
         for bot in self:
             bot.session_count = len(bot.session_ids)
+
+    # --- the dance/run mutex (multi-user concurrency) ------------------------------------ #
+    # A bot's browser does two kinds of work that must never overlap: its OWN isolated runs
+    # (already serialized one-at-a-time on its machine) and a HUMAN's attended login. They
+    # share one cookie profile, so an overlap means the login's flush clobbers the run's
+    # session — or the login's cleanup kills the run's live browser mid-filing. The two take
+    # turns via ONE per-bot Postgres advisory lock + this TTL'd latch:
+    #
+    #   dance side (login_dance_hold)  → EXCLUSIVE, blocking. It is the FIRST lock its caller
+    #                                    takes, so it can never be part of a cycle.
+    #   run side  (login_dance_blocks_run) → try-SHARED, NEVER waits. Contention means DEFER,
+    #                                    which is free: the bot_dispatch_queue cron re-drives
+    #                                    a deferred dispatch. Shared, so concurrent dispatches
+    #                                    for one bot don't exclude each OTHER — only the dance.
+    #
+    # No deadlock is constructible: only the dance ever waits, and it waits holding nothing.
+
+    def _login_dance_lock_key(self):
+        """The deterministic per-bot key both sides of the dance/run mutex hash. ONE key per
+        bot and one only — a single global lock ordering, so there is no second key to invert
+        it against."""
+        self.ensure_one()
+        return f"oteny.bot:{self.id}:dispatch"
+
+    def login_dance_active(self):
+        """True while a login dance holds the latch — set AND still in the future. Expiry needs
+        no cron and no sweep: the comparison against ``now`` IS the expiry."""
+        self.ensure_one()
+        return bool(self.login_dance_until and self.login_dance_until > fields.Datetime.now())
+
+    def login_dance_hold(self):
+        """DANCE side: take this bot's dance/run mutex EXCLUSIVELY for the caller's transaction,
+        then re-read the latch from COMMITTED truth. flush → lock → invalidate, the same
+        load-bearing order as riverflow's ``_bot_lock_row``: a read taken before the lock could
+        be a pre-lock snapshot.
+
+        Postgres releases the lock when the transaction ends, so it stands across whatever the
+        caller does next (for the login gate: the broker mint). That is deliberate — a dispatch
+        must not slip in between the admission check and the latch — and it costs nothing,
+        because nothing that matters waits on it (the run side tries and defers). The only
+        possible waiter is a SECOND dance start, bounded by the first's own HTTP timeout."""
+        self.ensure_one()
+        self.env.cr.flush()
+        self.env.cr.execute(
+            "SELECT pg_advisory_xact_lock(hashtext(%s))", [self._login_dance_lock_key()])
+        self.invalidate_recordset(["login_dance_until", "login_dance_user_id"])
+
+    def login_dance_blocks_run(self):
+        """RUN side: True when NO isolated run may be dispatched or started for this bot right
+        now — either a dance holds the latch, or one is being taken THIS INSTANT (the mutex is
+        held exclusively and the latch is about to appear).
+
+        NEVER waits. It TRIES the shared lock and reads contention as a defer, so a dispatch is
+        only ever delayed (the 3-min ``bot_dispatch_queue`` cron re-drives it), never failed —
+        and a dispatch can never sit in a lock cycle. Callers must treat True as 'try again
+        later', never as an error."""
+        self.ensure_one()
+        self.env.cr.flush()
+        self.env.cr.execute(
+            "SELECT pg_try_advisory_xact_lock_shared(hashtext(%s))",
+            [self._login_dance_lock_key()])
+        if not self.env.cr.fetchone()[0]:
+            return True  # a dance start owns the mutex right now — defer, don't wait
+        self.invalidate_recordset(["login_dance_until", "login_dance_user_id"])
+        return self.login_dance_active()
+
+    def login_dance_start(self, minutes=None):
+        """Latch the bot for an attended login dance (TTL'd — see LOGIN_DANCE_MINUTES) and return
+        the dance's EPOCH TOKEN. The caller MUST hold the mutex (``login_dance_hold``) so the latch
+        and any concurrent dispatch's latch-read are ordered.
+
+        The token is the caller's proof of ownership: keep it and hand it back to
+        ``login_dance_stop``. A second dance start (a takeover — the newest click wins, matching the
+        broker's handoff supersede) mints a FRESH token, which is exactly what makes the superseded
+        screen's later Cancel/OK a no-op instead of a release of somebody else's live dance.
+
+        sudo: writing the bot is manager-only, but starting a dance is an HR act on a record the
+        HR user may only read."""
+        self.ensure_one()
+        token = secrets.token_urlsafe(9)
+        self.sudo().write({
+            "login_dance_until": fields.Datetime.now() + timedelta(minutes=minutes or LOGIN_DANCE_MINUTES),
+            "login_dance_user_id": self.env.uid,
+            "login_dance_token": token,
+        })
+        return token
+
+    def login_dance_stop(self, token):
+        """COMPARE-and-clear: release the latch ONLY if ``token`` is the CURRENT dance's epoch.
+        Returns True when it released, False when it was somebody else's dance (or none).
+
+        The compare is the whole point. The latch is per-BOT, but the screens that release it are
+        per-user and per-record and there are several people working at once — so an unconditional
+        clear would mean *any* Cancel releases *whoever* is mid-sign-in, dropping a run straight
+        into their login and re-opening the exact overlap this latch exists to close. Owning the
+        dance, not merely having a screen open, is what earns the release.
+
+        Takes the mutex for the same reason ``login_dance_start`` needs it: without it, a stop that
+        read a matching token could still land its write AFTER a concurrent takeover committed, and
+        destroy the new dance's latch. flush → lock → invalidate, then compare against committed
+        truth. Never required for correctness (the TTL is the backstop) — it just returns the bot to
+        work now instead of in 15 minutes."""
+        self.ensure_one()
+        if not token:
+            return False
+        self.login_dance_hold()
+        if token != self.sudo().login_dance_token:
+            return False
+        self.sudo().write({
+            "login_dance_until": False, "login_dance_user_id": False, "login_dance_token": False,
+        })
+        return True
 
     @api.model
     def record_activity(self, uplink_ref, session, turns=None):
