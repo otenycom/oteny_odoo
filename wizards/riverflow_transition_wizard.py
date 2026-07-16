@@ -117,6 +117,16 @@ class TransitionWizard(models.AbstractModel):
                 if expected_state and current_state != expected_state:
                     raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
+                # The bot fence (the HUMAN path's choke point — the bot and the timeout reaper
+                # both advance via bot_claim over /json/2/ and never reach here). A human may
+                # not move a record out from under a LIVE agent run: the run's irreversible act
+                # and the record catching up with it are seconds apart, and a transition landing
+                # in between leaves the record disagreeing with the real world. Re-checked HERE
+                # and not only at the button click, because the run can start while the wizard
+                # sits open. hasattr: the wizard also drives pre-bot-layer models.
+                if hasattr(record, "_bot_assert_human_transition_allowed"):
+                    record._bot_assert_human_transition_allowed(transition)
+
                 write_vals = {"state_id": transition.to_state_id.id}
                 self.update_write_values(record, write_vals)
 

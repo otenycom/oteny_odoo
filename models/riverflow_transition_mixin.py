@@ -21,6 +21,13 @@ class RiverflowTransitionMixin(models.AbstractModel):
             if expected_state and current_state != expected_state:
                 raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
+            # Refuse at the BUTTON, not after the user has filled the wizard in, when a bot is
+            # mid-run on this record (the wizard's own action_save re-checks — a run can start
+            # while the screen is open). hasattr: this mixin also serves models that predate the
+            # bot layer.
+            if len(self.ids) == 1 and hasattr(self, "_bot_assert_human_transition_allowed"):
+                self._bot_assert_human_transition_allowed(transition)
+
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
 

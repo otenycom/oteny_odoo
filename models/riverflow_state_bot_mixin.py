@@ -28,13 +28,30 @@ the state machine enforces AT MOST ONE live agent run per claim epoch with three
 3. **Turn-start consume** — ``bot_run_claim`` stamps ``bot_run_started_at`` exactly once per
    token; the dispatcher (hh-discuss adapter / webhook harness) consumes it BEFORE any LLM
    activity, so a replayed dispatch message can never start a second agent run.
+
+THE RUN/HUMAN MUTEX (multi-user concurrency). A bot's runs and its owner's people act on the same
+records at random times, so this layer also owns two symmetric fences, both keyed on ONE predicate
+— ``_bot_claim_is_live`` ("an agent run is happening RIGHT NOW"):
+
+* ``_bot_dispatch_gate`` — a domain hook that DEFERS a dispatch (and a run's start) while the bot
+  is unavailable to run, e.g. because a human is mid-way through an attended login for it.
+  Deferred, never failed: the record keeps its place and the dispatch cron re-drives it.
+* ``_bot_assert_human_transition_allowed`` — refuses a HUMAN transition out from under a live run,
+  so a person cannot cancel a job in the seconds between the irreversible act and the record
+  catching up with it.
+
+Both are bounded by wall clock BY CONSTRUCTION: a claim stops being live the moment its state's
+``bot_timeout_minutes`` SLA passes (the reaper then owns it), and a state with NO SLA is never
+treated as live at all — an unbounded block would park a human forever, and liveness outranks the
+fence.
 """
 
 import logging
 import secrets
 from datetime import timedelta
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -196,6 +213,83 @@ class RiverflowStateBotMixin(models.AbstractModel):
         self.ensure_one()
         return {"skill": False, "prompt": "", "dto": {}}
 
+    # --- the run/human mutex: is an agent run happening RIGHT NOW? ------------------------ #
+
+    def _bot_claim_is_live(self):
+        """True when an agent run on THIS record is LIVE — the single predicate the dance
+        admission (may a human start an attended login?) and the human-transition guard (may a
+        human move this record?) both key on. All three conditions must hold:
+
+        * the record sits in a bot ``in_progress`` state (it is claimed at all);
+        * its ONE run has been CONSUMED (``bot_run_started_at`` stamped by ``bot_run_claim``) — a
+          claimed-but-never-started dispatch is not a run, it is a message waiting to be read, and
+          blocking humans on one would mean blocking them on a possibly-dead gateway;
+        * the run has not outlived its state's SLA — past that the timeout reaper owns the record,
+          and treating a reaper-eligible zombie as live would block a human until the reaper got
+          round to it.
+
+        LIVENESS IS STRUCTURAL, not a promise: a state with no SLA (``bot_timeout_minutes`` <= 0)
+        has no reaper and therefore no wall-clock bound, so its claim is NEVER live — a fence that
+        cannot expire is worse than no fence, and the answer here decides whether a HUMAN is
+        refused."""
+        self.ensure_one()
+        state = self.state_id
+        if state.bot_stage != "in_progress":
+            return False
+        if not self.bot_run_started_at or not self.bot_work_started_at:
+            return False
+        if state.bot_timeout_minutes <= 0:
+            return False
+        deadline = self.bot_work_started_at + timedelta(minutes=state.bot_timeout_minutes)
+        return fields.Datetime.now() < deadline
+
+    def _bot_dispatch_gate(self):
+        """Domain hook: may a NEW isolated run be dispatched — or a dispatched one START — for this
+        record right now? Return True to DEFER.
+
+        Deferred is NEVER failed: the record keeps its state and its claim epoch, and the 3-min
+        ``bot_dispatch_queue`` cron re-drives it (a queued record on the normal dispatch leg; an
+        already-claimed one on the ``_bot_redispatch_stalled`` belt). So a caller must return True
+        only for a condition that CLEARS ON ITS OWN — never one that needs a human.
+
+        Base: never deferred (a pure engine has no bot to be unavailable). An app that wires a bot
+        overrides it — e.g. crewradar_cuneus_sign defers while a human holds Barney's attended-login
+        latch, so the human's browser and the bot's never overlap. The override is also where the
+        per-bot mutex is taken, and it MUST be taken without waiting (see
+        ``oteny.bot.login_dance_blocks_run``): a dispatch that blocks on a lock could sit in a
+        cycle, whereas a dispatch that defers simply comes back in three minutes."""
+        self.ensure_one()
+        return False
+
+    def _bot_assert_human_transition_allowed(self, transition):
+        """Refuse a HUMAN transition that would move this record out from under a LIVE agent run —
+        raise ``UserError``, or return quietly.
+
+        The window this closes is small and real: an isolated run's irreversible act (a portal
+        submit) and the record catching up with it (write the proof, advance the state) are seconds
+        apart, and a person clicking *Cancel* in between leaves a real, filed side effect behind a
+        record that says cancelled. There is no way to un-submit, so the only correct answer is to
+        make the human wait for the run — a few minutes, never open-ended.
+
+        Called from the transition-execution choke point (the transition wizard's button-click and
+        its OK), which is the HUMAN path by construction: the bot advances through ``bot_claim`` over
+        ``/json/2/`` and the reaper through ``bot_claim`` too, so neither can reach this and neither
+        needs excluding by role. The bound is the run finishing or the SLA reaper handing the record
+        back; the message says so, because a refusal whose end the user cannot see is
+        indistinguishable from a hang."""
+        self.ensure_one()
+        if not self._bot_claim_is_live():
+            return
+        raise UserError(_(
+            "%(bot_state)s is working on this right now — it started %(minutes)s minute(s) ago and "
+            "usually takes a few minutes. Wait for it to finish and try again. If it never "
+            "finishes, it is handed back automatically within %(sla)s minutes — you do not need to "
+            "do anything.",
+            bot_state=self.state_id.name,
+            minutes=int((fields.Datetime.now() - self.bot_work_started_at).total_seconds() // 60),
+            sla=self.state_id.bot_timeout_minutes,
+        ))
+
     def _bot_lock_row(self):
         """Serialize concurrent claimants on THIS row: flush pending ORM writes, take the row lock
         (``FOR NO KEY UPDATE`` — the strength Odoo's own UPDATE takes, blocking, so the loser waits
@@ -284,6 +378,18 @@ class RiverflowStateBotMixin(models.AbstractModel):
         record = self.browse(res_id).exists()
         if not record:
             return {"ok": False, "reason": "unknown record"}
+        # The dispatch gate BEFORE the row lock — every path takes the per-bot mutex first and a
+        # row lock second, so the two orders can never invert into a cycle. This is the fence that
+        # makes "a run and an attended login never overlap" true BY CONSTRUCTION rather than by
+        # timing: the latch stops FUTURE dispatches, but a message already sitting in the channel
+        # (posted moments before the latch, or re-posted by the belt while the gateway was down)
+        # would otherwise be picked up mid-dance and open a browser the human's finalize then
+        # sweeps. Refusing the consume is free — the dispatcher is fail-closed and drops the
+        # message without starting the agent, and the re-dispatch belt re-posts it once the dance
+        # ends (same epoch, same token).
+        if record._bot_dispatch_gate():
+            return {"ok": False, "state": record.state_id.name,
+                    "reason": "bot unavailable — deferred"}
         record._bot_lock_row()
         if not record.exists():
             return {"ok": False, "reason": "record deleted"}
@@ -399,6 +505,8 @@ class RiverflowStateBotMixin(models.AbstractModel):
         Resolves the work item from the claim transition INTO the current state (reusing the standing
         ``bot_claim_token``) and hands it to the domain ``_bot_redispatch`` hook. True when re-fired."""
         self.ensure_one()
+        if self._bot_dispatch_gate():
+            return False  # deferred — a later queue pass re-fires it (still inside the ceiling)
         item = self._bot_inprogress_work_item()
         if not item:
             return False
@@ -448,8 +556,13 @@ class RiverflowStateBotMixin(models.AbstractModel):
 
     def _bot_dispatch_one(self):
         """Resolve THIS queued record's work item and hand it to the domain ``_bot_dispatch``
-        hook (the shared leg of the inline dispatch and the cron belt). True when dispatched."""
+        hook (the shared leg of the inline dispatch and the cron belt). True when dispatched.
+
+        A gated bot (``_bot_dispatch_gate``) DEFERS: the record stays queued and the 3-min cron
+        re-drives it, so nothing is lost and nobody sees an error."""
         self.ensure_one()
+        if self._bot_dispatch_gate():
+            return False
         item = self._bot_work_item()
         return bool(item and self._bot_dispatch(item, self._bot_dispatch_prompt(item)))
 
