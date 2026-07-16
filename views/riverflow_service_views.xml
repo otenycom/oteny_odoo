@@ -183,6 +183,9 @@
                                 <group string="Supply Order Settings">
                                     <field name="is_supply_order" />
                                 </group>
+                                <group string="Subject Settings">
+                                    <field name="subject_from" />
+                                </group>
                                 <group string="Template Settings" groups="base.group_no_one">
                                     <field name="is_root_a_template" />
                                     <field name="is_this_a_template" />
@@ -698,6 +701,22 @@
             'active_model': 'riverflow.service',
             },
             }
+        </field>
+    </record>
+
+    <!-- Developer-only: force-recompute res_id/res_model to profile the
+         subject cascade. Restricted to base.group_no_one so it only shows
+         in developer mode. -->
+    <record id="action_recompute_subject_debug" model="ir.actions.server">
+        <field name="name">Recompute Subject (debug)</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="group_ids" eval="[(4, ref('base.group_no_one'))]" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list,form</field>
+        <field name="code">
+            if records:
+            records.action_recompute_subject_debug()
         </field>
     </record>
 

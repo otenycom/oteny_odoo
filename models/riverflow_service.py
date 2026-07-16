@@ -167,6 +167,26 @@ class Service(models.Model):
         tracking=True,
     )
 
+    is_open = fields.Boolean(
+        "Open",
+        compute="_compute_is_open",
+        store=True,
+        help="True when the service is a live, in-progress service: active, not "
+        "a template, and not in an end state. Backs the one-open-service-per-"
+        "subject invariant (see riverflow.workflow.enforce_single_open) and the "
+        "partial-unique index on enforcing workflows.",
+    )
+
+    @api.depends("active", "is_this_a_template", "state_id", "state_id.is_end_state")
+    def _compute_is_open(self):
+        for service in self:
+            service.is_open = bool(
+                service.active
+                and not service.is_this_a_template
+                and service.state_id
+                and not service.state_id.is_end_state
+            )
+
     days_relative_to_project = fields.Integer(
         "Day",
         help="Number of days before or after the project deadline for this service to be completed, e.g. -1 for the day before",
@@ -185,6 +205,20 @@ class Service(models.Model):
         required=True,
         tracking=True,
         default="self",
+    )
+
+    subject_from = fields.Selection(
+        [
+            ("default", "Default"),
+        ],
+        string="Subject From",
+        required=True,
+        tracking=True,
+        default="default",
+        help="Where this service derives its subject (res_model/res_id) from. "
+        "'Default' cascades from the parent service (top-down); a service with no "
+        "parent keeps the subject it was created with. Higher-layer modules can "
+        "add more options (e.g. derive from a related record).",
     )
 
     use_project_deadline_from_options = fields.Json(compute="_compute_use_project_deadline_from_options")
@@ -321,18 +355,35 @@ class Service(models.Model):
     )
 
     # the container of the service (log_entry, employee, etc)
+    # res_model and res_id are stored compute fields driven by _compute_subject,
+    # which cascades the subject from the parent based on subject_from.
+    # readonly=False (rather than a no-op inverse) keeps them writable, so
+    # business logic (resource_ref inverse, template clone vals, migrations,
+    # tests) can assign res_id/res_model directly; the compute's "self" branch
+    # then preserves the written value on the next recompute.
     res_model = fields.Char(
         string="Subject of Service Model Name",
+        compute="_compute_subject",
+        store=True,
+        readonly=False,
+        recursive=True,
+        precompute=True,
     )
     res_id = fields.Integer(
-        string="Subject of Service ID", required=True, default=0
-    )  # prevent null vs 0 sorting differences
-    res_id_computed = fields.Integer(
-        "Computed Service Subject ID",
-        compute="_compute_res_id_computed",
-        store=False,
+        string="Subject of Service ID",
+        required=True,
+        compute="_compute_subject",
+        store=True,
+        readonly=False,
         recursive=True,
-        help="Syncs the service's subject reference (ref_id) with the Top-level service. All decendending services reference the same subject.",
+        precompute=True,
+        # Note: no explicit default. A literal default kicks in during
+        # _add_missing_default_values BEFORE precompute, which would make the
+        # precompute loop skip the field (it's already "in vals") and the
+        # cascade would silently fail. With no default, the precompute path
+        # owns the initial value: it falls back to the Integer column default
+        # (0) when subject_from='default' and the service has no parent and the
+        # caller didn't pass res_id.
     )
     res_name = fields.Char(
         string="Subject of Service",
@@ -540,15 +591,34 @@ class Service(models.Model):
                 service.res_id = False
                 service.res_model = False
 
-    @api.depends("root_id.res_id", "root_id.res_model")
-    def _compute_res_id_computed(self):
+    @api.depends(
+        "subject_from",
+        "parent_id.res_id",
+        "parent_id.res_model",
+    )
+    def _compute_subject(self):
+        # Subject cascade keyed off subject_from:
+        # "default" cascades the subject top-down: a service with a parent pulls
+        # the parent's subject (so a mid-chain change propagates to descendants),
+        # while a service with no parent keeps whatever subject it was created
+        # with. Other modes are dispatched to _apply_custom_subject_from.
+        # The parent_id guard protects roots: a service with no parent never
+        # gets its subject clobbered to (False, 0) -- this covers a root keeping
+        # its own subject and orphaning a child (clearing parent_id).
         for service in self:
-            service.res_id_computed = service.root_id.res_id
+            mode = service.subject_from
+            if mode == "default":
+                if service.parent_id:
+                    service.res_id = service.parent_id.res_id
+                    service.res_model = service.parent_id.res_model
+                # root (no parent): keep own subject -- no-op
+            else:
+                service._apply_custom_subject_from(mode)
 
-            isRootService = service.id == service.root_id.id
-            if not isRootService:
-                service.res_id = service.root_id.res_id
-                service.res_model = service.root_id.res_model
+    def _apply_custom_subject_from(self, mode):
+        """Hook: higher-layer modules override to handle custom subject_from
+        values they added via selection_add. Base implementation is a no-op."""
+        return
 
     @api.depends("front_office_workflow_id.is_supply_order")
     def _compute_is_supply_order(self):
@@ -851,7 +921,37 @@ class Service(models.Model):
         if any(isinstance(record.id, api.NewId) for record in self):
             return
 
+        # Bulk migrations / imports re-anchor or re-home hundreds of services in
+        # a Python loop, and every write touches a display_order dependency.
+        # Without this guard the costly per-record sibling scan + tree rebuild
+        # below runs once per write -- the dominant cost of those migrations (an
+        # N+1 query storm). When the caller opts in with `defer_display_order`,
+        # keep the current stored value and skip the rebuild; the caller does one
+        # batched, flag-free rebuild of every touched tree at the end.
+        #
+        # We re-assign the *current* value rather than bare-`return`: this is a
+        # STORED field, so a bare return would flush NULL. compute_value() has
+        # already cleared these records from `tocompute` and protects the field
+        # (see odoo/orm/fields.py), so reading the old value is safe and does not
+        # recurse, and assigning it marks the field computed -- a flush inside the
+        # deferred scope then converges instead of re-deferring forever.
+        if self.env.context.get("defer_display_order"):
+            for service in self:
+                service.display_order = service.display_order
+            return
+
+        # The sibling-discovery SQL below bypasses the ORM cache, so the
+        # stored compute fields it queries (root_id, res_id, res_model) must
+        # already be materialised in the database. Flush them first --
+        # otherwise children just-created in the same transaction look
+        # orphaned (their root_id column is still NULL while only the cache
+        # holds the computed value), the sibling set comes back empty, and
+        # display_order stays at its default.
+        self.env["riverflow.service"].flush_model(["root_id", "res_id", "res_model", "parent_path"])
+
         Service = self.env["riverflow.service"].with_context(active_test=False).sudo()
+
+        order_field = self._fields["display_order"]
 
         for record in self:
 
@@ -920,9 +1020,17 @@ class Service(models.Model):
                 # Retrieve the service object using its ID
                 service = service_dict[service_id]
 
-                # Only write display_order if the value is different from the current value
-                # This optimization avoids unnecessary database writes and ORM overhead
-                if service.display_order != display_order:
+                # Never READ display_order on a record whose recompute is still
+                # pending: display_order is recursive=True, so the ORM computes
+                # it record by record, and the read would re-enter this compute
+                # for `service`, nesting one Python stack level per dirty
+                # sibling. A root deadline change dirties the whole tree at
+                # once, so large trees overflow the stack (RecursionError).
+                # Assigning without reading is safe: Field.write() first calls
+                # env.remove_to_compute(), clearing the pending computation.
+                # For settled records, keep the read-and-compare to avoid
+                # unnecessary database writes and ORM overhead.
+                if self.env.is_to_compute(order_field, service) or service.display_order != display_order:
                     service.display_order = display_order
 
                 # Increment the display_order number for the next service
@@ -989,14 +1097,11 @@ class Service(models.Model):
             "target": "new",
         }
 
-    @api.onchange("parent_id")
-    def _onchange_parent_id(self):
-        if self.parent_id:
-            self.res_model = self.parent_id.res_model
-            self.res_id = self.parent_id.res_id
-
     @api.model_create_multi
     def create(self, vals_list):
+        # subject_from defaults to 'default' (the field default), which is
+        # parent-aware in _compute_subject: a root keeps its own subject while
+        # a child cascades from its parent. No per-record juggling needed here.
         # current user is not subscribed to the chatter, because we have the radar-view, the review-count and top-3 external messages
         # this way, a team can keep track of the external messages instead of a single user
         # Also, the user eventually sending messages in the chatter will be subscribed to the record thread; the
@@ -1009,38 +1114,44 @@ class Service(models.Model):
             ),
         ).create(vals_list)
         for record in records:
-            if record.parent_id and not record.res_id:
-                record.res_id = record.parent_id.res_id
-                record.res_model = record.parent_id.res_model
-            elif not record.parent_id and record.res_model == self._name and record.res_id:
-                # for auto-adding a child service, they set the parent via res_id
-                # Invalidate the recordset to ensure fresh data
+            if not record.parent_id and record.res_model == self._name and record.res_id:
+                # Auto-add reparenting hack: the caller passed res_id pointing
+                # to the parent service. Convert to a real parent_id assignment
+                # and let _compute_subject cascade res_id / res_model from the
+                # new parent (subject_from='default' ensures the cascade fires).
                 record.parent_id = record.res_id
-                record.root_id = record.parent_id.root_id
-                record.res_model = record.parent_id.res_model
-                record.res_id = record.parent_id.res_id
-                # recalculate the parent_id dependent fields
-                record.invalidate_recordset(["parent_id", "parent_path", "root_id", "res_model", "res_id"])
+                record.subject_from = "default"
+                record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                 record.parent_id.invalidate_recordset(["child_ids"])
         return records
 
     def write(self, vals):
+        # Guard manual archive (active=False) of a protected single-open service,
+        # the archive counterpart of the unlink guard. Scoped to a manual archive
+        # while the subject is still active, so a legitimate subject-cascade
+        # archive (subject_active already False) is never blocked.
+        if vals.get("active") is False and not self.env.context.get(
+            "bypass_user_unlink_check"
+        ):
+            blocked = self.filtered(
+                lambda s: s.subject_active and s._single_open_removal_blocked()
+            )
+            if blocked:
+                raise UserError(
+                    _(
+                        "Cannot archive %s: it is in progress or still has active "
+                        "sub-services. Close it through its workflow instead.",
+                        ", ".join(blocked.mapped("display_name")),
+                    )
+                )
         result = super(Service, self).write(vals)
-        if "parent_id" in vals:
-            for record in self:
-                if record.parent_id and not record.res_id:
-                    record.res_id = record.parent_id.res_id
-                    record.res_model = record.parent_id.res_model
-        elif "res_model" in vals and "res_id" in vals:
+        if "res_model" in vals and "res_id" in vals:
             for record in self:
                 if record.res_model == self._name:
+                    # Auto-add reparenting hack (see create() comment)
                     record.parent_id = record.res_id
-                    record.root_id = record.parent_id.root_id
-                    record.res_model = record.parent_id.res_model
-                    record.res_id = record.parent_id.res_id
-                    record.invalidate_recordset(
-                        ["parent_id", "parent_path", "root_id", "res_model", "res_id"]
-                    )
+                    record.subject_from = "default"
+                    record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                     record.parent_id.invalidate_recordset(["child_ids"])
 
         # When a supply order service changes state, trigger recomputation of related info services
@@ -1141,7 +1252,14 @@ class Service(models.Model):
         if not is_child_add and not template_service.can_be_root_service:
             return False
         allowed_models = template_service.allowed_subject_model_ids
-        if allowed_models:
+        # A child whose template derives its own subject via a custom
+        # subject_from mode (e.g. crewradar's "most_fitting_log_entry" picks a
+        # log entry off the parent's employee) does not take the parent's
+        # subject. The parent/context res_model is only the derivation source,
+        # not the child's eventual subject, so the allowed-subject gate must not
+        # apply to it -- the mode owns the subject model.
+        derives_own_subject = is_child_add and template_service.subject_from != "default"
+        if allowed_models and not derives_own_subject:
             # Template is restricted to specific subjects: reject if no subject
             # is provided or if the subject model is not in the allowed list.
             if not res_model or res_model not in allowed_models.mapped("model"):
@@ -1248,6 +1366,7 @@ class Service(models.Model):
             "tag_ids": [Command.link(tag_id) for tag_id in template_service.tag_ids.ids],
             "daily_prio": template_service.daily_prio,
             "weekend_deadline_rule": template_service.weekend_deadline_rule,
+            "subject_from": template_service.subject_from,
         }
 
         if deadline:
@@ -1612,12 +1731,43 @@ class Service(models.Model):
         # This is a flag method that allows the field to be written
         pass
 
+    def _single_open_removal_blocked(self):
+        """True when this OPEN service must not be deleted/archived by hand.
+
+        On a workflow that enforces single-open, a service that is **past its
+        initial state** or still holds **live child services** (active,
+        non-end-state — e.g. a booked AB appointment) is closed through its
+        workflow, never destroyed: destroying it would lose the in-progress work
+        and silently drop the single-open guarantee. A childless service still at
+        its initial state (a plain monitoring task) stays freely removable — it
+        self-heals (see crewradar_creds).
+        """
+        self.ensure_one()
+        if not (self.is_open and self.workflow_id.enforce_single_open):
+            return False
+        initial = self.workflow_id.state_ids.sorted("sequence")[:1]
+        past_initial = bool(initial and self.state_id.sequence > initial.sequence)
+        live_children = self.child_ids.filtered(
+            lambda c: c.active and not c.state_id.is_end_state
+        )
+        return past_initial or bool(live_children)
+
     def unlink(self):
         if not self.env.context.get("bypass_user_unlink_check"):
             if self.supply_leg_id.ids and not self.env.user.has_group("base.group_no_one"):
                 raise UserError(
                     _(
                         "Cannot delete info-service linked to a supply order leg. Delete the leg from the supply order instead."
+                    )
+                )
+            blocked = self.filtered(lambda s: s._single_open_removal_blocked())
+            if blocked:
+                raise UserError(
+                    _(
+                        "Cannot delete %s: it is in progress or still has active "
+                        "sub-services (e.g. a booked appointment). Close it through "
+                        "its workflow instead of deleting it.",
+                        ", ".join(blocked.mapped("display_name")),
                     )
                 )
 
@@ -1651,6 +1801,23 @@ class Service(models.Model):
             "view_mode": "list,form",
             "domain": [("record_id", "=", self.id), ("model_name", "=", self._name)],
         }
+
+    def action_recompute_subject_debug(self):
+        """Developer tool: force a recompute of res_id/res_model on these
+        services so the subject cascade can be profiled in isolation.
+
+        Exposed only in developer mode (base.group_no_one) via the
+        "Recompute Subject (debug)" server action in the list/form Action
+        menu. To profile: enable the UI profiler (debug menu), select some
+        services, run this action, then inspect the captured trace. We mark
+        the fields to-compute and flush so the run goes through Odoo's normal
+        recompute machinery (dependency resolution + recursive compute +
+        write), matching what happens during an upgrade.
+        """
+        self.invalidate_recordset(["res_id", "res_model"])
+        self.env.add_to_compute(self._fields["res_id"], self)
+        self.env.add_to_compute(self._fields["res_model"], self)
+        self.flush_recordset(["res_id", "res_model"])
 
     def handle_journey_drop(self, target_service_id, position, journey_service_ids=None):
         """

@@ -40,6 +40,16 @@ class RiverflowWorkflow(models.Model):
         "becomes 'issued'. Set to 'Not Needed' or similar end state.",
     )
 
+    enforce_single_open = fields.Boolean(
+        "Enforce Single Open Service",
+        default=False,
+        help="When set, auto-add creates at most one OPEN (active, non-end-state) "
+        "service per subject for this workflow, and a partial-unique index makes a "
+        "second open service structurally impossible. Used for credential-renewal "
+        "workflows like the DE Work Permit, where the golden rule is exactly one "
+        "live service per employee.",
+    )
+
     workflow_start_transition_ids = fields.One2many(
         "riverflow.transition",
         "workflow_id",
@@ -273,18 +283,78 @@ class RiverflowWorkflow(models.Model):
                         exc_info=True,
                     )
 
+        # Collect XML ids that ARE present in the scanned XML files. Records
+        # whose ir.model.data entry points at a workflow record but whose
+        # XML id is NOT in this set were removed from XML — they're
+        # orphan XML records. With noupdate="1" data files Odoo's standard
+        # orphan cleanup leaves them alone, so we archive them here.
+        present_xml_ids = set()
+        for module_name, _file_path, record_elements in files_to_import:
+            for rec_el in record_elements:
+                rec_id = rec_el.get("id", "")
+                present_xml_ids.add(rec_id)
+                if "." in rec_id:
+                    present_xml_ids.add(rec_id.split(".", 1)[1])
+                else:
+                    present_xml_ids.add(f"{module_name}.{rec_id}")
+
+        orphan_state_imd = state_imd.filtered(
+            lambda imd: imd.name not in present_xml_ids
+            and f"{imd.module}.{imd.name}" not in present_xml_ids
+        )
+        orphan_transition_imd = transition_imd.filtered(
+            lambda imd: imd.name not in present_xml_ids
+            and f"{imd.module}.{imd.name}" not in present_xml_ids
+        )
+
         # Re-activate XML-defined states/transitions that were manually archived,
-        # unless the XML explicitly sets active=False
+        # unless the XML explicitly sets active=False — and skip orphans (they're
+        # about to be archived below).
         xml_state_ids = set(state_imd.mapped("res_id"))
         xml_transition_ids = set(transition_imd.mapped("res_id"))
+        orphan_state_record_ids = set(orphan_state_imd.mapped("res_id"))
+        orphan_transition_record_ids = set(orphan_transition_imd.mapped("res_id"))
 
         for imd_rec in state_imd | transition_imd:
             qualified_id = f"{imd_rec.module}.{imd_rec.name}"
             if qualified_id in explicitly_inactive_ids:
                 continue
+            if imd_rec.res_id in orphan_state_record_ids or imd_rec.res_id in orphan_transition_record_ids:
+                continue
             record = self.env[imd_rec.model].with_context(active_test=False).browse(imd_rec.res_id)
             if record.exists() and not record.active:
                 record.active = True
+
+        # Archive orphan XML-defined records (XML record removed from data files)
+        orphan_states = (
+            self.env["riverflow.state"]
+            .with_context(active_test=False)
+            .browse(list(orphan_state_record_ids))
+            .filtered("active")
+        )
+        if orphan_states:
+            orphan_states.active = False
+            _logger.info(
+                "Archived %d XML-orphan states for workflow %s: %s",
+                len(orphan_states),
+                self.name,
+                ", ".join(orphan_states.mapped("name")),
+            )
+
+        orphan_transitions = (
+            self.env["riverflow.transition"]
+            .with_context(active_test=False)
+            .browse(list(orphan_transition_record_ids))
+            .filtered("active")
+        )
+        if orphan_transitions:
+            orphan_transitions.active = False
+            _logger.info(
+                "Archived %d XML-orphan transitions for workflow %s: %s",
+                len(orphan_transitions),
+                self.name,
+                ", ".join(orphan_transitions.mapped("name")),
+            )
 
         # Archive manually-added records (those without an XML ID)
         manual_states = states.filtered(lambda s: s.id not in xml_state_ids)
@@ -309,14 +379,16 @@ class RiverflowWorkflow(models.Model):
 
         _logger.info(
             "Reset workflow '%s' from XML: %d files processed, "
-            "%d states (%d XML / %d manual archived), "
-            "%d transitions (%d XML / %d manual archived)",
+            "%d states (%d XML / %d orphan archived / %d manual archived), "
+            "%d transitions (%d XML / %d orphan archived / %d manual archived)",
             self.name,
             len(files_to_import),
             len(states),
             len(xml_state_ids),
+            len(orphan_states),
             len(manual_states),
             len(transitions),
             len(xml_transition_ids),
+            len(orphan_transitions),
             len(manual_transitions),
         )
