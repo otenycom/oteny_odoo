@@ -574,9 +574,14 @@ class RiverflowStateBotMixin(models.AbstractModel):
         the MFNL unattended contract) would reach only the webhook escape hatch, not the primary
         Discuss dispatch."""
         self.ensure_one()
-        thin = (f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
-                f"#{self.id}. Load the skill, fetch this record's details over your uplink, complete "
-                "the work, and advance the record. Act only on this one record.")
+        # B-PROMPT1: name the ONE first uplink read by id — the channel never carries the DTO.
+        thin = (
+            f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
+            f"#{self.id} (riverflow.service). Load the skill. First uplink call: ONE "
+            f"search_read with domain [['id', '=', {self.id}]] for this record's fields — "
+            f"there is no record payload in this message. Fetch over your uplink, complete "
+            f"the work, and advance the record. Act only on this one record."
+        )
         declared = (item.get("prompt") or "").strip()
         return f"{thin}\n{declared}" if declared else thin
 
