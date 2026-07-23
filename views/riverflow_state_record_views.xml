@@ -82,6 +82,13 @@
         <field name="name">riverflow.state.record.calendar</field>
         <field name="model">riverflow.state.record</field>
         <field name="arch" type="xml">
+            <!-- edit="1" allows drag & resize of calendar events, but the renderer
+                 (state_record_calendar_renderer.js) restricts this per event: only
+                 events backed by a service may be dragged, which reschedules the
+                 service deadline. Rows without a service (log entry sign-on/sign-off
+                 milestones, employee/ship subject rows) derive their date from the
+                 master record and cannot be dragged - those planning dates must be
+                 changed on the log entry form itself. -->
             <calendar string="State Records"
                 js_class="state_record_calendar"
                 date_start="deadline"
