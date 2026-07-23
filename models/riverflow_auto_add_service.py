@@ -155,29 +155,49 @@ class AutoAddService(models.Model):
         new_services = self._filter_auto_add_candidates(new_services, model)
 
         # Get existing auto-added services to avoid duplicates.
-        # Dedup key is (rule_id, subject_id, context_ref) so the same rule can create
-        # multiple services for different occasions (e.g. initial vs renewal credentials).
+        # Dedup key is (rule_id, res_model, res_id, context_ref) so the same rule
+        # can create multiple services for different occasions (e.g. initial vs
+        # renewal credentials). Candidates are grouped by THEIR res_model because
+        # a filter hook may have redirected them to a different subject than the
+        # trigger model (e.g. credential-subject rules anchor the service on the
+        # credential's holder) — searching only the trigger model would let
+        # redirected candidates escape dedup on every re-evaluation.
         # context_ref defaults to False for backward compatibility with rules that don't use it.
-        current_services_dict = {
-            (s.created_by_auto_add_service_id.id, s.res_id, s.auto_add_context_ref or False): s
-            for s in self.with_context(active_test=False)
-            .env["riverflow.service"]
-            .search(
+        candidate_ids_by_model = {}
+        for ns in new_services:
+            candidate_ids_by_model.setdefault(ns["res_model"], set()).add(ns["res_id"])
+
+        Service = self.with_context(active_test=False).env["riverflow.service"]
+        current_service_keys = set()
+        for candidate_model, candidate_ids in candidate_ids_by_model.items():
+            for s in Service.search(
                 [
-                    ("res_id", "in", subjects.ids),
-                    ("res_model", "=", model),
+                    ("res_id", "in", list(candidate_ids)),
+                    ("res_model", "=", candidate_model),
                     ("created_by_auto_add_service_id", "!=", False),
                 ]
-            )
-        }
+            ):
+                current_service_keys.add(
+                    (
+                        s.created_by_auto_add_service_id.id,
+                        s.res_model,
+                        s.res_id,
+                        s.auto_add_context_ref or False,
+                    )
+                )
 
-        # Services to create (in new_services_set but not in current_services_dict)
+        # Services to create (candidates without an existing service for their key)
         # Only create services that don't already exist - no deactivation or reactivation
         to_create = [
             ns
             for ns in new_services
-            if (ns["created_by_auto_add_service_id"], ns["res_id"], ns.get("auto_add_context_ref") or False)
-            not in current_services_dict
+            if (
+                ns["created_by_auto_add_service_id"],
+                ns["res_model"],
+                ns["res_id"],
+                ns.get("auto_add_context_ref") or False,
+            )
+            not in current_service_keys
         ]
 
         # Single-open guard: for workflows that enforce one open service per
@@ -202,6 +222,10 @@ class AutoAddService(models.Model):
         occasion ref, so a renewal cycle never stacks a second service on an
         already-open one, and a manually-created open service equally blocks
         auto-creation. Non-enforcing workflows are returned unchanged.
+
+        Like the dedup above, existing open services are looked up per
+        candidate res_model (not per trigger model) so redirected candidates
+        are checked against their actual subject.
         """
         if not to_create:
             return to_create
@@ -218,24 +242,28 @@ class AutoAddService(models.Model):
         if not enforcing:
             return to_create
 
-        open_existing = {
-            (s.workflow_id.id, s.res_id)
+        candidate_ids_by_model = {}
+        for c in to_create:
+            candidate_ids_by_model.setdefault(c["res_model"], set()).add(c["res_id"])
+
+        open_existing = set()
+        for candidate_model, candidate_ids in candidate_ids_by_model.items():
             for s in Service.with_context(active_test=False).search(
                 [
-                    ("res_id", "in", subjects.ids),
-                    ("res_model", "=", model),
+                    ("res_id", "in", list(candidate_ids)),
+                    ("res_model", "=", candidate_model),
                     ("workflow_id", "in", list(enforcing)),
                     ("is_open", "=", True),
                 ]
-            )
-        }
+            ):
+                open_existing.add((s.workflow_id.id, s.res_model, s.res_id))
 
         result = []
         seen = set()
         for c in to_create:
             wf = workflow_by_template.get(c["template_id"])
             if wf and wf.id in enforcing:
-                key = (wf.id, c["res_id"])
+                key = (wf.id, c["res_model"], c["res_id"])
                 if key in open_existing or key in seen:
                     continue
                 seen.add(key)
