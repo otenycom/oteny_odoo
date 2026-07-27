@@ -21,6 +21,15 @@ class StateRecordCalendarCommonRenderer extends CalendarCommonRenderer {
         // Add the original Odoo record to the event object.
         // FullCalendar will automatically place this inside `extendedProps`.
         event.odooRecord = record;
+        // Only events backed by a service may be dragged/resized: the new date is
+        // then propagated to the service deadline (see _inverse_deadline on
+        // riverflow.state.record). Events without a service (log entry sign-on/
+        // sign-off milestones, employee/ship subject rows) show dates that belong
+        // to their master record; dragging them here would be a hidden planning
+        // change, so those dates must be changed on the master record form instead.
+        if (!record.rawRecord.service_id) {
+            event.editable = false;
+        }
         return event;
     }
 
