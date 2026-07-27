@@ -345,6 +345,10 @@
                 <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
                 <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
                 <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
+                <!-- Due within one month from today (overdue and undated included). Purely
+                     date-based, unlike Overdue/Today/Upcoming above: combine with the
+                     "Workflow Pending" filter to also hide completed services. -->
+                <filter string="Upcoming (1 Month)" name="upcoming_month" domain="['|', ('deadline', '=', False), ('deadline', '&lt;=', (context_today() + relativedelta(months=1)).strftime('%Y-%m-%d'))]" />
                 <separator />
                 <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
                 <filter string="Has Internal Notes" name="has_internal_notes"
