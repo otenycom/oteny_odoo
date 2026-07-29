@@ -555,9 +555,7 @@ class Service(models.Model):
     def _check_supply_time_of_day(self):
         for service in self:
             if service.supply_time_of_day < 0 or service.supply_time_of_day > 23.99:
-                raise ValidationError(
-                    _("Time of day must be between 00:00 and 23:59.")
-                )
+                raise ValidationError(_("Time of day must be between 00:00 and 23:59."))
 
     @api.constrains("project_deadline", "end_date")
     def _check_end_date(self):
@@ -760,9 +758,7 @@ class Service(models.Model):
                     # Use root's appointment date (supply_actual_date) with
                     # fallback to root's deadline. Keeps child deadlines stable
                     # even as the root's deadline changes during workflow progression.
-                    service.project_deadline = (
-                        service.root_id.supply_actual_date or service.root_id.deadline
-                    )
+                    service.project_deadline = service.root_id.supply_actual_date or service.root_id.deadline
 
     def _inverse_project_deadline(self):
         # this is a flag method specifying the user is allowed to store the project_deadline
@@ -787,12 +783,11 @@ class Service(models.Model):
     @api.depends("use_project_deadline_from", "root_id")
     def _compute_is_days_relative_to_project_applicable(self):
         for service in self:
-            service.is_days_relative_to_project_applicable = (
-                service.use_project_deadline_from not in ("self",)
-                and not (
-                    service.use_project_deadline_from in ("root", "root_appointment")
-                    and service.root_id.ids == service.ids
-                )
+            service.is_days_relative_to_project_applicable = service.use_project_deadline_from not in (
+                "self",
+            ) and not (
+                service.use_project_deadline_from in ("root", "root_appointment")
+                and service.root_id.ids == service.ids
             )
 
     @api.depends(
@@ -1130,12 +1125,8 @@ class Service(models.Model):
         # the archive counterpart of the unlink guard. Scoped to a manual archive
         # while the subject is still active, so a legitimate subject-cascade
         # archive (subject_active already False) is never blocked.
-        if vals.get("active") is False and not self.env.context.get(
-            "bypass_user_unlink_check"
-        ):
-            blocked = self.filtered(
-                lambda s: s.subject_active and s._single_open_removal_blocked()
-            )
+        if vals.get("active") is False and not self.env.context.get("bypass_user_unlink_check"):
+            blocked = self.filtered(lambda s: s.subject_active and s._single_open_removal_blocked())
             if blocked:
                 raise UserError(
                     _(
@@ -1292,13 +1283,13 @@ class Service(models.Model):
         else:
             res_model = self.env.context.get("default_res_model")
 
-        if not self._template_placement_allowed(template_service, res_model=res_model, is_child_add=is_child_add):
+        if not self._template_placement_allowed(
+            template_service, res_model=res_model, is_child_add=is_child_add
+        ):
             # Build a descriptive error message
             reasons = []
             if is_child_add and not template_service.can_be_child_service:
-                reasons.append(
-                    _("'%s' cannot be added as a child service.", template_service.name)
-                )
+                reasons.append(_("'%s' cannot be added as a child service.", template_service.name))
             if not is_child_add and not template_service.can_be_root_service:
                 reasons.append(
                     _("'%s' cannot be used as a standalone (root) service.", template_service.name)
@@ -1381,7 +1372,9 @@ class Service(models.Model):
             # Materialize the deadline relative to today at clone time, then store
             # as a concrete "self" date so it doesn't shift on recomputation.
             vals["use_project_deadline_from"] = "self"
-            vals["project_deadline"] = fields.Date.today() + timedelta(days=template_service.days_relative_to_project)
+            vals["project_deadline"] = fields.Date.today() + timedelta(
+                days=template_service.days_relative_to_project
+            )
             vals["days_relative_to_project"] = 0
         else:
             vals["use_project_deadline_from"] = template_service.use_project_deadline_from
@@ -1558,9 +1551,7 @@ class Service(models.Model):
             return
 
         # Find deferred children matching the target state
-        deferred_children = template.child_ids.filtered(
-            lambda c: c.create_on_state_id == target_state
-        )
+        deferred_children = template.child_ids.filtered(lambda c: c.create_on_state_id == target_state)
         if not deferred_children:
             return
 
@@ -1576,20 +1567,14 @@ class Service(models.Model):
         # any field not explicitly set in the vals dict — causing children
         # to inherit tags, deadlines, is_service_with_journey, credential
         # links, supply prices, etc. from the parent instead of the template.
-        clean_ctx = {
-            k: v
-            for k, v in self.env.context.items()
-            if not k.startswith("default_")
-        }
+        clean_ctx = {k: v for k, v in self.env.context.items() if not k.startswith("default_")}
         clean_ctx["default_res_model"] = self.res_model
         clean_ctx["default_res_id"] = self.res_id
         Service = self.env["riverflow.service"].with_context(clean_ctx)
         for child_template in deferred_children:
             if child_template.name in existing_names:
                 continue
-            new_child = Service._create_service_member_from_template(
-                child_template, self.id
-            )
+            new_child = Service._create_service_member_from_template(child_template, self.id)
             # Recursively clone the full descendant tree of the deferred
             # child. Without this, great-grandchildren and deeper levels
             # (e.g. an "Inform Employee" task under "AB Arrange Transport"
@@ -1630,9 +1615,7 @@ class Service(models.Model):
         for service in self:
             if not service.state_id.auto_done_children_on_enter:
                 continue
-            active_children = service.child_ids.filtered(
-                lambda c: c.active and not c.state_id.is_end_state
-            )
+            active_children = service.child_ids.filtered(lambda c: c.active and not c.state_id.is_end_state)
             for child in active_children:
                 done_state = self.env["riverflow.state"].search(
                     [
@@ -1747,9 +1730,7 @@ class Service(models.Model):
             return False
         initial = self.workflow_id.state_ids.sorted("sequence")[:1]
         past_initial = bool(initial and self.state_id.sequence > initial.sequence)
-        live_children = self.child_ids.filtered(
-            lambda c: c.active and not c.state_id.is_end_state
-        )
+        live_children = self.child_ids.filtered(lambda c: c.active and not c.state_id.is_end_state)
         return past_initial or bool(live_children)
 
     def unlink(self):
