@@ -77,6 +77,13 @@ class TestProjectDeadlineRootMode(TransactionCase):
         """relative_to_project_days_prefix returns 'Top-level service' for root mode."""
         self.assertEqual(self.child.relative_to_project_days_prefix(), "Top-level service")
 
+    def test_prefix_falls_back_to_selection_label(self):
+        """Modes without a bespoke short prefix (e.g. 'creation') fall back to
+        the label from the selection definition, so the timing widget never
+        shows an '(unknown: use_project_deadline_from)' warning."""
+        self.child.use_project_deadline_from = "creation"
+        self.assertEqual(self.child.relative_to_project_days_prefix(), "Creation Date")
+
 
 @tagged("post_install", "-at_install", "riverflow", "test_project_deadline")
 class TestProjectDeadlineRootAppointmentMode(TransactionCase):

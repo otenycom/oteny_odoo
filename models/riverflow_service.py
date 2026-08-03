@@ -887,7 +887,11 @@ class Service(models.Model):
         elif self.use_project_deadline_from == "root_appointment":
             return "Appointment"
         else:
-            return "(unknown: use_project_deadline_from)"
+            # Values without a bespoke short prefix (e.g. "creation", or options
+            # added by higher-layer modules) fall back to the label from the
+            # selection definition, so they never render as unknown.
+            selection = dict(self._fields["use_project_deadline_from"]._description_selection(self.env))
+            return selection.get(self.use_project_deadline_from, "")
 
     @api.depends("deadline")
     def _compute_deadline_formatted(self):
