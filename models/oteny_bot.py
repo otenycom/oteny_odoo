@@ -11,7 +11,8 @@ from datetime import timedelta
 
 from psycopg2 import IntegrityError
 
-from odoo import Command, api, fields, models
+from odoo import _, Command, api, fields, models
+from odoo.exceptions import UserError
 
 # The leading marker that tells the bot's gateway to run a Discuss message as a FRESH, isolated
 # agent turn (its own session) instead of a turn in the accumulating channel chat — the Discuss
@@ -391,15 +392,167 @@ class OtenyBotSession(models.Model):
     origin_res_id = fields.Integer("Origin Res ID", index=True, readonly=True)
     started_at = fields.Datetime(default=fields.Datetime.now, index=True, readonly=True)
     duration_s = fields.Float("Duration (s)", readonly=True)
+    # Opaque broker browser session ids this run used (never live-view URLs — R3).
+    # Written by the bot via record_run; powers Watch live / Replay from Bot Activity.
+    browser_session_ids = fields.Json(
+        "Browser Session Ids", readonly=True, copy=False,
+        help="Opaque cloud-browser session ids for this activity. Viewer URLs are "
+        "minted on click and never stored.")
+    browser_status = fields.Char(
+        "Browser", compute="_compute_browser_status",
+        help="Plain-language status of the cloud browser for this activity.")
+    has_browser_session = fields.Boolean(
+        compute="_compute_browser_status",
+        help="True when this activity linked at least one cloud-browser session.")
     turn_ids = fields.One2many("oteny.bot.turn", "session_id", string="Turns", readonly=True)
     turn_count = fields.Integer(compute="_compute_turn_metrics")
     tool_call_count = fields.Integer(compute="_compute_turn_metrics")
+
+    # Access window for forensic replay (matches the platform 48h promise).
+    _BROWSER_REPLAY_HOURS = 48
 
     @api.depends("turn_ids", "turn_ids.tool_call_count")
     def _compute_turn_metrics(self):
         for s in self:
             s.turn_count = len(s.turn_ids)
             s.tool_call_count = sum(s.turn_ids.mapped("tool_call_count"))
+
+    @api.depends(
+        "browser_session_ids", "outcome", "started_at", "duration_s",
+    )
+    def _compute_browser_status(self):
+        now = fields.Datetime.now()
+        for s in self:
+            ids = s.browser_session_ids or []
+            if not isinstance(ids, list):
+                ids = []
+            s.has_browser_session = bool(ids)
+            if not ids:
+                s.browser_status = _("No browser used")
+                continue
+            if s.outcome == "dispatched":
+                s.browser_status = _("Live now")
+                continue
+            closed = s.started_at
+            if closed and s.duration_s:
+                closed = closed + timedelta(seconds=int(s.duration_s))
+            if closed:
+                # hours left in the 48h access window (not a deletion claim).
+                age_h = (now - closed).total_seconds() / 3600.0
+                left = s._BROWSER_REPLAY_HOURS - age_h
+                if left > 0:
+                    s.browser_status = _(
+                        "Replay available · about %(hours)sh left",
+                        hours=max(1, int(round(left))),
+                    )
+                    continue
+            s.browser_status = _("Browser session ended")
+
+    def _can_mint_browser_viewer(self):
+        """HR users (and bot managers) may mint a Watch/Replay URL."""
+        user = self.env.user
+        if user.has_group("oteny_bot.group_oteny_bot_manager"):
+            return True
+        return user.has_group("hr.group_hr_user")
+
+    def _latest_browser_session_id(self):
+        self.ensure_one()
+        ids = self.browser_session_ids or []
+        if not isinstance(ids, list):
+            return None
+        for sid in reversed(ids):
+            if isinstance(sid, str) and sid:
+                return sid
+        return None
+
+    def action_watch_live_browser(self):
+        """Mint a read-only live view and open it in a new tab (R3 — URL not stored)."""
+        self.ensure_one()
+        if not self._can_mint_browser_viewer():
+            raise UserError(_(
+                "Only HR users can open the live browser view."
+            ))
+        sid = self._latest_browser_session_id()
+        if not sid:
+            raise UserError(_(
+                "This activity did not use a cloud browser, so there is nothing to watch."
+            ))
+        Broker = self.env["oteny.broker.client"]
+        try:
+            res = Broker._broker_post(
+                f"/v1/browser/session/{sid}/viewer",
+                purpose="live-watch",
+            )
+        except UserError as exc:
+            # Friendly wrap — never surface HTTP codes / Steel / session ids.
+            msg = str(exc)
+            if "404" in msg or "unknown session" in msg.lower():
+                raise UserError(_(
+                    "The live browser is no longer available. "
+                    "If a recording is still within the retention window, try Replay."
+                )) from exc
+            raise UserError(_(
+                "Could not open the live browser view. "
+                "Try again in a moment, or ask an administrator if this keeps happening."
+            )) from exc
+        url = (res or {}).get("session_viewer_url") or ""
+        if not url:
+            raise UserError(_(
+                "The live browser is no longer available."
+            ))
+        return {
+            "type": "ir.actions.act_url",
+            "url": url,
+            "target": "new",
+        }
+
+    def action_replay_browser(self):
+        """Mint a 48h forensic replay URL and open it (R3 — URL not stored)."""
+        self.ensure_one()
+        if not self._can_mint_browser_viewer():
+            raise UserError(_(
+                "Only HR users can open a browser replay."
+            ))
+        sid = self._latest_browser_session_id()
+        if not sid:
+            raise UserError(_(
+                "This activity did not use a cloud browser, so there is nothing to replay."
+            ))
+        Broker = self.env["oteny.broker.client"]
+        try:
+            res = Broker._broker_post(
+                f"/v1/browser/session/{sid}/replay",
+                purpose="replay-view",
+            )
+        except UserError as exc:
+            msg = str(exc)
+            if "410" in msg or "expired" in msg.lower():
+                raise UserError(_(
+                    "The browser recording is no longer available "
+                    "(the access window has closed)."
+                )) from exc
+            if "404" in msg or "unknown session" in msg.lower():
+                raise UserError(_(
+                    "No browser recording is available for this activity."
+                )) from exc
+            if "501" in msg or "not implemented" in msg.lower() or "unavailable" in msg.lower():
+                raise UserError(_(
+                    "Browser replay is not available yet on this environment."
+                )) from exc
+            raise UserError(_(
+                "Could not open the browser replay. "
+                "Try again in a moment, or ask an administrator if this keeps happening."
+            )) from exc
+        url = (res or {}).get("session_viewer_url") or (res or {}).get("replay_url") or ""
+        if not url:
+            raise UserError(_(
+                "No browser recording is available for this activity."
+            ))
+        return {
+            "type": "ir.actions.act_url",
+            "url": url,
+            "target": "new",
+        }
 
 
 class OtenyBotTurn(models.Model):

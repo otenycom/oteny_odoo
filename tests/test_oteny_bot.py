@@ -7,6 +7,7 @@ from odoo.addons.oteny_bot.models.oteny_bot import (
     VERBOSE_SENTINEL,
     WORK_HEADER_FMT,
 )
+from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
 
@@ -196,3 +197,70 @@ class TestOtenyBot(TransactionCase):
         self.assertFalse(res["ok"])
         self.assertIn("no session", res["reason"])
         self.assertFalse(self.env["oteny.bot"].record_run("", run={})["ok"])
+
+    # --- Bot Activity Watch / Replay (browser_session_ids + mint-on-click) --- #
+
+    def test_record_run_accepts_browser_session_ids(self):
+        session = self._open_session(token="tokBB")
+        self.env["oteny.bot"].record_run(
+            "tokBB",
+            run={"response": "filing…",
+                 "browser_session_ids": ["steel-sess-1", "steel-sess-2"]},
+        )
+        session.invalidate_recordset()
+        self.assertEqual(session.browser_session_ids, ["steel-sess-1", "steel-sess-2"])
+        self.assertTrue(session.has_browser_session)
+        self.assertEqual(session.browser_status, "Live now")  # still dispatched
+
+    def test_browser_status_replay_window_after_close(self):
+        session = self._open_session(token="tokRP")
+        session.write({
+            "browser_session_ids": ["steel-sess-9"],
+            "outcome": "ok",
+            "duration_s": 30.0,
+        })
+        session.invalidate_recordset()
+        self.assertTrue(session.has_browser_session)
+        self.assertIn("Replay available", session.browser_status)
+
+    def test_watch_live_opens_act_url_and_never_stores_it(self):
+        from unittest.mock import patch
+        session = self._open_session(token="tokW")
+        session.browser_session_ids = ["steel-sess-w"]
+        fake = {"session_id": "steel-sess-w",
+                "session_viewer_url": "https://viewer.example/live?interactive=false"}
+        with patch.object(
+            type(self.env["oteny.broker.client"]),
+            "_broker_post",
+            return_value=fake,
+        ) as mock_post:
+            action = session.action_watch_live_browser()
+        mock_post.assert_called_once()
+        self.assertEqual(action["type"], "ir.actions.act_url")
+        self.assertEqual(action["target"], "new")
+        self.assertEqual(action["url"], fake["session_viewer_url"])
+        # R3: the minted URL must not land on the session record.
+        session.invalidate_recordset()
+        self.assertEqual(session.browser_session_ids, ["steel-sess-w"])
+        dumped = repr(session.read()[0])
+        self.assertNotIn("viewer.example", dumped)
+
+    def test_watch_live_friendly_404(self):
+        from unittest.mock import patch
+        session = self._open_session(token="tok404")
+        session.browser_session_ids = ["gone"]
+        with patch.object(
+            type(self.env["oteny.broker.client"]),
+            "_broker_post",
+            side_effect=UserError("refused (404): unknown session"),
+        ):
+            with self.assertRaises(UserError) as err:
+                session.action_watch_live_browser()
+        self.assertIn("no longer available", str(err.exception).lower())
+        self.assertNotIn("Steel", str(err.exception))
+
+    def test_watch_without_browser_ids_is_friendly(self):
+        session = self._open_session(token="tokNone")
+        with self.assertRaises(UserError) as err:
+            session.action_watch_live_browser()
+        self.assertIn("did not use a cloud browser", str(err.exception))

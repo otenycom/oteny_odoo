@@ -59,6 +59,7 @@
                        decoration-success="outcome == 'ok'"
                        decoration-warning="outcome == 'halted' or outcome == 'escalated'"
                        decoration-danger="outcome == 'error' or outcome == 'timeout'"/>
+                <field name="browser_status" optional="show"/>
                 <field name="outcome_detail" optional="show"/>
                 <field name="turn_count"/>
                 <field name="tool_call_count"/>
@@ -72,6 +73,17 @@
         <field name="model">oteny.bot.session</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_watch_live_browser" type="object"
+                            string="Watch live browser"
+                            class="btn-primary"
+                            invisible="not has_browser_session or outcome != 'dispatched'"
+                            groups="base.group_user"/>
+                    <button name="action_replay_browser" type="object"
+                            string="Replay browser session"
+                            invisible="not has_browser_session or outcome == 'dispatched'"
+                            groups="base.group_user"/>
+                </header>
                 <sheet>
                     <group>
                         <group>
@@ -80,6 +92,9 @@
                             <field name="kind"/>
                             <field name="outcome"/>
                             <field name="outcome_detail"/>
+                            <field name="browser_status"/>
+                            <field name="has_browser_session" invisible="1"/>
+                            <field name="browser_session_ids" invisible="1"/>
                         </group>
                         <group>
                             <field name="started_at"/>

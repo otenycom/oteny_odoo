@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.4",  # 19.0.1.3: the login-dance latch — login_dance_until / login_dance_user_id + the per-bot dance/run mutex (login_dance_hold / login_dance_blocks_run / login_dance_start / login_dance_stop). A bot's isolated runs and a human's attended sign-in share one cookie profile, so they must take turns; one Postgres advisory key per bot orders them (EXCLUSIVE + blocking on the dance side, try-SHARED + defer-never-wait on the run side), and the latch's 15-min TTL means an abandoned dance unlatches the bot on wall clock alone — no cron, no operator. Additive columns; no migration.
+    "version": "19.0.1.5",  # 19.0.1.5: Bot Activity Watch/Replay — browser_session_ids Json + browser_status chip + Watch live / Replay header buttons (mint-on-click via oteny.broker.client; R3: never store viewer URLs). Additive columns; no migration.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
