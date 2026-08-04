@@ -39,6 +39,24 @@
                         <field name="uplink_ref"/>
                         <field name="active"/>
                     </group>
+                    <notebook>
+                        <page string="Role Channels" name="role_channels">
+                            <div class="alert alert-info" role="alert">
+                                Bind one of this bot's declared roles to a room and the bot
+                                answers there with that role's own persona and preloaded
+                                skills, and its workflow dispatches land there. Rooms you
+                                simply add the bot to still work — it answers with its general
+                                desk persona. Role names come from the bot's Talent; a typo
+                                silently leaves the room general.
+                            </div>
+                            <field name="channel_ids">
+                                <list editable="bottom">
+                                    <field name="role"/>
+                                    <field name="channel_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

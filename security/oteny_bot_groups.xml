@@ -7,6 +7,22 @@
         <field name="comment">Review Oteny business-bot activity — every request/response exchange a bot had with this Odoo.</field>
     </record>
 
+    <!-- Who may WAKE a bot in a new room. An Oteny bot answers in any Discuss channel it
+         has been added to (the casual lane) — but only when the channel's CREATOR holds
+         this group and every member is an internal user. That pair of gates is what makes
+         "add the bot and it answers" safe: an ordinary user cannot spin up a room, drop the
+         bot in, and get an agent that reads this Odoo through the bot's grants. Assign it to
+         the back-office people who actually work with the bot; a Bot Manager has it already.
+         Revoking it does not silence a bot in rooms it already serves — unbind or remove it. -->
+    <record id="group_oteny_bot_operator" model="res.groups">
+        <field name="name">Oteny Bot Operator</field>
+        <field name="comment">Add an Oteny business bot to a Discuss channel and have it answer there (channels this user creates are auto-authorized, provided every member is an internal user).</field>
+    </record>
+
+    <record id="group_oteny_bot_manager" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('oteny_bot.group_oteny_bot_operator'))]"/>
+    </record>
+
     <record id="base.group_system" model="res.groups">
         <field name="implied_ids" eval="[(4, ref('oteny_bot.group_oteny_bot_manager'))]"/>
     </record>

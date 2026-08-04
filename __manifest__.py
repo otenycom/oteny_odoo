@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.12",  # 19.0.1.12: rehome stale same-user bot on ensure/bind (no mute xmlid fork).
+    "version": "19.0.1.13",  # 19.0.1.13: D248 — role channels + channels_for_bot admission verdict.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",

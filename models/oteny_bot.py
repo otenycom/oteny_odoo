@@ -70,8 +70,15 @@ class OtenyBot(models.Model):
         "res.users", string="Bot User",
         help="The Odoo login the bot authenticates as over /json/2/ (its scoped seam user).")
     discuss_channel_id = fields.Many2one(
-        "discuss.channel", string="Channel",
-        help="The Discuss channel the bot converses in with its owner/operators.")
+        "discuss.channel", string="Home Channel",
+        help="The Discuss channel the bot converses in with its owner/operators, and the one "
+        "it posts proactive news into. Always served; extra rooms come from channel_ids "
+        "(a declared role) or from an operator simply adding the bot to a channel.")
+    channel_ids = fields.One2many(
+        "oteny.bot.channel", "bot_id", string="Role Channels",
+        help="Which room plays which of the bot's declared ROLES. A role is named by the "
+        "Talent the bot runs (its routing.channels); binding it here is what gives that room "
+        "the role's own persona and preloaded skills.")
     uplink_ref = fields.Char(
         "Uplink Ref", index=True, copy=False,
         help="The Oteny-side tenant reference (e.g. hh00140) the bot writes its activity under. "
@@ -450,7 +457,126 @@ class OtenyBot(models.Model):
         bot.discuss_channel_id = channel
         return {"ok": True, "bot_id": bot.id, "channel_id": channel.id}
 
-    def dispatch_isolated_turn(self, prompt, work=None, verbose=False):
+    # --- channel admission: which rooms this bot may serve (the D248 two lanes) ---------- #
+
+    @api.model
+    def _bot_for_seam_user(self):
+        """The bot asking — resolved from the AUTHENTICATED login, never from an argument.
+
+        The bot reaches this Odoo as its own scoped seam user (``bot_user_id``), so the
+        caller's identity IS the answer. That is the whole access control on the admission
+        read: a bot can only ever ask about itself, and a compromised uplink key cannot
+        enumerate another bot's rooms by passing a different id."""
+        return self.sudo().search([("bot_user_id", "=", self.env.uid)], limit=1)
+
+    def _autoauth_refusal(self, channel):
+        """Why ``channel`` may NOT be auto-served, or '' when it passes every gate.
+
+        "Add the bot and it answers" is only safe because three independent gates hold, and
+        all are checked HERE (server-side) where group membership and channel membership
+        actually live — the bot's own machine is never asked to police its own admission:
+
+        1. **Somebody actually added it.** A channel carrying ``group_ids`` auto-subscribes
+           every member of those groups — Odoo's own mechanism, and how the default
+           ``general`` channel works. The bot's seam user is an internal user, so it is
+           swept into such rooms the moment the login is created. Nobody chose that, so it
+           is not consent; an operator who genuinely wants the bot company-wide adds it to
+           a normal channel or binds a role.
+        2. **Who put it there.** The channel's creator must hold the Oteny Bot Operator
+           group. An ordinary internal user cannot conjure a room, drop the bot in, and get
+           an answering agent that reads this Odoo through the bot's grants.
+        3. **Who can read the answers.** Every member must be an internal user — no portal
+           user, no guest. Barney's replies quote employee and client data; a room with an
+           outside reader is refused outright rather than quietly served.
+
+        A DM ('chat') passes the same gates — a private room with an operator is a
+        legitimate casual lane. Live-chat/WhatsApp channel types never are."""
+        self.ensure_one()
+        if channel.channel_type not in ("channel", "group", "chat"):
+            return f"channel type {channel.channel_type!r} is not a staff room"
+        if channel.group_ids:
+            return "auto-subscription channel — nobody added the bot to it"
+        creator = channel.create_uid
+        if not creator or not creator.has_group("oteny_bot.group_oteny_bot_operator"):
+            return (f"created by {creator.name or '?'}, who is not an Oteny Bot Operator")
+        for member in channel.channel_member_ids:
+            if member.guest_id:
+                return "has a guest member"
+            partner = member.partner_id
+            if partner == self.bot_user_id.partner_id:
+                continue
+            users = partner.user_ids
+            if not users or all(u.share for u in users):
+                return f"has a non-internal member ({partner.name or '?'})"
+        return ""
+
+    @api.model
+    def channels_for_bot(self):
+        """Which Discuss channels the calling bot may serve → ``{ok, channels, skipped}``.
+
+        The client Odoo owns this verdict (D248) — the bot's adapter only consumes it. Two
+        lanes come back, distinguished by ``declared``:
+
+        * **declared** — the home channel plus every ``channel_ids`` role binding. A
+          deliberate act by whoever configured the bot, so it is served even when the
+          operator has switched autoauth off on the Oteny side.
+        * **casual** (``declared: False``) — a room the bot was simply ADDED to, admitted
+          only when it passes ``_autoauth_refusal``'s two gates. Refusals come back in
+          ``skipped`` with their reason so a room that quietly fails the gate shows up in
+          the bot's log instead of just being absent.
+
+        ``role`` names the persona/skills the bot should run in that room; blank means the
+        casual desk persona. Channels the bot is not a member of are never listed — it
+        could not read them anyway."""
+        bot = self._bot_for_seam_user()
+        if not bot:
+            return {"ok": False, "reason": "no oteny.bot is bound to this login"}
+        channels, skipped, seen = [], [], set()
+
+        def _add(channel, role, declared):
+            seen.add(channel.id)
+            channels.append({"id": channel.id, "name": channel.name or "",
+                             "role": role, "declared": declared})
+
+        if bot.discuss_channel_id:
+            _add(bot.discuss_channel_id, "", True)
+        for binding in bot.channel_ids:
+            if binding.channel_id and binding.channel_id.id not in seen:
+                _add(binding.channel_id, binding.role, True)
+            elif binding.channel_id:
+                # The home channel IS the role channel — name its role rather than
+                # dropping the binding (the common single-room deployment).
+                for row in channels:
+                    if row["id"] == binding.channel_id.id and not row["role"]:
+                        row["role"] = binding.role
+        member_of = self.env["discuss.channel"].sudo().search([
+            ("channel_member_ids.partner_id", "=", bot.bot_user_id.partner_id.id),
+        ]) if bot.bot_user_id.partner_id else self.env["discuss.channel"]
+        for channel in member_of:
+            if channel.id in seen:
+                continue
+            refusal = bot._autoauth_refusal(channel)
+            if refusal:
+                skipped.append({"id": channel.id, "name": channel.name or "",
+                                "reason": refusal})
+            else:
+                _add(channel, "", False)
+        return {"ok": True, "channels": channels, "skipped": skipped}
+
+    def _channel_for_role(self, role):
+        """The room bound to ``role``, falling back to the home channel.
+
+        A client that never bound the role still gets its filings in the one room it has —
+        the home channel doubles as the dedicated lane (matching the adapter's
+        ``home_role``), so a role-targeted dispatch can never land nowhere."""
+        self.ensure_one()
+        if role:
+            binding = self.channel_ids.filtered(lambda b: b.role == role)[:1]
+            if binding.channel_id:
+                return binding.channel_id
+        return self.discuss_channel_id
+
+    def dispatch_isolated_turn(self, prompt, work=None, verbose=False, role=None):
         """Dispatch ONE isolated agent turn to this bot over Discuss (the trigger that replaces the
         Oteny-side harness poll). Posts ``<sentinel> [work header] {prompt} [token trailer]`` into
         the bot's channel; the bot's gateway poll picks it up and runs it as a FRESH, isolated
@@ -459,9 +585,15 @@ class OtenyBot(models.Model):
         ``{res_model, res_id, token}`` from a winning ``bot_claim``: it renders the machine
         header the adapter consumes (bot_run_claim — at most one run per dispatch) plus the token
         trailer the run needs for its advances. Requires ``discuss_channel_id``. Returns
-        ``{ok, message_id}`` (``{ok: False}`` if unbound)."""
+        ``{ok, message_id, channel_id}`` (``{ok: False}`` if unbound).
+
+        ``role`` (D248) targets the room the client bound that role to, so a workflow's
+        dispatches land in the dedicated lane — where the run starts with that role's persona
+        and preloaded skills — instead of in whatever casual room shares the bot. Unbound
+        role → the home channel, which is the dedicated lane by default."""
         self.ensure_one()
-        if not self.discuss_channel_id:
+        channel = self._channel_for_role(role)
+        if not channel:
             return {"ok": False, "reason": "bot has no discuss_channel_id"}
         head = ISOLATED_TURN_SENTINEL
         if verbose:
@@ -473,9 +605,9 @@ class OtenyBot(models.Model):
                 res_model=work["res_model"], res_id=work["res_id"], token=work["token"])
             tail = WORK_TOKEN_TRAILER.format(token=work["token"])
         body = f"{head} {(prompt or '').strip()}{tail}".strip()
-        msg = self.discuss_channel_id.sudo().message_post(
+        msg = channel.sudo().message_post(
             body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
-        return {"ok": True, "message_id": msg.id}
+        return {"ok": True, "message_id": msg.id, "channel_id": channel.id}
 
     def action_open_sessions(self):
         self.ensure_one()
@@ -487,6 +619,37 @@ class OtenyBot(models.Model):
             "domain": [("bot_id", "=", self.id)],
             "context": {"search_default_bot_id": self.id},
         }
+
+
+class OtenyBotChannel(models.Model):
+    """One of the bot's declared ROLES, bound to one of this Odoo's Discuss channels (D248).
+
+    A bot runs a Talent that declares roles (``routing.channels`` — e.g. ``mfnl_filing``),
+    each with its own persona and preloaded skills. Which ROOM plays a role is the client's
+    call, not Oteny's: the control plane never learns this Odoo's channel ids, so the pairing
+    is made here and read back over the admission seam. Binding a role also routes that
+    workflow's dispatches (``dispatch_isolated_turn(role=…)``) into the room.
+
+    A room without a binding is not shut out — it is simply CASUAL: the bot answers there
+    with the desk persona. Roles buy focus, not authority; the bot's grants are its seam
+    user's, identical in every room."""
+
+    _name = "oteny.bot.channel"
+    _description = "Oteny Bot Role Channel"
+    _order = "bot_id, role"
+    _role_uniq = models.Constraint(
+        "unique(bot_id, role)",
+        "A bot can bind each role to only one channel.",
+    )
+
+    bot_id = fields.Many2one("oteny.bot", required=True, ondelete="cascade", index=True)
+    role = fields.Char(
+        required=True,
+        help="The role name as the bot's Talent declares it (routing.channels[].role), "
+        "e.g. mfnl_filing. Must match exactly — a typo silently leaves the room casual.")
+    channel_id = fields.Many2one(
+        "discuss.channel", required=True, ondelete="cascade", string="Channel",
+        help="The room that plays this role. The bot must be a member of it.")
 
 
 class OtenyBotSession(models.Model):

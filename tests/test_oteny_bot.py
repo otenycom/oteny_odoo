@@ -2,6 +2,7 @@
 
 from psycopg2 import IntegrityError
 
+from odoo import Command
 from odoo.addons.oteny_bot.models.oteny_bot import (
     ISOLATED_TURN_SENTINEL,
     VERBOSE_SENTINEL,
@@ -103,7 +104,7 @@ class TestOtenyBot(TransactionCase):
         seed = self.env["oteny.bot"].create({
             "name": "Barney", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
         })
-        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         fork = self.env["oteny.bot"].create({
             "name": "hh00397", "uplink_ref": "hh00397",
             "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
@@ -119,7 +120,7 @@ class TestOtenyBot(TransactionCase):
     def test_bind_discuss_channel_rehomes_seeded_bot_onto_new_ref(self):
         # Second provision rehomes the seeded xmlid row onto the new uplink_ref and
         # keeps the HR channel there (never a mute seed + channel-holding fork).
-        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         seeded = self.env["oteny.bot"].create({
             "name": "Barney", "uplink_ref": "hh00394",
             "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
@@ -143,7 +144,7 @@ class TestOtenyBot(TransactionCase):
     # --- the Discuss-flag dispatch (the trigger that replaces the harness poll) --- #
 
     def test_dispatch_isolated_turn_posts_a_flagged_message(self):
-        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
             {"name": "Barney", "uplink_ref": "hh5", "discuss_channel_id": channel.id})
         res = bot.dispatch_isolated_turn("File the MFNL for placement 42")
@@ -161,7 +162,7 @@ class TestOtenyBot(TransactionCase):
         # The WP1 wire: a token-fenced dispatch carries the machine-readable work header
         # (sentinel-adjacent, parsed by the hh-discuss adapter's WORK_HEADER_RE) plus the
         # token instructions the run needs for its bot_claim advances.
-        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
             {"name": "Barney", "uplink_ref": "hh7", "discuss_channel_id": channel.id})
         res = bot.dispatch_isolated_turn(
@@ -187,7 +188,7 @@ class TestOtenyBot(TransactionCase):
 
     def test_dispatch_verbose_flag_rides_the_body(self):
         # opt-in live-narration flag — off by default, present only when asked
-        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
             {"name": "Barney", "uplink_ref": "hh9", "discuss_channel_id": channel.id})
         plain = self.env["mail.message"].browse(
@@ -196,6 +197,177 @@ class TestOtenyBot(TransactionCase):
         loud = self.env["mail.message"].browse(
             bot.dispatch_isolated_turn("run it", verbose=True)["message_id"]).body
         self.assertIn(VERBOSE_SENTINEL, loud)
+
+    # --- D248: role channels + the channel admission verdict ------------------------- #
+
+    def _bot_with_seam_user(self, login="seam.bot", ref="hhD248", operator=False):
+        """A bot with its own seam login (what channels_for_bot identifies it by)."""
+        groups = [self.env.ref("base.group_user").id]
+        if operator:
+            groups.append(self.env.ref("oteny_bot.group_oteny_bot_operator").id)
+        user = self.env["res.users"].create({
+            "name": "Seam Bot", "login": login, "group_ids": [Command.set(groups)]})
+        bot = self.env["oteny.bot"].create(
+            {"name": "Barney", "uplink_ref": ref, "bot_user_id": user.id})
+        return bot, user
+
+    def _room(self, name, creator, members):
+        """A Discuss channel created BY ``creator`` with exactly ``members`` as partners."""
+        return self.env["discuss.channel"].with_user(creator).create({
+            "name": name,
+            "channel_member_ids": [
+                Command.create({"partner_id": p.id}) for p in members],
+        })
+
+    def test_dispatch_role_targets_the_bound_room(self):
+        # The dedicated lane: a workflow's dispatches must land in the room bound to its
+        # role, so the run starts with that role's persona + preloaded skills — not in
+        # whatever casual room happens to share the bot.
+        home = self.env["discuss.channel"].create({"name": "Crew Ops"})
+        lane = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        bot = self.env["oteny.bot"].create({
+            "name": "Barney", "uplink_ref": "hhROLE", "discuss_channel_id": home.id,
+            "channel_ids": [Command.create({"role": "mfnl_filing",
+                                            "channel_id": lane.id})]})
+        res = bot.dispatch_isolated_turn("File it", role="mfnl_filing")
+        self.assertEqual(res["channel_id"], lane.id)
+        self.assertEqual(
+            self.env["mail.message"].browse(res["message_id"]).res_id, lane.id)
+        # no role, or a role nobody bound → the home channel, never nowhere
+        self.assertEqual(bot.dispatch_isolated_turn("hi")["channel_id"], home.id)
+        self.assertEqual(
+            bot.dispatch_isolated_turn("hi", role="unbound")["channel_id"], home.id)
+
+    def test_a_role_can_only_be_bound_once_per_bot(self):
+        a = self.env["discuss.channel"].create({"name": "A"})
+        b = self.env["discuss.channel"].create({"name": "B"})
+        bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hhUNIQ"})
+        self.env["oteny.bot.channel"].create(
+            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": a.id})
+        with self.assertRaises(IntegrityError), self.cr.savepoint():
+            self.env["oteny.bot.channel"].create(
+                {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": b.id})
+
+    def test_channels_for_bot_returns_home_and_declared_roles(self):
+        # The declared lane is served on the strength of the CONFIGURATION, so it holds
+        # even with autoauth off on the Oteny side (the adapter keeps `declared` rooms).
+        bot, user = self._bot_with_seam_user(login="seam.declared", ref="hhDECL")
+        home = self.env["discuss.channel"].create({"name": "Crew Ops"})
+        lane = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        bot.discuss_channel_id = home
+        self.env["oteny.bot.channel"].create(
+            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": lane.id})
+        out = self.env["oteny.bot"].with_user(user).channels_for_bot()
+        self.assertTrue(out["ok"])
+        by_id = {c["id"]: c for c in out["channels"]}
+        self.assertEqual(by_id[home.id], {"id": home.id, "name": "Crew Ops",
+                                          "role": "", "declared": True})
+        self.assertEqual(by_id[lane.id]["role"], "mfnl_filing")
+        self.assertTrue(by_id[lane.id]["declared"])
+
+    def test_channels_for_bot_names_the_home_channels_role_when_they_are_one_room(self):
+        # The common single-room deployment: the client binds the role to the SAME room
+        # that is already the home channel. It must come back once, WITH the role — a
+        # duplicate row (or a role-less home entry) would run the lane personaless.
+        bot, user = self._bot_with_seam_user(login="seam.oneroom", ref="hhONE")
+        room = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        bot.discuss_channel_id = room
+        self.env["oteny.bot.channel"].create(
+            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": room.id})
+        rows = self.env["oteny.bot"].with_user(user).channels_for_bot()["channels"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["role"], "mfnl_filing")
+
+    def test_channels_for_bot_autoauths_an_operators_all_internal_room(self):
+        # The casual lane: an operator adds the bot to a staff room and it answers there.
+        bot, seam = self._bot_with_seam_user(login="seam.casual", ref="hhCASUAL")
+        operator = self.env["res.users"].create({
+            "name": "Kirsten", "login": "kirsten.d248", "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("oteny_bot.group_oteny_bot_operator").id])]})
+        room = self._room("Crew Ops", operator,
+                          [operator.partner_id, seam.partner_id])
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        casual = [c for c in out["channels"] if c["id"] == room.id]
+        self.assertEqual(casual, [{"id": room.id, "name": "Crew Ops",
+                                   "role": "", "declared": False}])
+        self.assertNotIn(room.id, [s["id"] for s in out["skipped"]])
+
+    def test_channels_for_bot_refuses_the_auto_subscription_general_channel(self):
+        # Gate 0 — SOMEBODY ACTUALLY ADDED IT. Odoo's `general` channel carries
+        # group_ids = Employees, which auto-subscribes every internal user the moment it is
+        # created — including the bot's seam login. Without this gate every bot silently
+        # wakes up company-wide on day one, in a room nobody chose to put it in (and it
+        # passes the other two gates: created by the system admin, all-internal members).
+        bot, seam = self._bot_with_seam_user(login="seam.general", ref="hhGEN")
+        general = self.env.ref("mail.channel_all_employees")
+        self.assertTrue(general.group_ids, "premise: general auto-subscribes a group")
+        self.assertIn(seam.partner_id, general.channel_partner_ids,
+                      "premise: a new internal user is auto-subscribed to general")
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        self.assertEqual([c["id"] for c in out["channels"]], [])
+        self.assertIn("auto-subscription", out["skipped"][0]["reason"])
+
+    def test_channels_for_bot_refuses_a_room_a_non_operator_made(self):
+        # Gate 1 — WHO put it there. Otherwise any internal user could conjure a room,
+        # drop the bot in, and get an agent reading this Odoo through the bot's grants.
+        bot, seam = self._bot_with_seam_user(login="seam.gate1", ref="hhGATE1")
+        plain = self.env["res.users"].create({
+            "name": "Nosy", "login": "nosy.d248",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
+        room = self._room("Shadow Room", plain, [plain.partner_id, seam.partner_id])
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        self.assertEqual([c["id"] for c in out["channels"]], [])
+        refusal = {s["id"]: s["reason"] for s in out["skipped"]}
+        self.assertIn("Operator", refusal[room.id])
+
+    def test_channels_for_bot_refuses_a_room_with_an_outside_reader(self):
+        # Gate 2 — WHO can read the answers. The bot quotes employee and client data, so a
+        # room holding a portal user is refused outright rather than quietly served.
+        bot, seam = self._bot_with_seam_user(login="seam.gate2", ref="hhGATE2")
+        operator = self.env["res.users"].create({
+            "name": "Kirsten", "login": "kirsten.gate2", "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("oteny_bot.group_oteny_bot_operator").id])]})
+        portal = self.env["res.users"].create({
+            "name": "Client", "login": "client.gate2",
+            "group_ids": [Command.set([self.env.ref("base.group_portal").id])]})
+        room = self._room("Client Room", operator,
+                          [operator.partner_id, portal.partner_id, seam.partner_id])
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        self.assertEqual([c["id"] for c in out["channels"]], [])
+        refusal = {s["id"]: s["reason"] for s in out["skipped"]}
+        self.assertIn("non-internal", refusal[room.id])
+
+    def test_channels_for_bot_declared_room_skips_the_autoauth_gates(self):
+        # A binding is a deliberate act by whoever configured the bot, so it outranks the
+        # creator gate — otherwise a room seeded by module data (create_uid = the installing
+        # admin at some past upgrade) could fall out of the set on a later restore.
+        bot, seam = self._bot_with_seam_user(login="seam.declgate", ref="hhDG")
+        plain = self.env["res.users"].create({
+            "name": "Plain", "login": "plain.declgate",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
+        room = self._room("Filing", plain, [plain.partner_id, seam.partner_id])
+        self.env["oteny.bot.channel"].create(
+            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": room.id})
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        self.assertEqual([c["id"] for c in out["channels"]], [room.id])
+        self.assertNotIn(room.id, [s["id"] for s in out["skipped"]])
+
+    def test_channels_for_bot_never_answers_for_another_bot(self):
+        # The verdict is keyed off the AUTHENTICATED login, never an argument — a
+        # compromised uplink key cannot enumerate another bot's rooms, and a login with no
+        # bot behind it gets nothing rather than someone else's set.
+        _bot_a, seam_a = self._bot_with_seam_user(login="seam.a", ref="hhA")
+        bot_b, _seam_b = self._bot_with_seam_user(login="seam.b", ref="hhB")
+        bot_b.discuss_channel_id = self.env["discuss.channel"].create({"name": "B room"})
+        self.assertEqual(
+            self.env["oteny.bot"].with_user(seam_a).channels_for_bot()["channels"], [])
+        stranger = self.env["res.users"].create({
+            "name": "Stranger", "login": "stranger.d248",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
+        out = self.env["oteny.bot"].with_user(stranger).channels_for_bot()
+        self.assertFalse(out["ok"])
 
     # --- record_run: the end-of-run write-back that ends the "silence" (D174 hybrid) --- #
 
