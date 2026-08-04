@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.9",  # 19.0.1.8: bind_discuss_channel moves HR channel onto current uplink_ref (no orphan fork).
+    "version": "19.0.1.10",  # 19.0.1.10: Replay maps recording_pending / session_busy to HR-friendly errors.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",

@@ -286,3 +286,38 @@ class TestOtenyBot(TransactionCase):
         with self.assertRaises(UserError) as err:
             session.action_watch_live_browser()
         self.assertIn("did not use a cloud browser", str(err.exception))
+
+    def test_replay_friendly_recording_pending(self):
+        from unittest.mock import patch
+        session = self._open_session(token="tokRP2")
+        session.write({
+            "browser_session_ids": ["steel-sess-pending"],
+            "outcome": "ok",
+            "duration_s": 30.0,
+        })
+        with patch.object(
+            type(self.env["oteny.broker.client"]),
+            "_broker_post",
+            side_effect=UserError("refused (409): recording_pending"),
+        ):
+            with self.assertRaises(UserError) as err:
+                session.action_replay_browser()
+        self.assertIn("finalized", str(err.exception).lower())
+        self.assertNotIn("Steel", str(err.exception))
+
+    def test_replay_friendly_session_busy(self):
+        from unittest.mock import patch
+        session = self._open_session(token="tokBusy")
+        session.write({
+            "browser_session_ids": ["steel-sess-busy"],
+            "outcome": "ok",
+            "duration_s": 30.0,
+        })
+        with patch.object(
+            type(self.env["oteny.broker.client"]),
+            "_broker_post",
+            side_effect=UserError("refused (409): session_busy"),
+        ):
+            with self.assertRaises(UserError) as err:
+                session.action_replay_browser()
+        self.assertIn("login", str(err.exception).lower())

@@ -574,6 +574,17 @@ class OtenyBotSession(models.Model):
                     "The browser recording is no longer available "
                     "(the access window has closed)."
                 )) from exc
+            # Distinct 409 bodies — check the specific error string before a bare "409".
+            if "recording_pending" in msg.lower():
+                raise UserError(_(
+                    "The browser recording is still being finalized. "
+                    "Try Replay again in a minute."
+                )) from exc
+            if "session_busy" in msg.lower():
+                raise UserError(_(
+                    "Someone is still using this browser session for a login. "
+                    "Finish or cancel that login, then try Replay again."
+                )) from exc
             if "404" in msg or "unknown session" in msg.lower():
                 raise UserError(_(
                     "No browser recording is available for this activity."
