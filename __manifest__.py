@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.6",  # 19.0.1.5: Bot Activity Watch/Replay — browser_session_ids Json + browser_status chip + Watch live / Replay header buttons (mint-on-click via oteny.broker.client; R3: never store viewer URLs). Additive columns; no migration.
+    "version": "19.0.1.7",  # 19.0.1.7: data/neutralize.sql clears broker ICP params + unbinds oteny.bot.uplink_ref on restore (WP4).
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
