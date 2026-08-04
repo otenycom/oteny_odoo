@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.8",  # 19.0.1.8: bind_discuss_channel moves HR channel onto current uplink_ref (no orphan fork).
+    "version": "19.0.1.9",  # 19.0.1.8: bind_discuss_channel moves HR channel onto current uplink_ref (no orphan fork).
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
