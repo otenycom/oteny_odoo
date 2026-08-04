@@ -284,6 +284,76 @@ class OtenyBot(models.Model):
         return {"ok": True, "session_id": session.id}
 
     @api.model
+    def attach_browser_sessions(self, work_token, session_ids=None):
+        """Mid-run attach of opaque broker browser session ids (Watch live).
+
+        The Discuss adapter calls this as soon as the first ``browser_*`` tool opens
+        a cloud-browser session — so Bot Activity shows *Live now* + Watch while the
+        run is still ``dispatched``. Ids only (never URLs). Merges with any ids already
+        on the token-matched session; never changes ``outcome`` (a closed run stays
+        closed; a dispatched run stays dispatched). Possessing ``work_token`` proves
+        the claim epoch. Returns ``{ok, session_id, browser_session_ids}``."""
+        if not work_token:
+            return {"ok": False, "reason": "attach_browser_sessions needs a work_token"}
+        Session = self.env["oteny.bot.session"].sudo()
+        session = Session.search([("work_token", "=", work_token)], order="id desc", limit=1)
+        if not session:
+            return {"ok": False, "reason": f"no session for work_token {work_token!r}"}
+        incoming = [s for s in (session_ids or []) if isinstance(s, str) and s]
+        existing = session.browser_session_ids or []
+        if not isinstance(existing, list):
+            existing = []
+        merged = list(existing)
+        for sid in incoming:
+            if sid not in merged:
+                merged.append(sid)
+        if merged != existing:
+            session.browser_session_ids = merged
+        return {
+            "ok": True,
+            "session_id": session.id,
+            "browser_session_ids": merged,
+        }
+
+    @api.model
+    def _canonical_same_user_bot(self, *, exclude_id=None):
+        """Oldest active ``oteny.bot`` for the calling bot user (seeded xmlid when present).
+
+        Business apps seed one channel-bound bot per seam user; Hand-to-Barney / domain
+        dispatch resolve that seed by xmlid. Fresh box provision must rehome *that* row,
+        never leave it on a destroyed uplink_ref while a fork holds the channel."""
+        uid = self.env.uid
+        if not uid:
+            return self.sudo().browse()
+        domain = [("bot_user_id", "=", uid), ("active", "=", True)]
+        if exclude_id:
+            domain.append(("id", "!=", exclude_id))
+        return self.sudo().search(domain, order="id asc", limit=1)
+
+    @api.model
+    def _collapse_onto_canonical(self, bot, uplink_ref):
+        """If ``bot`` is a younger same-user fork, move ``uplink_ref`` (+ channel) onto the seed.
+
+        Returns the canonical recordset (empty when no collapse). Deactivates the fork so
+        ``unique(uplink_ref)`` and xmlid dispatch stay on one row."""
+        if not bot:
+            return self.sudo().browse()
+        canonical = self._canonical_same_user_bot(exclude_id=bot.id)
+        if not canonical or canonical.id > bot.id:
+            return self.sudo().browse()
+        # Free the unique slot, then point the seed at the live box.
+        if bot.uplink_ref == uplink_ref:
+            bot.uplink_ref = False
+        if bot.discuss_channel_id and not canonical.discuss_channel_id:
+            canonical.discuss_channel_id = bot.discuss_channel_id
+            bot.discuss_channel_id = False
+        canonical.uplink_ref = uplink_ref
+        if not canonical.bot_user_id:
+            canonical.bot_user_id = bot.bot_user_id or self.env.uid
+        bot.active = False
+        return canonical
+
+    @api.model
     def ensure_bot(self, uplink_ref, name=None):
         """Idempotently ensure an ``oteny.bot`` exists for ``uplink_ref`` (owner-visibility, generic).
 
@@ -294,19 +364,31 @@ class OtenyBot(models.Model):
         never renamed on a re-call (the owner may have relabelled it). The ``unique(uplink_ref)``
         constraint makes it race-safe: two overlapping sweeps that both miss the search collide on
         create, and the loser returns the winner's record rather than forking the log. Kwargs are
-        never named ``ids`` (the /json/2/ recordset selector). Returns ``{ok, bot_id, created}``."""
+        never named ``ids`` (the /json/2/ recordset selector). Returns ``{ok, bot_id, created}``
+        (``adopted`` / ``rehomed`` when a seeded or stale same-user row was reused)."""
         bot = self.sudo().search([("uplink_ref", "=", uplink_ref)], limit=1)
         if bot:
+            collapsed = self._collapse_onto_canonical(bot, uplink_ref)
+            if collapsed:
+                return {"ok": True, "bot_id": collapsed.id, "created": False, "rehomed": True}
             return {"ok": True, "bot_id": bot.id, "created": False}
         # Adopt a pre-seeded bot: a business app (e.g. crewradar) seeds the oteny.bot with its
         # discuss_channel_id + bot_user_id but no uplink_ref (it can't know the Oteny tenant ref).
         # The first write-back — authenticated AS that bot user — claims the seeded record by
         # setting its ref, so the channel-bound record is reused (the dispatch needs it), not forked.
         seeded = self.sudo().search(
-            [("bot_user_id", "=", self.env.uid), ("uplink_ref", "in", (False, ""))], limit=1)
+            [("bot_user_id", "=", self.env.uid), ("uplink_ref", "in", (False, ""))],
+            order="id asc", limit=1)
         if seeded:
             seeded.uplink_ref = uplink_ref
             return {"ok": True, "bot_id": seeded.id, "created": False, "adopted": True}
+        # Fresh provision / --fresh destroy: the seeded row still carries the *old* uplink_ref.
+        # Rehome it onto the new box instead of creating a mute sibling (xmlid Hand-to-Barney
+        # would keep dispatching against the seed while the channel sat on the fork).
+        stale = self._canonical_same_user_bot()
+        if stale and stale.uplink_ref and stale.uplink_ref != uplink_ref:
+            stale.uplink_ref = uplink_ref
+            return {"ok": True, "bot_id": stale.id, "created": False, "rehomed": True}
         try:
             with self.env.cr.savepoint():
                 bot = self.sudo().create({"uplink_ref": uplink_ref, "name": name or uplink_ref})
@@ -316,18 +398,22 @@ class OtenyBot(models.Model):
             # a concurrent ensure_bot won the create race (unique(uplink_ref)); return its record.
             bot = self.sudo().search([("uplink_ref", "=", uplink_ref)], limit=1)
             if bot:
+                collapsed = self._collapse_onto_canonical(bot, uplink_ref)
+                if collapsed:
+                    return {"ok": True, "bot_id": collapsed.id, "created": False, "rehomed": True}
                 return {"ok": True, "bot_id": bot.id, "created": False}
             return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
 
     def bind_discuss_channel(self, uplink_ref, channel_id=None):
-        """Ensure ``uplink_ref`` owns the Discuss channel (move off orphan siblings).
+        """Ensure ``uplink_ref`` owns the Discuss channel (rehome seed; clear orphan siblings).
 
-        A second provision for a new tenant ref used to call ``ensure_bot`` alone: that
-        creates a channel-less bot while the previous ref still held the HR channel, so
-        Hand-to-Barney kept dispatching against a mute/old box. This moves
-        ``discuss_channel_id`` onto the current ref and clears every other bot that held it.
-        ``channel_id`` optional — when omitted, take the channel from a sibling that shares
-        ``bot_user_id`` (or the caller's uid). Returns ``{ok, bot_id, channel_id}``."""
+        A second provision for a new tenant ref must not fork a channel-less bot while the
+        seeded xmlid row keeps the old uplink_ref — Hand-to-Barney resolves the seed and
+        stays mute. ``ensure_bot`` rehomes the same-user seed onto ``uplink_ref``; this
+        method then moves ``discuss_channel_id`` onto that row and clears every other bot
+        that held the channel. ``channel_id`` optional — when omitted, take the channel from
+        a sibling that shares ``bot_user_id`` (or the caller's uid). Returns
+        ``{ok, bot_id, channel_id}``."""
         ensured = self.ensure_bot(uplink_ref)
         if not ensured.get("ok"):
             return ensured
@@ -343,7 +429,9 @@ class OtenyBot(models.Model):
                 ("discuss_channel_id", "!=", False),
             ], limit=1)
             if not donor:
-                donor = self.sudo().search([
+                # Also look at inactive forks (collapse may have just deactivated one that
+                # still held the channel until we moved it — or an older clear left it here).
+                donor = self.sudo().with_context(active_test=False).search([
                     ("id", "!=", bot.id),
                     ("discuss_channel_id", "!=", False),
                     "|", ("bot_user_id", "=", False), ("bot_user_id", "=", self.env.uid),
@@ -351,7 +439,7 @@ class OtenyBot(models.Model):
             channel = donor.discuss_channel_id if donor else bot.discuss_channel_id
         if not channel:
             return {"ok": False, "reason": "no_channel", "bot_id": bot.id}
-        others = self.sudo().search([
+        others = self.sudo().with_context(active_test=False).search([
             ("discuss_channel_id", "=", channel.id),
             ("id", "!=", bot.id),
         ])
@@ -465,6 +553,8 @@ class OtenyBotSession(models.Model):
     )
     def _compute_browser_status(self):
         now = fields.Datetime.now()
+        Broker = self.env["oteny.broker.client"]
+        replay_mintable = Broker._broker_purpose_configured("replay-view")
         for s in self:
             ids = s.browser_session_ids or []
             if not isinstance(ids, list):
@@ -484,10 +574,18 @@ class OtenyBotSession(models.Model):
                 age_h = (now - closed).total_seconds() / 3600.0
                 left = s._BROWSER_REPLAY_HOURS - age_h
                 if left > 0:
-                    s.browser_status = _(
-                        "Replay available · about %(hours)sh left",
-                        hours=max(1, int(round(left))),
-                    )
+                    # Honest: do not claim "Replay available" when only a login-gate
+                    # otci_ is wired — that mint 401s. Dedicated replay-view (or
+                    # dog-food otmt_) must be present.
+                    if replay_mintable:
+                        s.browser_status = _(
+                            "Replay available · about %(hours)sh left",
+                            hours=max(1, int(round(left))),
+                        )
+                    else:
+                        s.browser_status = _(
+                            "Recording kept · replay not configured"
+                        )
                     continue
             s.browser_status = _("Browser session ended")
 
@@ -533,6 +631,16 @@ class OtenyBotSession(models.Model):
                 raise UserError(_(
                     "The live browser is no longer available. "
                     "If a recording is still within the retention window, try Replay."
+                )) from exc
+            if (
+                "401" in msg
+                or "inactive token" in msg.lower()
+                or "unknown or inactive" in msg.lower()
+                or "not configured" in msg.lower()
+            ):
+                raise UserError(_(
+                    "Live browser watch is not configured on this environment. "
+                    "Ask an administrator to wire the live-watch broker token."
                 )) from exc
             raise UserError(_(
                 "Could not open the live browser view. "
@@ -592,6 +700,16 @@ class OtenyBotSession(models.Model):
             if "501" in msg or "not implemented" in msg.lower() or "unavailable" in msg.lower():
                 raise UserError(_(
                     "Browser replay is not available yet on this environment."
+                )) from exc
+            if (
+                "401" in msg
+                or "inactive token" in msg.lower()
+                or "unknown or inactive" in msg.lower()
+                or "not configured" in msg.lower()
+            ):
+                raise UserError(_(
+                    "Browser replay is not configured on this environment. "
+                    "Ask an administrator to wire the replay-view broker token."
                 )) from exc
             raise UserError(_(
                 "Could not open the browser replay. "

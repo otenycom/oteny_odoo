@@ -34,8 +34,13 @@ class OtenyBrokerClient(models.AbstractModel):
     _description = "Oteny Cloud-Browser Broker Client"
 
     def _broker_token(self, purpose=None):
-        """Resolve the bearer for ``purpose``. Dedicated purpose params win;
-        otherwise fall back to ``oteny.broker_token`` (dog-food / single-token)."""
+        """Resolve the bearer for ``purpose``. Dedicated purpose params win.
+
+        Dog-food fall-back to ``oteny.broker_token`` is only for a metering
+        ``otmt_`` token (tailnet broker). A purpose-scoped ``otci_`` login-gate
+        token must never be reused for live-watch / replay-view — that yields
+        401 ``unknown or inactive token`` while the chip still said Replay was
+        available."""
         icp = self.env["ir.config_parameter"].sudo()
         if purpose:
             dedicated = _PURPOSE_TOKEN_PARAMS.get(purpose)
@@ -43,7 +48,18 @@ class OtenyBrokerClient(models.AbstractModel):
                 tok = (icp.get_param(dedicated) or "").strip()
                 if tok:
                     return tok
+            # login-gate's dedicated slot IS TOKEN_PARAM (already checked above).
+            if purpose == "login-gate":
+                return ""
+            fallback = (icp.get_param(TOKEN_PARAM) or "").strip()
+            if fallback.startswith("otmt_"):
+                return fallback
+            return ""
         return (icp.get_param(TOKEN_PARAM) or "").strip()
+
+    def _broker_purpose_configured(self, purpose):
+        """True when a mint for ``purpose`` has a usable bearer (honest UI gate)."""
+        return bool(self._broker_token(purpose))
 
     def _broker_post(self, path, payload=None, *, purpose=None):
         """POST to the Oteny cloud-browser broker. Fenced on base URL + token
@@ -55,9 +71,15 @@ class OtenyBrokerClient(models.AbstractModel):
         base = (icp.get_param(BASE_PARAM) or "").rstrip("/")
         token = self._broker_token(purpose)
         if not base or not token:
+            purpose_hint = {
+                "live-watch": _("oteny.broker_token_live_watch"),
+                "replay-view": _("oteny.broker_token_replay_view"),
+            }.get(purpose) or _("oteny.broker_token")
             raise UserError(_(
                 "The Oteny cloud-browser broker is not configured on this environment "
-                "(oteny.broker_base_url / oteny.broker_token)."
+                "(%(base)s / %(token)s). Ask an administrator to wire the broker seam.",
+                base=_("oteny.broker_base_url"),
+                token=purpose_hint,
             ))
         try:
             resp = requests.post(

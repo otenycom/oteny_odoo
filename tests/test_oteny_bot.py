@@ -83,20 +83,55 @@ class TestOtenyBot(TransactionCase):
         self.assertEqual(seeded.uplink_ref, "hh00140")
         self.assertEqual(seeded.name, "Barney")           # not renamed on adoption
 
-    def test_bind_discuss_channel_moves_channel_off_orphan_sibling(self):
-        # Second provision for a new ref must not leave the HR channel on the old bot
-        # (hh00394 held channel 6982 while hh00395 was channel-less → mute Hand-to-Barney).
+    def test_ensure_bot_rehomes_stale_same_user_uplink_ref(self):
+        # --fresh destroys the box but leaves the seeded row on the old uplink_ref.
+        # Rehome that row; do not fork a second bot (xmlid Hand-to-Barney stays live).
+        seeded = self.env["oteny.bot"].create({
+            "name": "Barney", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
+        })
+        res = self.env["oteny.bot"].ensure_bot("hh00397", name="ignored")
+        self.assertTrue(res["ok"] and res.get("rehomed") and not res["created"])
+        self.assertEqual(res["bot_id"], seeded.id)
+        self.assertEqual(seeded.uplink_ref, "hh00397")
+        self.assertEqual(seeded.name, "Barney")
+        self.assertEqual(
+            self.env["oteny.bot"].search_count([("bot_user_id", "=", self.env.uid)]), 1)
+
+    def test_ensure_bot_collapses_channel_less_fork_onto_seed(self):
+        # Bad prior provision already forked: seed keeps old ref; fork has the new ref.
+        # ensure_bot must collapse onto the seed and deactivate the fork.
+        seed = self.env["oteny.bot"].create({
+            "name": "Barney", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
+        })
         channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
-        old = self.env["oteny.bot"].create({
+        fork = self.env["oteny.bot"].create({
+            "name": "hh00397", "uplink_ref": "hh00397",
+            "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
+        })
+        res = self.env["oteny.bot"].ensure_bot("hh00397")
+        self.assertTrue(res["ok"] and res.get("rehomed"))
+        self.assertEqual(res["bot_id"], seed.id)
+        self.assertEqual(seed.uplink_ref, "hh00397")
+        self.assertEqual(seed.discuss_channel_id, channel)
+        self.assertFalse(fork.active)
+        self.assertFalse(fork.discuss_channel_id)
+
+    def test_bind_discuss_channel_rehomes_seeded_bot_onto_new_ref(self):
+        # Second provision rehomes the seeded xmlid row onto the new uplink_ref and
+        # keeps the HR channel there (never a mute seed + channel-holding fork).
+        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        seeded = self.env["oteny.bot"].create({
             "name": "Barney", "uplink_ref": "hh00394",
             "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
         })
         res = self.env["oteny.bot"].bind_discuss_channel("hh00395")
         self.assertTrue(res["ok"])
-        new = self.env["oteny.bot"].browse(res["bot_id"])
-        self.assertEqual(new.uplink_ref, "hh00395")
-        self.assertEqual(new.discuss_channel_id, channel)
-        self.assertFalse(old.discuss_channel_id)
+        self.assertEqual(res["bot_id"], seeded.id)
+        self.assertEqual(seeded.uplink_ref, "hh00395")
+        self.assertEqual(seeded.discuss_channel_id, channel)
+        self.assertEqual(
+            self.env["oteny.bot"].search_count([
+                ("bot_user_id", "=", self.env.uid), ("active", "=", True)]), 1)
 
     def test_bind_discuss_channel_with_explicit_channel_id(self):
         channel = self.env["discuss.channel"].create({"name": "HR"})
@@ -235,6 +270,9 @@ class TestOtenyBot(TransactionCase):
         self.assertEqual(session.browser_status, "Live now")  # still dispatched
 
     def test_browser_status_replay_window_after_close(self):
+        # Mintable chip requires a replay-capable bearer (dedicated or dog-food otmt_).
+        self.env["ir.config_parameter"].sudo().set_param(
+            "oteny.broker_token_replay_view", "otci_replay_for_chip_test")
         session = self._open_session(token="tokRP")
         session.write({
             "browser_session_ids": ["steel-sess-9"],
@@ -321,3 +359,91 @@ class TestOtenyBot(TransactionCase):
             with self.assertRaises(UserError) as err:
                 session.action_replay_browser()
         self.assertIn("login", str(err.exception).lower())
+
+    def test_attach_browser_sessions_mid_run_live_now(self):
+        session = self._open_session(token="tokAttach")
+        res = self.env["oteny.bot"].attach_browser_sessions(
+            "tokAttach", ["steel-1"])
+        self.assertTrue(res["ok"])
+        session.invalidate_recordset()
+        self.assertEqual(session.browser_session_ids, ["steel-1"])
+        self.assertEqual(session.outcome, "dispatched")
+        self.assertEqual(session.browser_status, "Live now")
+        # Second call merges; outcome stays dispatched.
+        res2 = self.env["oteny.bot"].attach_browser_sessions(
+            "tokAttach", ["steel-1", "steel-2"])
+        self.assertTrue(res2["ok"])
+        session.invalidate_recordset()
+        self.assertEqual(session.browser_session_ids, ["steel-1", "steel-2"])
+        self.assertEqual(session.outcome, "dispatched")
+        # After close: ids may still merge; outcome must not reopen.
+        session.outcome = "ok"
+        session.duration_s = 12.0
+        res3 = self.env["oteny.bot"].attach_browser_sessions(
+            "tokAttach", ["steel-3"])
+        self.assertTrue(res3["ok"])
+        session.invalidate_recordset()
+        self.assertEqual(session.outcome, "ok")
+        self.assertIn("steel-3", session.browser_session_ids)
+        missing = self.env["oteny.bot"].attach_browser_sessions("", ["x"])
+        self.assertFalse(missing["ok"])
+        unknown = self.env["oteny.bot"].attach_browser_sessions("nope", ["x"])
+        self.assertFalse(unknown["ok"])
+
+    def test_browser_status_honest_without_replay_token(self):
+        # Login-gate otci_ alone must NOT claim "Replay available" as mintable.
+        icp = self.env["ir.config_parameter"].sudo()
+        icp.set_param("oteny.broker_base_url", "https://client-ingress.oteny.bot")
+        icp.set_param("oteny.broker_token", "otci_login_gate_only")
+        icp.search([("key", "=", "oteny.broker_token_replay_view")]).unlink()
+        icp.search([("key", "=", "oteny.broker_token_live_watch")]).unlink()
+        session = self._open_session(token="tokHonest")
+        session.write({
+            "browser_session_ids": ["steel-sess-honest"],
+            "outcome": "ok",
+            "duration_s": 30.0,
+        })
+        session.invalidate_recordset()
+        self.assertTrue(session.has_browser_session)
+        self.assertNotIn("Replay available", session.browser_status)
+        self.assertIn("not configured", session.browser_status.lower())
+        # Dedicated replay-view token → mintable chip.
+        icp.set_param("oteny.broker_token_replay_view", "otci_replay_ok")
+        session.invalidate_recordset()
+        self.assertIn("Replay available", session.browser_status)
+
+    def test_broker_token_prefers_dedicated_and_skips_otci_fallback(self):
+        Broker = self.env["oteny.broker.client"]
+        icp = self.env["ir.config_parameter"].sudo()
+        icp.set_param("oteny.broker_token", "otci_login_only")
+        icp.search([("key", "=", "oteny.broker_token_replay_view")]).unlink()
+        self.assertEqual(Broker._broker_token("login-gate"), "otci_login_only")
+        self.assertFalse(Broker._broker_purpose_configured("replay-view"))
+        self.assertEqual(Broker._broker_token("replay-view"), "")
+        # Dog-food otmt_ still falls back for Watch/Replay.
+        icp.set_param("oteny.broker_token", "otmt_dogfood")
+        self.assertTrue(Broker._broker_purpose_configured("replay-view"))
+        self.assertEqual(Broker._broker_token("replay-view"), "otmt_dogfood")
+        icp.set_param("oteny.broker_token_replay_view", "otci_dedicated_replay")
+        self.assertEqual(Broker._broker_token("replay-view"), "otci_dedicated_replay")
+
+    def test_replay_401_maps_to_not_configured(self):
+        from unittest.mock import patch
+        session = self._open_session(token="tok401")
+        session.write({
+            "browser_session_ids": ["steel-sess-401"],
+            "outcome": "ok",
+            "duration_s": 30.0,
+        })
+        with patch.object(
+            type(self.env["oteny.broker.client"]),
+            "_broker_post",
+            side_effect=UserError(
+                "refused (401): unknown or inactive token"),
+        ):
+            with self.assertRaises(UserError) as err:
+                session.action_replay_browser()
+        msg = str(err.exception).lower()
+        self.assertIn("not configured", msg)
+        self.assertIn("administrator", msg)
+        self.assertNotIn("401", str(err.exception))

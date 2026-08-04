@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.10",  # 19.0.1.10: Replay maps recording_pending / session_busy to HR-friendly errors.
+    "version": "19.0.1.12",  # 19.0.1.12: rehome stale same-user bot on ensure/bind (no mute xmlid fork).
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
