@@ -319,6 +319,49 @@ class OtenyBot(models.Model):
                 return {"ok": True, "bot_id": bot.id, "created": False}
             return {"ok": False, "reason": f"could not ensure oteny.bot for {uplink_ref!r}"}
 
+    def bind_discuss_channel(self, uplink_ref, channel_id=None):
+        """Ensure ``uplink_ref`` owns the Discuss channel (move off orphan siblings).
+
+        A second provision for a new tenant ref used to call ``ensure_bot`` alone: that
+        creates a channel-less bot while the previous ref still held the HR channel, so
+        Hand-to-Barney kept dispatching against a mute/old box. This moves
+        ``discuss_channel_id`` onto the current ref and clears every other bot that held it.
+        ``channel_id`` optional — when omitted, take the channel from a sibling that shares
+        ``bot_user_id`` (or the caller's uid). Returns ``{ok, bot_id, channel_id}``."""
+        ensured = self.ensure_bot(uplink_ref)
+        if not ensured.get("ok"):
+            return ensured
+        bot = self.sudo().browse(ensured["bot_id"])
+        channel = None
+        if channel_id:
+            channel = self.env["discuss.channel"].sudo().browse(int(channel_id)).exists()
+        if not channel:
+            uid = bot.bot_user_id.id or self.env.uid
+            donor = self.sudo().search([
+                ("bot_user_id", "=", uid),
+                ("id", "!=", bot.id),
+                ("discuss_channel_id", "!=", False),
+            ], limit=1)
+            if not donor:
+                donor = self.sudo().search([
+                    ("id", "!=", bot.id),
+                    ("discuss_channel_id", "!=", False),
+                    "|", ("bot_user_id", "=", False), ("bot_user_id", "=", self.env.uid),
+                ], limit=1)
+            channel = donor.discuss_channel_id if donor else bot.discuss_channel_id
+        if not channel:
+            return {"ok": False, "reason": "no_channel", "bot_id": bot.id}
+        others = self.sudo().search([
+            ("discuss_channel_id", "=", channel.id),
+            ("id", "!=", bot.id),
+        ])
+        if others:
+            others.write({"discuss_channel_id": False})
+        if not bot.bot_user_id:
+            bot.bot_user_id = self.env.uid
+        bot.discuss_channel_id = channel
+        return {"ok": True, "bot_id": bot.id, "channel_id": channel.id}
+
     def dispatch_isolated_turn(self, prompt, work=None, verbose=False):
         """Dispatch ONE isolated agent turn to this bot over Discuss (the trigger that replaces the
         Oteny-side harness poll). Posts ``<sentinel> [work header] {prompt} [token trailer]`` into

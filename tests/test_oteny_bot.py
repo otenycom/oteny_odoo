@@ -83,6 +83,28 @@ class TestOtenyBot(TransactionCase):
         self.assertEqual(seeded.uplink_ref, "hh00140")
         self.assertEqual(seeded.name, "Barney")           # not renamed on adoption
 
+    def test_bind_discuss_channel_moves_channel_off_orphan_sibling(self):
+        # Second provision for a new ref must not leave the HR channel on the old bot
+        # (hh00394 held channel 6982 while hh00395 was channel-less → mute Hand-to-Barney).
+        channel = self.env["discuss.channel"].create({"name": "HR and Barney"})
+        old = self.env["oteny.bot"].create({
+            "name": "Barney", "uplink_ref": "hh00394",
+            "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
+        })
+        res = self.env["oteny.bot"].bind_discuss_channel("hh00395")
+        self.assertTrue(res["ok"])
+        new = self.env["oteny.bot"].browse(res["bot_id"])
+        self.assertEqual(new.uplink_ref, "hh00395")
+        self.assertEqual(new.discuss_channel_id, channel)
+        self.assertFalse(old.discuss_channel_id)
+
+    def test_bind_discuss_channel_with_explicit_channel_id(self):
+        channel = self.env["discuss.channel"].create({"name": "HR"})
+        res = self.env["oteny.bot"].bind_discuss_channel("hh00396", channel_id=channel.id)
+        self.assertTrue(res["ok"])
+        bot = self.env["oteny.bot"].browse(res["bot_id"])
+        self.assertEqual(bot.discuss_channel_id, channel)
+
     # --- the Discuss-flag dispatch (the trigger that replaces the harness poll) --- #
 
     def test_dispatch_isolated_turn_posts_a_flagged_message(self):

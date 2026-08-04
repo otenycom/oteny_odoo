@@ -26,6 +26,12 @@
                             <field name="session_count" widget="statinfo" string="Exchanges"/>
                         </button>
                     </div>
+                    <div class="alert alert-info" role="alert">
+                        If Discuss is silent for this bot, check
+                        <code>oteny traces --ref &lt;uplink_ref&gt;</code> for
+                        <code>uplink_status</code> (<code>auth_failed</code> → re-mint / re-provision).
+                        Website login is not the Talent debug path.
+                    </div>
                     <group>
                         <field name="name"/>
                         <field name="bot_user_id"/>
