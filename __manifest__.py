@@ -49,9 +49,20 @@
     "assets": {
         "web.assets_backend": [
             "riverflow/static/src/components/**/*",
+            # Dark mode files load via web.assets_web_dark only
+            (
+                "remove",
+                "riverflow/static/src/components/timeline/timeline_scale_selector.dark.scss",
+            ),
             "riverflow/static/src/patch/**/*",
             "riverflow/static/src/riverflow_force_xl.js",
             "riverflow/static/src/scss/bg-decorations.scss",
+        ],
+        "web.assets_web_dark": [
+            "riverflow/static/src/components/timeline/timeline_scale_selector.dark.scss",
+        ],
+        "web.assets_unit_tests": [
+            "riverflow/static/tests/**/*",
         ],
     },
     "application": True,

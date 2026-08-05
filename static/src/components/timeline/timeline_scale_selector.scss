@@ -1,0 +1,37 @@
+// Shared timeline scale selector (crew planning + credential planning).
+// The dropdown menu is teleported to the overlay container, so these rules
+// must live at the top level — nesting them under a view container class
+// would never match the rendered menu.
+
+.o_timeline_scale_selector_menu .o_scale_button_custom.dropdown-item {
+    // The custom row hosts the pickers and Apply button; it should not look
+    // or behave like a clickable menu entry itself.
+    &:not(.disabled):not(:disabled) {
+        background-color: inherit !important;
+        cursor: default !important;
+
+        label {
+            cursor: default !important;
+        }
+
+        &.active {
+            font-weight: 400;
+        }
+    }
+
+    &:before {
+        top: auto !important;
+    }
+}
+
+// Picker "inputs" — spans that open a date picker popover on click
+.o_timeline_scale_picker {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    background-color: #fff;
+    min-width: 100px;
+
+    &:hover {
+        background-color: #f8f9fa;
+    }
+}
