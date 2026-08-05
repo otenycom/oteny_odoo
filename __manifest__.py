@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.13",  # 19.0.1.13: D248 — role channels + channels_for_bot admission verdict.
+    "version": "19.0.1.14",  # 19.0.1.14: a bot may not authorize its own room.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",

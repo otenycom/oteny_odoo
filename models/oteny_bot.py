@@ -483,8 +483,11 @@ class OtenyBot(models.Model):
            is not consent; an operator who genuinely wants the bot company-wide adds it to
            a normal channel or binds a role.
         2. **Who put it there.** The channel's creator must hold the Oteny Bot Operator
-           group. An ordinary internal user cannot conjure a room, drop the bot in, and get
-           an answering agent that reads this Odoo through the bot's grants.
+           group, and must be a *person* — never the bot's own seam login. An ordinary
+           internal user cannot conjure a room, drop the bot in, and get an answering agent
+           that reads this Odoo through the bot's grants; and since a seam login is normally
+           an HR user (which implies the operator group), a bot that talked itself into
+           creating a channel would otherwise be admitted into a room of its own making.
         3. **Who can read the answers.** Every member must be an internal user — no portal
            user, no guest. Barney's replies quote employee and client data; a room with an
            outside reader is refused outright rather than quietly served.
@@ -497,6 +500,8 @@ class OtenyBot(models.Model):
         if channel.group_ids:
             return "auto-subscription channel — nobody added the bot to it"
         creator = channel.create_uid
+        if creator and creator == self.bot_user_id:
+            return "created by the bot's own login — a bot may not authorize itself"
         if not creator or not creator.has_group("oteny_bot.group_oteny_bot_operator"):
             return (f"created by {creator.name or '?'}, who is not an Oteny Bot Operator")
         for member in channel.channel_member_ids:

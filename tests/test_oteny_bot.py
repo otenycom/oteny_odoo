@@ -321,6 +321,19 @@ class TestOtenyBot(TransactionCase):
         refusal = {s["id"]: s["reason"] for s in out["skipped"]}
         self.assertIn("Operator", refusal[room.id])
 
+    def test_channels_for_bot_refuses_a_room_the_bot_itself_made(self):
+        # A seam login is normally an HR user, and HR implies Oteny Bot Operator — so
+        # without this gate a bot that was talked into creating a channel would pass gate 1
+        # on its own authority and start serving a room nobody asked for.
+        bot, seam = self._bot_with_seam_user(login="seam.selfauth", ref="hhSELF")
+        seam.group_ids = [Command.link(
+            self.env.ref("oteny_bot.group_oteny_bot_operator").id)]
+        room = self._room("Room I Made Myself", seam, [seam.partner_id])
+        out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
+        self.assertEqual([c["id"] for c in out["channels"]], [])
+        refusal = {s["id"]: s["reason"] for s in out["skipped"]}
+        self.assertIn("may not authorize itself", refusal[room.id])
+
     def test_channels_for_bot_refuses_a_room_with_an_outside_reader(self):
         # Gate 2 — WHO can read the answers. The bot quotes employee and client data, so a
         # room holding a portal user is refused outright rather than quietly served.
