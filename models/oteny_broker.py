@@ -86,7 +86,9 @@ class OtenyBrokerClient(models.AbstractModel):
                 f"{base}{path}",
                 headers={"Authorization": f"Bearer {token}"},
                 json=payload or {},
-                timeout=30,
+                # login-handoff landing may retry Steel CDP 503s for ~28 s
+                # (plus create); 30 s was cutting the mint off mid-retry.
+                timeout=45,
             )
             if not resp.ok:
                 detail = ""
@@ -95,12 +97,23 @@ class OtenyBrokerClient(models.AbstractModel):
                 except ValueError:
                     body = {}
                 if isinstance(body, dict):
-                    detail = body.get("message") or body.get("error") or ""
+                    detail = (
+                        body.get("message")
+                        or body.get("error")
+                        or ""
+                    )
                     if body.get("error") == "bad_login_url":
                         detail += _(
                             " — fix the CrewRadar system parameter "
                             "oteny.portal_login_url"
                         )
+                    elif body.get("error") == "login_page_unreachable":
+                        detail = detail or _(
+                            "Could not open the portal sign-in page — "
+                            "click Open login browser again."
+                        )
+                if not detail and (resp.text or "").strip():
+                    detail = (resp.text or "").strip()[:200]
                 raise UserError(_(
                     "The Oteny cloud-browser broker refused the request (%(status)s): "
                     "%(detail)s",
