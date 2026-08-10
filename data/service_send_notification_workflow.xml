@@ -12,7 +12,10 @@
         <field name="model_id" ref="riverflow.model_riverflow_service" />
         <field name="name">Send Notification</field>
         <field name="description">Workflow for sending one-shot notification emails (fast path to Done)</field>
-        <field name="icon">fa-envelope</field>
+        <!-- Bell, not envelope: Send Email (await-reply) owns fa-envelope and
+             both workflows sit side by side in the same picker — the bell marks
+             this as the one-shot notification variant. -->
+        <field name="icon">fa-bell</field>
     </record>
 
     <!-- States -->
