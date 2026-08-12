@@ -205,7 +205,7 @@ class AutoAddService(models.Model):
         # for that workflow, and collapse duplicate candidates within this batch.
         # This is the application layer of the invariant; a partial-unique index
         # on enforcing workflows is the structural backstop against races.
-        to_create = self._filter_single_open(to_create, model, subjects)
+        to_create = self._filter_single_open(to_create)
 
         if to_create:
             for service_vals in to_create:
@@ -213,7 +213,7 @@ class AutoAddService(models.Model):
                 service_context = self.env["riverflow.service"].with_context(**ctx)
                 service_context._create_services_from_template(service_vals["template_id"])
 
-    def _filter_single_open(self, to_create, model, subjects):
+    def _filter_single_open(self, to_create):
         """Drop candidates that would create a second OPEN service for a
         subject on a workflow that enforces single-open, and collapse duplicate
         candidates within this batch (same workflow + subject).

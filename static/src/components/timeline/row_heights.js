@@ -3,35 +3,25 @@
 /**
  * Shared row-height helpers for timeline virtual scrolling / unloaded spacers.
  *
- * Credential planning and crew planning use different geometry constants;
- * pass the view's constants into the helpers rather than hard-coding one set.
+ * Formulas only — the geometry constants live with the view that owns them
+ * (crew planning in `plan_timeline_track.js`, credential planning in its
+ * renderer), so this module never has to know who its callers are. Each
+ * helper therefore takes its constants explicitly; there is no default set,
+ * because the two shapes are disjoint and silently defaulting to the wrong
+ * one used to yield NaN.
  */
-
-/** Default geometry for the credential planning timeline. */
-export const CRED_ROW_HEIGHT_CONSTANTS = {
-    trackHeight: 21,
-    trackGap: 1,
-    trackPadding: 7, // top 3px + bottom 4px
-};
-
-/** Default geometry for the crew planning timeline. */
-export const CREW_ROW_HEIGHT_CONSTANTS = {
-    statusTrackHeight: 22,
-    trackHeight: 20,
-    trackGap: 1,
-    verticalPadding: 12,
-    borderHeight: 1,
-    sectionHeaderHeight: 20,
-};
 
 /**
- * Credential-style row height from track count (no status track).
+ * Height of a row that is just N stacked tracks plus padding.
  *
  * @param {number} trackCount
- * @param {Object} [constants=CRED_ROW_HEIGHT_CONSTANTS]
+ * @param {Object} constants
+ * @param {number} constants.trackHeight
+ * @param {number} constants.trackGap
+ * @param {number} constants.trackPadding
  * @returns {number}
  */
-export function rowHeightForTracks(trackCount, constants = CRED_ROW_HEIGHT_CONSTANTS) {
+export function stackedTracksHeight(trackCount, constants) {
     const { trackHeight, trackGap, trackPadding } = constants;
     const single = trackHeight + trackPadding;
     if (trackCount <= 1) {
@@ -41,13 +31,19 @@ export function rowHeightForTracks(trackCount, constants = CRED_ROW_HEIGHT_CONST
 }
 
 /**
- * Crew-planning-style row height including the status track.
+ * Height of a row that carries a status track above its N stacked tracks,
+ * plus vertical padding and a bottom border.
  *
  * @param {number} trackCount
- * @param {Object} [constants=CREW_ROW_HEIGHT_CONSTANTS]
+ * @param {Object} constants
+ * @param {number} constants.statusTrackHeight
+ * @param {number} constants.trackHeight
+ * @param {number} constants.trackGap
+ * @param {number} constants.verticalPadding
+ * @param {number} constants.borderHeight
  * @returns {number}
  */
-export function calculateRowHeight(trackCount, constants = CREW_ROW_HEIGHT_CONSTANTS) {
+export function statusTrackRowHeight(trackCount, constants) {
     const {
         statusTrackHeight,
         trackHeight,
@@ -58,7 +54,9 @@ export function calculateRowHeight(trackCount, constants = CREW_ROW_HEIGHT_CONST
     return (
         statusTrackHeight +
         trackCount * trackHeight +
-        (trackCount - 1) * trackGap +
+        // A single track has no gap to add; guard so a zero count cannot
+        // subtract one (callers floor at 1, so this is insurance only).
+        Math.max(0, trackCount - 1) * trackGap +
         verticalPadding +
         borderHeight
     );
@@ -69,14 +67,10 @@ export function calculateRowHeight(trackCount, constants = CREW_ROW_HEIGHT_CONST
  *
  * @param {Array<Object>} rows
  * @param {function(Object): number} getTrackCount
- * @param {Object} [constants=CREW_ROW_HEIGHT_CONSTANTS]
+ * @param {Object} constants - statusTrackRowHeight's constants + sectionHeaderHeight
  * @returns {Array<number>}
  */
-export function calculateCumulativeHeights(
-    rows,
-    getTrackCount,
-    constants = CREW_ROW_HEIGHT_CONSTANTS
-) {
+export function calculateCumulativeHeights(rows, getTrackCount, constants) {
     if (rows.length === 0) {
         return [];
     }
@@ -89,25 +83,10 @@ export function calculateCumulativeHeights(
         if (i === 0 || rows[i - 1].type !== row.type) {
             cumulativeHeight += sectionHeaderHeight;
         }
-        cumulativeHeight += calculateRowHeight(getTrackCount(row), constants);
+        cumulativeHeight += statusTrackRowHeight(getTrackCount(row), constants);
         heights.push(cumulativeHeight);
     }
     return heights;
-}
-
-/**
- * @param {Array<Object>} rows
- * @param {function(Object): number} getTrackCount
- * @param {Object} [constants=CREW_ROW_HEIGHT_CONSTANTS]
- * @returns {number}
- */
-export function calculateTotalHeight(
-    rows,
-    getTrackCount,
-    constants = CREW_ROW_HEIGHT_CONSTANTS
-) {
-    const heights = calculateCumulativeHeights(rows, getTrackCount, constants);
-    return heights.length > 0 ? heights[heights.length - 1] : 0;
 }
 
 /**
@@ -115,20 +94,16 @@ export function calculateTotalHeight(
  *
  * @param {Array<Object>} rows
  * @param {function(Object): number} getTrackCount
- * @param {Object} [constants=CREW_ROW_HEIGHT_CONSTANTS]
+ * @param {Object} constants
  * @returns {number}
  */
-export function calculateAverageRowHeight(
-    rows,
-    getTrackCount,
-    constants = CREW_ROW_HEIGHT_CONSTANTS
-) {
+export function calculateAverageRowHeight(rows, getTrackCount, constants) {
     if (rows.length === 0) {
         return 0;
     }
     let totalHeight = 0;
     for (const row of rows) {
-        totalHeight += calculateRowHeight(getTrackCount(row), constants);
+        totalHeight += statusTrackRowHeight(getTrackCount(row), constants);
     }
     return totalHeight / rows.length;
 }

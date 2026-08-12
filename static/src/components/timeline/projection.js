@@ -43,6 +43,36 @@ export function getItemPctPosition({
 }
 
 /**
+ * Turn an already-computed horizontal position into the CSS style string for
+ * a timeline item bar.
+ *
+ * Separate from getItemPctPosition because a view may post-process the raw
+ * percentages before rendering (credential planning insets bar edges by a
+ * hairline so abutting bars stay visually separate).
+ *
+ * @param {{leftPct: number, widthPct: number}|null} pos - null renders hidden
+ * @param {Object} geometry
+ * @param {number} [geometry.trackIndex=0]
+ * @param {number} geometry.trackHeight
+ * @param {number} geometry.trackGap
+ * @param {number} geometry.topOffset - Pixels above track 0 (status track, padding, …)
+ * @returns {string}
+ */
+export function formatItemPositionStyle(
+    pos,
+    { trackIndex = 0, trackHeight, trackGap, topOffset }
+) {
+    if (!pos) {
+        return "display: none;";
+    }
+    const topPx = topOffset + trackIndex * (trackHeight + trackGap);
+    return (
+        `left: ${pos.leftPct}%; width: ${pos.widthPct}%; ` +
+        `top: ${topPx}px; height: ${trackHeight}px;`
+    );
+}
+
+/**
  * Build the CSS position style string for a timeline item bar.
  *
  * @param {Object} opts - Same as getItemPctPosition, plus vertical geometry
@@ -53,15 +83,5 @@ export function getItemPctPosition({
  * @returns {string}
  */
 export function getItemPositionStyle(opts) {
-    const pos = getItemPctPosition(opts);
-    if (!pos) {
-        return "display: none;";
-    }
-    const trackIndex = opts.trackIndex || 0;
-    const topPx =
-        opts.topOffset + trackIndex * (opts.trackHeight + opts.trackGap);
-    return (
-        `left: ${pos.leftPct}%; width: ${pos.widthPct}%; ` +
-        `top: ${topPx}px; height: ${opts.trackHeight}px;`
-    );
+    return formatItemPositionStyle(getItemPctPosition(opts), opts);
 }

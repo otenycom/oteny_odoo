@@ -23,6 +23,28 @@
  *   (credential planning behaviour).
  * @returns {Array<Object>} the same items array
  */
+/**
+ * First-fit track allocation: reuse the lowest track that is free at
+ * itemStart, else open a new one. Mutates `tracks` (each entry is the end of
+ * the item currently occupying that track, or null when free).
+ *
+ * @param {Array<luxon.DateTime|null>} tracks
+ * @param {luxon.DateTime} itemStart
+ * @param {luxon.DateTime} itemEnd
+ * @returns {number} the assigned track index
+ */
+function claimFirstFreeTrack(tracks, itemStart, itemEnd) {
+    for (let i = 0; i < tracks.length; i++) {
+        const trackEnd = tracks[i];
+        if (!trackEnd || itemStart >= trackEnd) {
+            tracks[i] = itemEnd;
+            return i;
+        }
+    }
+    tracks.push(itemEnd);
+    return tracks.length - 1;
+}
+
 export function assignVerticalTracks(
     items,
     { parseDate, viewStart = null, defaultEnd = null }
@@ -47,20 +69,7 @@ export function assignVerticalTracks(
         // Crew planning: items entirely before the view still get a track, but
         // later pruning clears tracks that end before viewStart.
         if (viewStart && itemEnd <= viewStart) {
-            let assignedTrack = -1;
-            for (let i = 0; i < tracks.length; i++) {
-                const trackEnd = tracks[i];
-                if (!trackEnd || itemStart >= trackEnd) {
-                    assignedTrack = i;
-                    tracks[i] = itemEnd;
-                    break;
-                }
-            }
-            if (assignedTrack === -1) {
-                assignedTrack = tracks.length;
-                tracks.push(itemEnd);
-            }
-            item.trackIndex = assignedTrack;
+            item.trackIndex = claimFirstFreeTrack(tracks, itemStart, itemEnd);
             continue;
         }
 
@@ -72,20 +81,7 @@ export function assignVerticalTracks(
             }
         }
 
-        let assignedTrack = -1;
-        for (let i = 0; i < tracks.length; i++) {
-            const trackEnd = tracks[i];
-            if (!trackEnd || itemStart >= trackEnd) {
-                assignedTrack = i;
-                tracks[i] = itemEnd;
-                break;
-            }
-        }
-        if (assignedTrack === -1) {
-            assignedTrack = tracks.length;
-            tracks.push(itemEnd);
-        }
-        item.trackIndex = assignedTrack;
+        item.trackIndex = claimFirstFreeTrack(tracks, itemStart, itemEnd);
     }
 
     return items;
