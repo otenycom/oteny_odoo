@@ -674,6 +674,48 @@ class TestOtenyBot(TransactionCase):
         self.assertIn('name="summary"', arch)
         self.assertIn('name="technical"', arch)
 
+    def test_session_form_request_response_are_full_width(self):
+        from lxml import etree
+        arch = etree.fromstring(
+            self.env.ref("oteny_bot.oteny_bot_session_view_form").arch_db)
+        self.assertFalse(arch.xpath("//group[@string='Response']"))
+        self.assertFalse(arch.xpath("//group[@string='Request']"))
+        self.assertFalse(arch.xpath("//button[@name='action_toggle_request']"))
+        self.assertFalse(arch.xpath("//field[@name='request_preview']"))
+        self.assertNotIn("3 lines, click to open", etree.tostring(arch, encoding="unicode"))
+        self.assertTrue(arch.xpath("//page[@name='summary']//separator[@string='Response']"))
+        self.assertTrue(arch.xpath("//page[@name='summary']//separator[@string='Request']"))
+        self.assertTrue(arch.xpath(
+            "//page[@name='summary']//div[contains(@class,'o_oteny_bot_session_body')]"
+            "/field[@name='response']"))
+        self.assertTrue(arch.xpath(
+            "//page[@name='summary']//div[contains(@class,'o_oteny_bot_session_body')]"
+            "/field[@name='request']"))
+
+    def test_action_open_discuss_channel_uses_home_channel(self):
+        channel = self.env["discuss.channel"].create({"name": "Home Room"})
+        bot = self.env["oteny.bot"].create({
+            "name": "ChanBot", "uplink_ref": "hhCHAN",
+            "discuss_channel_id": channel.id,
+        })
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+        })
+        action = session.action_open_discuss_channel()
+        expected = channel._get_access_action()
+        self.assertEqual(action["type"], "ir.actions.act_url")
+        self.assertEqual(action["url"], expected["url"])
+        self.assertIn("mail.action_discuss", action["url"])
+        self.assertIn(f"active_id={channel.id}", action["url"])
+
+    def test_action_open_discuss_channel_requires_home_channel(self):
+        bot = self.env["oteny.bot"].create({"name": "NoChan", "uplink_ref": "hhNOCHAN"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+        })
+        with self.assertRaises(UserError):
+            session.action_open_discuss_channel()
+
     def test_replay_401_maps_to_not_configured(self):
         from unittest.mock import patch
         session = self._open_session(token="tok401")

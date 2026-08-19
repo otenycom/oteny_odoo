@@ -625,6 +625,14 @@ class OtenyBot(models.Model):
             "context": {"search_default_bot_id": self.id},
         }
 
+    def action_open_discuss_channel(self):
+        """Open this bot's Discuss home channel via the standard Discuss client action."""
+        self.ensure_one()
+        channel = self.discuss_channel_id
+        if not channel:
+            raise UserError(_("This bot has no Discuss home channel."))
+        return channel._get_access_action()
+
 
 class OtenyBotChannel(models.Model):
     """One of the bot's declared ROLES, bound to one of this Odoo's Discuss channels (D248).
@@ -663,6 +671,10 @@ class OtenyBotSession(models.Model):
     _order = "started_at desc, id desc"
 
     bot_id = fields.Many2one("oteny.bot", required=True, ondelete="cascade", index=True)
+    discuss_channel_id = fields.Many2one(
+        related="bot_id.discuss_channel_id",
+        string="Home Channel",
+        help="The bot's Discuss home channel. Used to open that room from this activity.")
     name = fields.Char("Task", help="A short label for the exchange (the task / request summary).")
     kind = fields.Selection(
         [("conversational", "Conversational"), ("isolated_turn", "Isolated turn")],
@@ -775,6 +787,11 @@ class OtenyBotSession(models.Model):
             "target": "current",
             "context": ctx,
         }
+
+    def action_open_discuss_channel(self):
+        """Open this bot's Discuss home channel (mail.action_discuss)."""
+        self.ensure_one()
+        return self.bot_id.action_open_discuss_channel()
 
     @api.depends(
         "browser_session_ids", "outcome", "started_at", "duration_s",

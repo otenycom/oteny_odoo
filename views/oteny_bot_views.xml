@@ -131,32 +131,19 @@
                                     <field name="duration_s"/>
                                 </group>
                             </group>
-                            <group string="Response">
+                            <separator string="Response"/>
+                            <div class="o_oteny_bot_session_body w-100">
                                 <div class="alert alert-info" role="alert"
                                      invisible="outcome != 'dispatched' or response">
                                     The bot is working. The answer is not ready.
                                 </div>
                                 <field name="response" nolabel="1"
                                        invisible="outcome == 'dispatched' and not response"/>
-                            </group>
-                            <group string="Request">
-                                <div class="text-muted"
-                                     invisible="context.get('oteny_bot_show_full_request')">
-                                    3 lines, click to open
-                                </div>
-                                <button name="action_toggle_request" type="object"
-                                        string="3 lines, click to open"
-                                        class="btn-link"
-                                        invisible="context.get('oteny_bot_show_full_request')"/>
-                                <button name="action_toggle_request" type="object"
-                                        string="Show less"
-                                        class="btn-link"
-                                        invisible="not context.get('oteny_bot_show_full_request')"/>
-                                <field name="request_preview" nolabel="1"
-                                       invisible="context.get('oteny_bot_show_full_request')"/>
-                                <field name="request" nolabel="1"
-                                       invisible="not context.get('oteny_bot_show_full_request')"/>
-                            </group>
+                            </div>
+                            <separator string="Request"/>
+                            <div class="o_oteny_bot_session_body w-100">
+                                <field name="request" nolabel="1"/>
+                            </div>
                         </page>
                         <page string="Technical" name="technical">
                             <group>

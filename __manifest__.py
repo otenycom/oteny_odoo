@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.16",  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
+    "version": "19.0.1.18",  # 19.0.1.18: drop Request expander chrome that leaked under Response.  # 19.0.1.17: full-width Summary request/response + generic Discuss home-channel action.  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
@@ -25,6 +25,11 @@ depending on it.
         "security/ir.model.access.csv",
         "views/oteny_bot_views.xml",
     ],
+    "assets": {
+        "web.assets_backend": [
+            "oteny_bot/static/src/scss/oteny_bot.scss",
+        ],
+    },
     "auto_install": False,
     "license": "OEEL-1",
 }
