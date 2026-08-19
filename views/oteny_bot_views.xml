@@ -78,16 +78,18 @@
                 <field name="started_at"/>
                 <field name="bot_id"/>
                 <field name="name"/>
-                <field name="kind"/>
                 <field name="outcome" widget="badge"
                        decoration-success="outcome == 'ok'"
                        decoration-warning="outcome == 'halted' or outcome == 'escalated'"
-                       decoration-danger="outcome == 'error' or outcome == 'timeout'"/>
+                       decoration-danger="outcome == 'error' or outcome == 'timeout'"
+                       decoration-info="outcome == 'dispatched'"/>
                 <field name="browser_status" optional="show"/>
-                <field name="outcome_detail" optional="show"/>
-                <field name="turn_count"/>
-                <field name="tool_call_count"/>
+                <field name="response_first_line" string="Outcome Detail"/>
                 <field name="duration_s"/>
+                <field name="kind" optional="hide"/>
+                <field name="turn_count" optional="hide"/>
+                <field name="tool_call_count" optional="hide"/>
+                <field name="outcome_detail" optional="hide"/>
             </list>
         </field>
     </record>
@@ -109,29 +111,68 @@
                             groups="base.group_user"/>
                 </header>
                 <sheet>
-                    <group>
-                        <group>
-                            <field name="bot_id"/>
-                            <field name="name"/>
-                            <field name="kind"/>
-                            <field name="outcome"/>
-                            <field name="outcome_detail"/>
-                            <field name="browser_status"/>
-                            <field name="has_browser_session" invisible="1"/>
-                            <field name="browser_session_ids" invisible="1"/>
-                        </group>
-                        <group>
-                            <field name="started_at"/>
-                            <field name="duration_s"/>
-                            <field name="origin_model"/>
-                            <field name="origin_res_id"/>
-                            <field name="work_token" groups="base.group_no_one"/>
-                        </group>
-                    </group>
                     <notebook>
-                        <page string="Request"><field name="request"/></page>
-                        <page string="Response"><field name="response"/></page>
-                        <page string="Turns">
+                        <page string="Summary" name="summary">
+                            <group>
+                                <group>
+                                    <field name="bot_id"/>
+                                    <field name="name"/>
+                                    <field name="outcome" widget="badge"
+                                           decoration-success="outcome == 'ok'"
+                                           decoration-warning="outcome == 'halted' or outcome == 'escalated'"
+                                           decoration-danger="outcome == 'error' or outcome == 'timeout'"
+                                           decoration-info="outcome == 'dispatched'"/>
+                                    <field name="browser_status"/>
+                                    <field name="has_browser_session" invisible="1"/>
+                                    <field name="browser_session_ids" invisible="1"/>
+                                </group>
+                                <group>
+                                    <field name="started_at"/>
+                                    <field name="duration_s"/>
+                                </group>
+                            </group>
+                            <group string="Response">
+                                <div class="alert alert-info" role="alert"
+                                     invisible="outcome != 'dispatched' or response">
+                                    The bot is working. The answer is not ready.
+                                </div>
+                                <field name="response" nolabel="1"
+                                       invisible="outcome == 'dispatched' and not response"/>
+                            </group>
+                            <group string="Request">
+                                <div class="text-muted"
+                                     invisible="context.get('oteny_bot_show_full_request')">
+                                    3 lines, click to open
+                                </div>
+                                <button name="action_toggle_request" type="object"
+                                        string="3 lines, click to open"
+                                        class="btn-link"
+                                        invisible="context.get('oteny_bot_show_full_request')"/>
+                                <button name="action_toggle_request" type="object"
+                                        string="Show less"
+                                        class="btn-link"
+                                        invisible="not context.get('oteny_bot_show_full_request')"/>
+                                <field name="request_preview" nolabel="1"
+                                       invisible="context.get('oteny_bot_show_full_request')"/>
+                                <field name="request" nolabel="1"
+                                       invisible="not context.get('oteny_bot_show_full_request')"/>
+                            </group>
+                        </page>
+                        <page string="Technical" name="technical">
+                            <group>
+                                <group>
+                                    <field name="kind"/>
+                                    <field name="name"/>
+                                    <field name="origin_model"/>
+                                    <field name="origin_res_id"/>
+                                    <field name="work_token" groups="base.group_no_one"/>
+                                </group>
+                                <group>
+                                    <field name="turn_count"/>
+                                    <field name="tool_call_count"/>
+                                    <field name="outcome_detail"/>
+                                </group>
+                            </group>
                             <field name="turn_ids">
                                 <list>
                                     <field name="sequence"/>

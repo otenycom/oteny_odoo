@@ -1,8 +1,10 @@
 """The generic Oteny bot activity log + its /json/2/ write-back seam (Layer 1, no domain)."""
 
+from datetime import timedelta
+
 from psycopg2 import IntegrityError
 
-from odoo import Command
+from odoo import Command, fields
 from odoo.addons.oteny_bot.models.oteny_bot import (
     ISOLATED_TURN_SENTINEL,
     VERBOSE_SENTINEL,
@@ -611,6 +613,66 @@ class TestOtenyBot(TransactionCase):
         self.assertEqual(Broker._broker_token("replay-view"), "otmt_dogfood")
         icp.set_param("oteny.broker_token_replay_view", "otci_dedicated_replay")
         self.assertEqual(Broker._broker_token("replay-view"), "otci_dedicated_replay")
+
+    def test_response_first_line_skips_blank_lines(self):
+        bot = self.env["oteny.bot"].create({"name": "LineBot", "uplink_ref": "hhLINE"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "preview", "outcome": "ok",
+            "response": "\n\n  Handed Endurance back to HR.\nSecond line.",
+        })
+        self.assertEqual(session.response_first_line, "Handed Endurance back to HR.")
+        session.response = "   \n"
+        self.assertFalse(session.response_first_line)
+        session.response = False
+        self.assertFalse(session.response_first_line)
+
+    def test_request_preview_keeps_first_three_lines(self):
+        bot = self.env["oteny.bot"].create({"name": "ReqBot", "uplink_ref": "hhREQ"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "preview", "outcome": "ok",
+            "request": "line1\nline2\nline3\nline4",
+        })
+        self.assertEqual(session.request_preview, "line1\nline2\nline3")
+        session.request = "only\ntwo"
+        self.assertEqual(session.request_preview, "only\ntwo")
+        session.request = False
+        self.assertFalse(session.request_preview)
+
+    def test_search_latest_for_origin_ignores_other_res_id(self):
+        bot = self.env["oteny.bot"].create({"name": "OrigBot", "uplink_ref": "hhORIG"})
+        Session = self.env["oteny.bot.session"]
+        Session.create({
+            "bot_id": bot.id, "name": "old", "outcome": "ok",
+            "origin_model": "res.partner", "origin_res_id": 10,
+            "started_at": fields.Datetime.now() - timedelta(hours=1),
+        })
+        newer = Session.create({
+            "bot_id": bot.id, "name": "new", "outcome": "dispatched",
+            "origin_model": "res.partner", "origin_res_id": 10,
+        })
+        Session.create({
+            "bot_id": bot.id, "name": "other", "outcome": "ok",
+            "origin_model": "res.partner", "origin_res_id": 11,
+        })
+        found = Session.search_latest_for_origin("res.partner", 10)
+        self.assertEqual(found, newer)
+        self.assertFalse(Session.search_latest_for_origin("res.partner", 99))
+
+    def test_action_toggle_request_flips_context(self):
+        bot = self.env["oteny.bot"].create({"name": "ToggleBot", "uplink_ref": "hhTOG"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "toggle", "outcome": "ok",
+        })
+        action = session.action_toggle_request()
+        self.assertTrue(action["context"]["oteny_bot_show_full_request"])
+        self.assertEqual(action["res_id"], session.id)
+        again = session.with_context(oteny_bot_show_full_request=True).action_toggle_request()
+        self.assertFalse(again["context"]["oteny_bot_show_full_request"])
+
+    def test_session_form_has_summary_and_technical_pages(self):
+        arch = self.env.ref("oteny_bot.oteny_bot_session_view_form").arch_db
+        self.assertIn('name="summary"', arch)
+        self.assertIn('name="technical"', arch)
 
     def test_replay_401_maps_to_not_configured(self):
         from unittest.mock import patch

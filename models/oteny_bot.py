@@ -672,13 +672,19 @@ class OtenyBotSession(models.Model):
     request = fields.Text("Request / anchored task", readonly=True)
     response = fields.Text("Response", readonly=True)
     outcome = fields.Selection(
-        [("dispatched", "Dispatched"), ("ok", "OK"), ("halted", "Halted / handed back"),
+        [("dispatched", "Working"), ("ok", "OK"), ("halted", "Halted / handed back"),
          ("escalated", "Escalated"), ("timeout", "Timed out"), ("error", "Error")],
         index=True, readonly=True,
-        help="dispatched = the isolated turn was posted and is (presumed) running; the workflow "
-        "layer closes it deterministically to ok / escalated / timeout when the record exits its "
-        "bot in-progress state.")
-    outcome_detail = fields.Char(readonly=True)
+        help="dispatched = the isolated turn was posted and is (presumed) running (the Working "
+        "pill); the workflow layer closes it deterministically to ok / escalated / timeout when "
+        "the record exits its bot in-progress state.")
+    outcome_detail = fields.Char("Close Reason", readonly=True)
+    response_first_line = fields.Char(
+        "Outcome Detail", compute="_compute_response_first_line",
+        help="First non-empty line of response. List label only — not the stored close reason.")
+    request_preview = fields.Text(
+        compute="_compute_request_preview",
+        help="First three lines of the request, for the Summary rollup.")
     work_token = fields.Char(
         "Work Token", index=True, readonly=True, copy=False,
         help="The dispatch token of the claim epoch this session records (D174 write-back). Set "
@@ -715,6 +721,60 @@ class OtenyBotSession(models.Model):
         for s in self:
             s.turn_count = len(s.turn_ids)
             s.tool_call_count = sum(s.turn_ids.mapped("tool_call_count"))
+
+    @api.depends("response")
+    def _compute_response_first_line(self):
+        for s in self:
+            s.response_first_line = s._first_nonempty_line(s.response)
+
+    @api.depends("request")
+    def _compute_request_preview(self):
+        for s in self:
+            s.request_preview = s._first_n_lines(s.request, 3)
+
+    @staticmethod
+    def _first_nonempty_line(text):
+        if not text:
+            return False
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped
+        return False
+
+    @staticmethod
+    def _first_n_lines(text, n):
+        if not text:
+            return False
+        lines = text.splitlines()[:n]
+        return "\n".join(lines) if lines else False
+
+    @api.model
+    def search_latest_for_origin(self, origin_model, origin_res_id):
+        """Latest session for a soft origin, or an empty recordset."""
+        if not origin_model or not origin_res_id:
+            return self.browse()
+        return self.sudo().search(
+            [("origin_model", "=", origin_model), ("origin_res_id", "=", origin_res_id)],
+            order="started_at desc, id desc",
+            limit=1,
+        )
+
+    def action_toggle_request(self):
+        """Reload this form with the full request shown or hidden."""
+        self.ensure_one()
+        ctx = dict(self.env.context)
+        ctx["oteny_bot_show_full_request"] = not ctx.get("oteny_bot_show_full_request")
+        return {
+            "type": "ir.actions.act_window",
+            "name": _("Bot Activity"),
+            "res_model": self._name,
+            "res_id": self.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "current",
+            "context": ctx,
+        }
 
     @api.depends(
         "browser_session_ids", "outcome", "started_at", "duration_s",

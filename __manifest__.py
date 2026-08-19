@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.15",  # 19.0.1.14: a bot may not authorize its own room.
+    "version": "19.0.1.16",  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
     "depends": ["base", "mail"],
     "author": "Oteny",
     "category": "Productivity",
