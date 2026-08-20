@@ -38,8 +38,9 @@ def get_clone_prefix():
 def reuse_clones():
     """
     Whether to keep clone databases between runs and reuse them when the
-    base DB schema has not changed. Defaults to True — saves ~9s on
-    repeated runs. Set to false to always create fresh clones.
+    base DB schema, XML IDs, and module versions have not changed.
+    Defaults to True — saves ~9s on repeated runs. Set to false to
+    always create fresh clones.
     """
     return os.environ.get("ODOO_TEST_REUSE_CLONES", "true").lower() not in ("false", "0", "no")
 

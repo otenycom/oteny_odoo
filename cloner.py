@@ -5,13 +5,16 @@ Uses PostgreSQL's createdb -T (template clone) which is fast because
 it does a file-level copy. Requires no active connections on the
 template database during cloning.
 
-Clone reuse: after a parallel run, clones are kept. On the next run two
+Clone reuse: after a parallel run, clones are kept. On the next run three
 fingerprints detect whether the base DB has changed:
 1. Schema fingerprint — md5 of all public table columns + types
 2. XML-ID fingerprint — md5 of ir_model_data rows (module.name=model:res_id)
-If both match AND the right number of clones still exist, cloning is
+3. Module-version fingerprint — md5 of ir_module_module name=latest_version
+If all three match AND the right number of clones still exist, cloning is
 skipped entirely (~0s vs ~9s). The XML-ID fingerprint catches the common
-case where noupdate=1 data records are added without schema changes.
+case where noupdate=1 data records are added without schema changes. The
+module-version fingerprint catches a value-only migration: the schema and
+XML-ID set stay the same, but latest_version moves, so clones refresh.
 """
 
 import json
@@ -144,6 +147,68 @@ def _get_xmlid_fingerprint(db_name):
     return None
 
 
+def _get_module_version_fingerprint(db_name):
+    """
+    Compute an md5 hash of installed module versions.
+
+    A migration that only rewrites a field value on an existing record
+    changes neither the schema nor the XML-ID set. It does bump
+    ir_module_module.latest_version after -u, so this hash moves and
+    stale worker clones are discarded.
+    """
+    env = _get_pg_env()
+    args = _get_pg_args()
+    sql = (
+        "SELECT md5(string_agg("
+        "name || '=' || COALESCE(latest_version, ''), "
+        "',' ORDER BY name)) "
+        "FROM ir_module_module "
+        "WHERE state = 'installed'"
+    )
+    cmd = ["psql", "-d", db_name] + args + ["-t", "-A", "-c", sql]
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return None
+
+
+def _reuse_key_matches(
+    state,
+    *,
+    base_db,
+    fingerprint,
+    xmlid_fingerprint,
+    version_fingerprint,
+    count,
+    clone_names,
+):
+    """True when saved clone state matches the current schema, XML-ID, and version key."""
+    if not fingerprint or not xmlid_fingerprint or not version_fingerprint:
+        return False
+    return (
+        state.get("base_db") == base_db
+        and state.get("fingerprint") == fingerprint
+        and state.get("xmlid_fingerprint") == xmlid_fingerprint
+        and state.get("version_fingerprint") == version_fingerprint
+        and state.get("worker_count") == count
+        and state.get("clone_names") == clone_names
+    )
+
+
+def _reuse_miss_reasons(state, fingerprint, xmlid_fingerprint, version_fingerprint, count):
+    """Human-readable reasons the saved clone state does not match the current key."""
+    reasons = []
+    if state.get("fingerprint") != fingerprint:
+        reasons.append("schema changed")
+    if state.get("xmlid_fingerprint") != xmlid_fingerprint:
+        reasons.append("XML IDs changed")
+    if state.get("version_fingerprint") != version_fingerprint:
+        reasons.append("module versions changed")
+    if state.get("worker_count") != count:
+        reasons.append("worker count changed")
+    return reasons
+
+
 def _load_clone_state():
     """Load the clone state file. Returns dict or empty dict on any error."""
     if not os.path.exists(CLONE_STATE_PATH):
@@ -155,7 +220,9 @@ def _load_clone_state():
         return {}
 
 
-def _save_clone_state(base_db, fingerprint, xmlid_fingerprint, clone_names):
+def _save_clone_state(
+    base_db, fingerprint, xmlid_fingerprint, version_fingerprint, clone_names
+):
     """Persist the clone state so the next run can attempt reuse."""
     try:
         with open(CLONE_STATE_PATH, "w") as f:
@@ -164,6 +231,7 @@ def _save_clone_state(base_db, fingerprint, xmlid_fingerprint, clone_names):
                     "base_db": base_db,
                     "fingerprint": fingerprint,
                     "xmlid_fingerprint": xmlid_fingerprint,
+                    "version_fingerprint": version_fingerprint,
                     "clone_names": clone_names,
                     "worker_count": len(clone_names),
                 },
@@ -194,8 +262,9 @@ def _clones_exist(clone_names):
 def clone_databases(base_db, count):
     """
     Provide N worker databases, either by reusing existing clones (when the
-    base DB schema has not changed and the right number of clones still exist)
-    or by creating fresh clones via createdb -T.
+    base DB schema, XML IDs, and module versions have not changed and the
+    right number of clones still exist) or by creating fresh clones via
+    createdb -T.
 
     Returns list of clone db names.
     Raises RuntimeError if cloning is not possible (e.g. permission issues).
@@ -213,40 +282,43 @@ def clone_databases(base_db, count):
         )
 
     # Check if we can reuse clones from the previous run.
-    # Both the schema fingerprint (column definitions) and the XML-ID
-    # fingerprint (ir_model_data rows) must match. The XML-ID check
-    # catches additions of noupdate=1 data records that don't alter
-    # the schema but do change the database content.
+    # Schema, XML-ID, and module-version fingerprints must all match.
+    # The version check catches a value-only migration: same columns and
+    # same ir_model_data rows, but latest_version moved after -u.
     if config.reuse_clones():
         fingerprint = _get_db_fingerprint(base_db)
         xmlid_fingerprint = _get_xmlid_fingerprint(base_db)
+        version_fingerprint = _get_module_version_fingerprint(base_db)
         state = _load_clone_state()
-        if (
-            fingerprint
-            and xmlid_fingerprint
-            and state.get("base_db") == base_db
-            and state.get("fingerprint") == fingerprint
-            and state.get("xmlid_fingerprint") == xmlid_fingerprint
-            and state.get("worker_count") == count
-            and state.get("clone_names") == clone_names
-            and _clones_exist(clone_names)
-        ):
-            _logger.info("Reusing %d existing clone databases (schema and XML IDs unchanged)", count)
+        if _reuse_key_matches(
+            state,
+            base_db=base_db,
+            fingerprint=fingerprint,
+            xmlid_fingerprint=xmlid_fingerprint,
+            version_fingerprint=version_fingerprint,
+            count=count,
+            clone_names=clone_names,
+        ) and _clones_exist(clone_names):
+            _logger.info(
+                "Reusing %d existing clone databases "
+                "(schema, XML IDs, and module versions unchanged)",
+                count,
+            )
             return clone_names
         if state:
-            reasons = []
-            if state.get("fingerprint") != fingerprint:
-                reasons.append("schema changed")
-            if state.get("xmlid_fingerprint") != xmlid_fingerprint:
-                reasons.append("XML IDs changed")
-            if state.get("worker_count") != count:
-                reasons.append("worker count changed")
-            _logger.info("Clone cache miss — %s", ", ".join(reasons) if reasons else "creating fresh clones")
+            reasons = _reuse_miss_reasons(
+                state, fingerprint, xmlid_fingerprint, version_fingerprint, count
+            )
+            _logger.info(
+                "Clone cache miss — %s",
+                ", ".join(reasons) if reasons else "creating fresh clones",
+            )
         else:
             _logger.info("Clone cache miss — no prior state")
     else:
         fingerprint = None
         xmlid_fingerprint = None
+        version_fingerprint = None
 
     # Need fresh clones — close connections and clone
     _fresh_clone(base_db, clone_names)
@@ -257,8 +329,16 @@ def clone_databases(base_db, count):
             fingerprint = _get_db_fingerprint(base_db)
         if not xmlid_fingerprint:
             xmlid_fingerprint = _get_xmlid_fingerprint(base_db)
-        if fingerprint:
-            _save_clone_state(base_db, fingerprint, xmlid_fingerprint, clone_names)
+        if not version_fingerprint:
+            version_fingerprint = _get_module_version_fingerprint(base_db)
+        if fingerprint and xmlid_fingerprint and version_fingerprint:
+            _save_clone_state(
+                base_db,
+                fingerprint,
+                xmlid_fingerprint,
+                version_fingerprint,
+                clone_names,
+            )
 
     return clone_names
 
