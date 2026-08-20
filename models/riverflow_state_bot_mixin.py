@@ -117,10 +117,24 @@ class RiverflowStateBotMixin(models.AbstractModel):
         hand-off (e.g. Kirsten's *Hand to Barney* wizard) triggers the bot in the same
         transaction — real time, not on the next cron tick (on odoo.sh cron workers run out of
         band and slowly). The 3-min dispatch cron stays as the catch-up belt for records whose
-        inline dispatch failed (bot unbound, post error) or that were queued before activation."""
+        inline dispatch failed (bot unbound, post error) or that were queued before activation.
+
+        When a record LEAVES a slot-holding state (``in_progress`` or ``bot_login_hold``),
+        drain the oldest queued peer of the same workflow. The 3-min cron is still the
+        correctness belt; inline drain is latency sugar. Opt out with
+        ``bot_no_inline_dispatch`` (same flag as inline dispatch)."""
+        leaving_slot = self.browse()
+        if "state_id" in vals and not self.env.context.get("bot_no_inline_dispatch"):
+            leaving_slot = self.filtered(
+                lambda r: r.active and (
+                    r.state_id.bot_stage == "in_progress" or r.state_id.bot_login_hold
+                )
+            )
         res = super().write(vals)
         if "state_id" in vals:
             self._bot_dispatch_inline()
+            if leaving_slot:
+                leaving_slot._bot_drain_peers()
         return res
 
     @api.model_create_multi
@@ -243,6 +257,93 @@ class RiverflowStateBotMixin(models.AbstractModel):
         deadline = self.bot_work_started_at + timedelta(minutes=state.bot_timeout_minutes)
         return fields.Datetime.now() < deadline
 
+    def _bot_one_live_slot_defers(self):
+        """True when another record of THIS workflow holds the bot's one live slot.
+
+        Derived from service states. No occupancy row, no TTL, no release bookkeeping.
+
+        Exclude-self: a record in a ``bot_login_hold`` state is never blocked by its own
+        hold. That is the whole priority system — the parked record's login resume is
+        always admitted; fresh work is not.
+
+        Strict at dispatch for a fresh-work queue (``bot_stage == queue`` and not a
+        login-hold): any other claimed in-progress peer defers. *Register Login* is a
+        queue state AND a login-hold — it uses the relaxed fence so a stray claimed
+        peer cannot deadlock the occupant's resume.
+
+        Relaxed at consume / re-post / login-hold resume: only a consumed, in-SLA peer
+        defers (``_bot_claim_is_live``). Two claimed-unconsumed rows from a REPEATABLE
+        READ race may both post; the consume fence plus the box serializer admit one
+        browser Open. A second Open burns SMS; that happens at consume, never at post.
+
+        A serializing write on the bot row would close even the extra Discuss post.
+        That write is skipped until an impact dump shows a real double-post.
+        """
+        self.ensure_one()
+        if not self.active:
+            return False
+        workflow = self.state_id.workflow_id
+        if not workflow or not workflow.active:
+            return False
+        peer_states = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("active", "=", True),
+            "|",
+            ("bot_stage", "=", "in_progress"),
+            ("bot_login_hold", "=", True),
+        ])
+        if not peer_states:
+            return False
+        others = self.search([
+            ("state_id", "in", peer_states.ids),
+            ("id", "!=", self.id),
+            ("active", "=", True),
+        ])
+        if not others:
+            return False
+        if (not self.state_id.bot_login_hold
+                and any(o.state_id.bot_login_hold for o in others)):
+            return True
+        claimed = others.filtered(
+            lambda o: o.active and o.state_id.bot_stage == "in_progress"
+        )
+        if self.state_id.bot_stage == "queue" and not self.state_id.bot_login_hold:
+            return bool(claimed)
+        return any(o._bot_claim_is_live() for o in claimed)
+
+    def _bot_drain_peers(self):
+        """Dispatch the oldest queued peer of the same workflow.
+
+        Called after a record leaves a slot-holding state. Each peer goes through
+        ``_bot_dispatch_inline`` (savepoint per record, swallow-and-log). A failed
+        drain never rolls back the exit that freed the slot. The cron belt retries.
+        One attempt is enough: the claimed peer drains the next one when it exits.
+        """
+        if self.env.context.get("bot_no_inline_dispatch"):
+            return
+        for record in self.filtered(lambda r: r.active):
+            record._bot_drain_one_peer()
+
+    def _bot_drain_one_peer(self):
+        self.ensure_one()
+        workflow = self.state_id.workflow_id
+        if not workflow or not workflow.active:
+            return
+        queue_states = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("bot_stage", "=", "queue"),
+            ("active", "=", True),
+        ])
+        if not queue_states:
+            return
+        peer = self.search([
+            ("state_id", "in", queue_states.ids),
+            ("id", "!=", self.id),
+            ("active", "=", True),
+        ], order="id asc", limit=1)
+        if peer:
+            peer._bot_dispatch_inline()
+
     def _bot_dispatch_gate(self):
         """Domain hook: may a NEW isolated run be dispatched — or a dispatched one START — for this
         record right now? Return True to DEFER.
@@ -252,14 +353,15 @@ class RiverflowStateBotMixin(models.AbstractModel):
         already-claimed one on the ``_bot_redispatch_stalled`` belt). So a caller must return True
         only for a condition that CLEARS ON ITS OWN — never one that needs a human.
 
-        Base: never deferred (a pure engine has no bot to be unavailable). An app that wires a bot
-        overrides it — e.g. crewradar_cuneus_sign defers while a human holds Barney's attended-login
-        latch, so the human's browser and the bot's never overlap. The override is also where the
-        per-bot mutex is taken, and it MUST be taken without waiting (see
-        ``oteny.bot.login_dance_blocks_run``): a dispatch that blocks on a lock could sit in a
-        cycle, whereas a dispatch that defers simply comes back in three minutes."""
+        Base: defer when another record of this workflow holds the bot's one live slot
+        (a claimed run, or a ``bot_login_hold`` park — see ``_bot_one_live_slot_defers``).
+        An app that wires an attended-login latch overrides this and MUST call ``super()``
+        after its cheap latch check. The override is also where the per-bot dance mutex is
+        taken, and it MUST be taken without waiting (see ``oteny.bot.login_dance_blocks_run``):
+        a dispatch that blocks on a lock could sit in a cycle, whereas a dispatch that defers
+        simply comes back in three minutes."""
         self.ensure_one()
-        return False
+        return self._bot_one_live_slot_defers()
 
     def _bot_assert_human_transition_allowed(self, transition):
         """Refuse a HUMAN transition that would move this record out from under a LIVE agent run —

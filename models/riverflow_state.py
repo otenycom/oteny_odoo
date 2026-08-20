@@ -43,6 +43,14 @@ class RiverflowWorkflowState(models.Model):
         "is_bot_timeout transition. 0 disables the reaper for this state (the backstop for a dead "
         "harness that never reported back — set it comfortably above the harness's own poll window).",
     )
+    bot_login_hold = fields.Boolean(
+        "Bot Login Hold",
+        default=False,
+        help="A record in this state holds its bot's one live slot for a human sign-in. "
+        "Fresh bot work on the same workflow waits. The record's own login resume is "
+        "admitted (exclude-self). Set this on login-park and login-resume states in the "
+        "workflow XML. There is no occupancy record and no extra clock.",
+    )
 
     """
     SERVICE STATE COLORS
