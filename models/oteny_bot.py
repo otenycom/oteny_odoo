@@ -9,10 +9,20 @@ to its own record without this addon depending on it.
 import secrets
 from datetime import timedelta
 
+import mistune
 from psycopg2 import IntegrityError
 
 from odoo import _, Command, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import html_sanitize
+
+# Renders a session's markdown ``response``/``request`` for display, the same way the
+# platform's Discuss adapter renders the model's final reply before message_post
+# (hermeshost catalog/plugins/hh-discuss/discuss_wire.py::markdown_to_discuss_html).
+# hard_wrap=True turns a single "\n" into "<br>" (that adapter's python-markdown
+# "nl2br" extension) — without it a plain-text multi-line reply collapses onto one
+# line in HTML, since a bare "\n" inside a <p> is just whitespace to a browser.
+_MARKDOWN = mistune.create_markdown(hard_wrap=True)
 
 # The leading marker that tells the bot's gateway to run a Discuss message as a FRESH, isolated
 # agent turn (its own session) instead of a turn in the accumulating channel chat — the Discuss
@@ -760,6 +770,19 @@ class OtenyBotSession(models.Model):
             return False
         lines = text.splitlines()[:n]
         return "\n".join(lines) if lines else False
+
+    @staticmethod
+    def _markdown_to_html(text):
+        """Render a bot's markdown text (``response``/``request``) as sanitized HTML.
+
+        A bot writes markdown (``**bold**``, bullet lists, links); a view that reads
+        the raw field and shows it as plain text displays the literal ``**`` markers
+        instead of formatting. html_sanitize is the safety net for any tag mistune
+        passes through untouched from the bot's own markdown (mirrors the platform's
+        Discuss adapter, which sanitizes on the message body write)."""
+        if not text:
+            return False
+        return html_sanitize(_MARKDOWN(text))
 
     @api.model
     def search_latest_for_origin(self, origin_model, origin_res_id):
