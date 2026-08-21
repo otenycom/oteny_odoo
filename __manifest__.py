@@ -1,6 +1,6 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.19",  # 19.0.1.19: OtenyBotSession._markdown_to_html — a consumer view can render response/request as sanitized HTML instead of literal ** markers.  # 19.0.1.18: drop Request expander chrome that leaked under Response.  # 19.0.1.17: full-width Summary request/response + generic Discuss home-channel action.  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
+    "version": "19.0.1.20",  # 19.0.1.19: OtenyBotSession._markdown_to_html — a consumer view can render response/request as sanitized HTML instead of literal ** markers.  # 19.0.1.18: drop Request expander chrome that leaked under Response.  # 19.0.1.17: full-width Summary request/response + generic Discuss home-channel action.  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
     "depends": ["base", "mail"],
     "external_dependencies": {"python": ["mistune"]},
     "author": "Oteny",
