@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "19.0.1.1211",  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
+    "version": "19.0.1.1212",  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
     "depends": ["base", "mail", "documents", "oteny_shortcut"],
     "author": "Vriend Studio",
     "category": "Workflow",
