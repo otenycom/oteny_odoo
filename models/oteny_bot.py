@@ -679,6 +679,13 @@ class OtenyBotSession(models.Model):
     _name = "oteny.bot.session"
     _description = "Oteny Bot Activity (one exchange)"
     _order = "started_at desc, id desc"
+    # This model IS the bot's activity log: the bot writes each exchange here over /json/2/ and
+    # the owner reads it under Bot Activity. Auditing it copies every machine-written record a
+    # second time into oteny.audit.log, which buries the real business changes an auditor came
+    # to read. There is no human edit to attribute either -- ordinary users are read-only on it
+    # (security/ir.model.access.csv), so only the bot's seam user ever writes. Same call the
+    # equivalent in-process log already makes (wilma.debug.session / wilma.debug.turn).
+    _oteny_audit_ignore = True
 
     bot_id = fields.Many2one("oteny.bot", required=True, ondelete="cascade", index=True)
     discuss_channel_id = fields.Many2one(
@@ -999,6 +1006,8 @@ class OtenyBotTurn(models.Model):
     _name = "oteny.bot.turn"
     _description = "Oteny Bot Activity Turn (one LLM call)"
     _order = "session_id, sequence, id"
+    # Per-LLM-call detail under an already-ignored session -- see OtenyBotSession.
+    _oteny_audit_ignore = True
 
     session_id = fields.Many2one("oteny.bot.session", required=True, ondelete="cascade", index=True)
     sequence = fields.Integer(default=10)

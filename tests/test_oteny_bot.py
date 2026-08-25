@@ -736,3 +736,44 @@ class TestOtenyBot(TransactionCase):
         self.assertIn("not configured", msg)
         self.assertIn("administrator", msg)
         self.assertNotIn("401", str(err.exception))
+
+    def test_activity_log_models_are_audit_ignored(self):
+        """The activity log is not audited a second time.
+
+        oteny.bot.session / oteny.bot.turn ARE the bot's log — the bot writes them over
+        /json/2/ and Bot Activity reads them. Auditing them copies each machine-written
+        record into oteny.audit.log as well, which drowns the real business changes an
+        auditor opens the trail to find.
+        """
+        Session = self.env["oteny.bot.session"]
+        Turn = self.env["oteny.bot.turn"]
+        self.assertTrue(Session._oteny_audit_ignore)
+        self.assertTrue(Turn._oteny_audit_ignore)
+
+        if "oteny.audit.log" not in self.env:
+            self.skipTest("oteny_audit is not installed in this database")
+
+        self.env["oteny.bot"].create({"name": "AuditProbe", "uplink_ref": "hhAUDIT"})
+        res = self.env["oteny.bot"].record_activity(
+            "hhAUDIT",
+            {"name": "probe", "kind": "isolated_turn", "request": "r", "response": "x",
+             "outcome": "ok"},
+            turns=[{"sequence": 10, "llm_model": "m", "llm_response": "done"}])
+        self.assertTrue(res["ok"])
+        session = Session.browse(res["session_id"])
+        session.flush_recordset()
+        session.turn_ids.flush_recordset()
+
+        Log = self.env["oteny.audit.log"]
+        self.assertTrue(Log._is_audit_ignored("oteny.bot.session"))
+        self.assertTrue(Log._is_audit_ignored("oteny.bot.turn"))
+        self.assertEqual(
+            Log.search_count([("model_name", "=", "oteny.bot.session"),
+                              ("record_id", "=", session.id)]),
+            0,
+            "an activity session must not produce audit log rows")
+        self.assertEqual(
+            Log.search_count([("model_name", "=", "oteny.bot.turn"),
+                              ("record_id", "in", session.turn_ids.ids)]),
+            0,
+            "an activity turn must not produce audit log rows")
