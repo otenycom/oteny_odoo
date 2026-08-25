@@ -173,6 +173,11 @@ class OtenyAuditLog(models.Model):
     # readable, and parent refs (via `_model_parent_keys`) make the chatter
     # appear under the business record's Audit Log view.
     #
+    # A message posted into a container that is ITSELF on this list has no such
+    # business record to outlive, so it is skipped one record at a time by
+    # `mail.message._oteny_audit_ignore_record`. That is the per-RECORD lever;
+    # this set is the per-MODEL one.
+    #
     # A specific module can still re-enable auditing for any of these by
     # setting `_oteny_audit_ignore = False` on the model class.
     _DEFAULT_IGNORED_MODEL_NAMES = {

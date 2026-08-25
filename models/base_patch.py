@@ -40,6 +40,131 @@ def _maybe_strip_html(model, field_name, value):
         return value
     return _strip_html_for_audit(value)
 
+
+# --- secret redaction ---------------------------------------------------------------
+#
+# The audit log is readable by every internal user (security/ir.model.access.csv grants
+# `base.group_user` read on oteny.audit.log + the aggregated view, and the list view can
+# be searched by value). So a credential that reaches an audit row is exposed to the whole
+# staff for the whole retention window. The raw SQL read in patched_create/patched_unlink
+# also bypasses Odoo's field-level `groups=`, which is what protects `ir.mail_server.smtp_pass`
+# and `iap.account.account_token` everywhere else. Redaction is therefore fail-closed: the
+# audit log keeps the FACT of the change (who, when, which field) and drops only the value.
+AUDIT_REDACTED = "***redacted***"
+
+# Field names that always hold a credential, whatever model carries them. The match runs on
+# the field NAME; the field TYPE gate below then drops anything a credential cannot be.
+#
+# EXACT names. `smtp_pass` and `pin` have no marker word, and `credential` is exact rather
+# than a marker because rivercreds names a whole family `credential_*` after work-permit
+# DOCUMENTS (`credential_type_id`, `credential_plan_item_id`) — none of which is a secret.
+_SECRET_FIELD_NAMES = frozenset({
+    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "access_token", "refresh_token", "private_key",
+    "smtp_pass", "pin", "credential",
+})
+
+# Marker words, matched ANYWHERE in the name. A suffix rule alone missed real credentials:
+# `stripe_secret_key`, `google_calendar_rtoken`, `firebase_push_certificate_key`.
+_SECRET_NAME_MARKERS = ("password", "passwd", "secret", "token", "apikey")
+
+# Suffixes. `_key` is the largest credential family in core + enterprise — `openai_key`,
+# `avalara_api_key`, `sendcloud_secret_key`, `wise_api_key`, `partner_key`, `app_key`.
+_SECRET_FIELD_SUFFIXES = ("_key", "_credential")
+
+# The few `*_key` fields that are lookup or correlation keys rather than credentials. Only
+# names measured in THIS database go here: `wilma.api.cache.cache_key` and
+# `rivercreds.document.import.job.gemini_request_key` (which is literally `job-<id>`).
+# Bare `key` is not in any set above, so `ir.config_parameter.key` — the parameter NAME an
+# auditor must read — and `sign.template.dto.override.key` are never touched.
+_NOT_SECRET_FIELD_NAMES = frozenset({"cache_key", "gemini_request_key"})
+
+# A credential is never a number, a flag, a date or a relation. Everything else can hold one,
+# so this is a DENY list. An ALLOW list of {char, text, html} silently let a Binary private
+# key through: `ir.mail_server.smtp_ssl_private_key` is `Binary(attachment=False)`, a real
+# `bytea` column, and it wrote a full PEM into the audit log on every mail-server edit.
+_NON_SECRET_FIELD_TYPES = frozenset({
+    "integer", "float", "monetary", "boolean", "date", "datetime",
+    "many2one", "one2many", "many2many", "many2one_reference",
+})
+
+
+def _is_secret_field_name(name):
+    """True when a field name alone marks the field as holding a credential.
+
+    Name-only, so the data scrub in `migrations/19.0.1.519/post-migrate.py` can reuse the
+    exact same shape against stored rows, where no field object survives. The runtime adds
+    a field-TYPE gate on top of this; the scrub cannot, but a stored value is a string by
+    then anyway.
+    """
+    if name in _NOT_SECRET_FIELD_NAMES:
+        return False
+    if name in _SECRET_FIELD_NAMES or name.endswith(_SECRET_FIELD_SUFFIXES):
+        return True
+    return any(marker in name for marker in _SECRET_NAME_MARKERS)
+
+
+def _is_secret_field(model, field, record=None):
+    """True when `field` on `model` holds a credential that must not be logged.
+
+    Three levers, checked in order:
+      1. `_oteny_audit_redact_fields` on the model class — an explicit opt-in that mirrors
+         `_oteny_audit_html_strip_fields`, and the only one that can force a numeric or
+         relational field. Nothing in production declares it today; it is the escape hatch
+         for a credential the name shape cannot see.
+      2. The name shape above — the fail-closed default that covers every credential-shaped
+         field in the database, present and future.
+      3. `_oteny_audit_redact_record_field(field_name, record)` on the model class — for the
+         case where the answer depends on the RECORD, not the field. Only `ir.config_parameter`
+         needs it today.
+    """
+    name = field.name
+    declared = getattr(model, "_oteny_audit_redact_fields", None)
+    if declared and name in declared:
+        return True
+    if field.type in _NON_SECRET_FIELD_TYPES:
+        return False
+    if _is_secret_field_name(name):
+        return True
+    hook = getattr(model, "_oteny_audit_redact_record_field", None)
+    if hook is None or record is None:
+        return False
+    try:
+        return bool(hook(name, record))
+    except Exception:
+        # An audit hook must never break the write it is observing. Fail OPEN to auditing:
+        # a value we could not classify is kept, which is the module's normal behaviour.
+        return False
+
+
+def _maybe_redact(model, field, value, record=None):
+    """Replace a credential value with a placeholder before it reaches the audit log."""
+    if not value:
+        return value
+    if _is_secret_field(model, field, record):
+        return AUDIT_REDACTED
+    return value
+
+
+def _record_audit_ignored(model, record):
+    """Per-RECORD skip, for a model that is audited in general.
+
+    `oteny.audit.log._is_audit_ignored` answers per MODEL, which cannot express the one case
+    that needs finer grain: a `mail.message` is audited so chatter outlives the cascade-unlink
+    of its business record, but a message posted into a container that is itself audit-ignored
+    (a `discuss.channel`) has no such record to outlive. See mail_message_override.py.
+
+    Fails OPEN — if the hook raises, the record is audited as usual.
+    """
+    hook = getattr(model, "_oteny_audit_ignore_record", None)
+    if hook is None:
+        return False
+    try:
+        return bool(hook(record))
+    except Exception:
+        return False
+
+
 original_create = models.BaseModel.create
 original_unlink = models.BaseModel.unlink
 original_write = models.BaseModel.write
@@ -491,6 +616,8 @@ def patched_create(self, vals_list):
         snapshot_field_names = defaultdict(set)  # record_id -> {field_name, ...}
         model_fields = self._fields
         for record in records:
+            if _record_audit_ignored(self, record):
+                continue
             if hasattr(record, "display_name"):
                 record_display_name = record.display_name
             else:
@@ -519,6 +646,11 @@ def patched_create(self, vals_list):
                 # Measure 2: HTML-strip raw + display values for marked fields.
                 new_value_raw = _maybe_strip_html(self, col, new_value_raw)
                 new_val_display = _maybe_strip_html(self, col, new_val_display)
+                # Never store a credential. The snapshot KEEPS the field, with a placeholder
+                # value, so the change is still recorded and the aggregated view still unnests
+                # one row for it.
+                new_value_raw = _maybe_redact(self, field, new_value_raw, record)
+                new_val_display = _maybe_redact(self, field, new_val_display, record)
 
                 snapshot[col] = {
                     "raw": new_value_raw,
@@ -601,6 +733,8 @@ def patched_unlink(self):
     logs = []
     model_fields = self._fields
     for record in self:
+        if _record_audit_ignored(self, record):
+            continue
         try:
             record_display_name = record.display_name
         except Exception:
@@ -621,6 +755,10 @@ def patched_unlink(self):
             # Measure 2: strip HTML to plain text for fields marked as strippable.
             old_value_raw = _maybe_strip_html(self, col, old_value_raw)
             old_val_display = _maybe_strip_html(self, col, old_val_display)
+            # The delete tombstone is the row that would otherwise preserve a rotated-out
+            # secret for the whole retention window, so it needs the same redaction.
+            old_value_raw = _maybe_redact(self, field, old_value_raw, record)
+            old_val_display = _maybe_redact(self, field, old_val_display, record)
 
             snapshot[col] = {
                 "raw": old_value_raw,
@@ -736,6 +874,8 @@ def patched_write(self, vals):
 
         logs = []
         for record in self:
+            if _record_audit_ignored(self, record):
+                continue
             old_rec_vals = old_values_map.get(record.id, {})
             new_rec_vals = new_values_map.get(record.id, {})
             try:
@@ -760,6 +900,16 @@ def patched_write(self, vals):
                     old_val_display = _get_display_value(field, old_val_cache, record.env)
                     new_val_display = _get_display_value(field, new_val_cache, record.env)
 
+                    old_value_raw = str(old_val_cache) if old_val_cache is not None else ""
+                    new_value_raw = str(new_val_cache) if new_val_cache is not None else ""
+                    # Only x2many fields reach this branch, so no relational value can hold a
+                    # credential today. The call is here so the redaction covers every emitting
+                    # site by inspection, the way _maybe_strip_html should have.
+                    old_value_raw = _maybe_redact(self, field, old_value_raw, record)
+                    new_value_raw = _maybe_redact(self, field, new_value_raw, record)
+                    old_val_display = _maybe_redact(self, field, old_val_display, record)
+                    new_val_display = _maybe_redact(self, field, new_val_display, record)
+
                     logs.append(
                         {
                             "model_name": self._name,
@@ -767,8 +917,8 @@ def patched_write(self, vals):
                             "record_display_name": record_display_name,
                             "field_name": name,
                             "field_display_name": field.string,
-                            "old_value": str(old_val_cache) if old_val_cache is not None else "",
-                            "new_value": str(new_val_cache) if new_val_cache is not None else "",
+                            "old_value": old_value_raw,
+                            "new_value": new_value_raw,
                             "old_value_display_name": old_val_display,
                             "new_value_display_name": new_val_display,
                             "change_type": "u",
@@ -845,6 +995,15 @@ def patched_flush(self, fnames=None):
     if not all_ids:
         # All dirty fields have already been logged in this transaction.
         return original_flush(self)
+
+    # Per-record skip (see _record_audit_ignored). Resolved once per flush rather than per
+    # (field, record) pair, and only for a model that declares the hook at all.
+    skipped_ids = set()
+    if getattr(self, "_oteny_audit_ignore_record", None) is not None:
+        skipped_ids = {
+            rec.id for rec in self.sudo().browse(all_ids) if _record_audit_ignored(self, rec)
+        }
+        all_ids -= skipped_ids
 
     # Get display names for all affected records
     display_names = {}
@@ -927,6 +1086,8 @@ def patched_flush(self, fnames=None):
 
     for name, field in loggable_fields_dict.items():
         for rid in batches.get(name, []):
+            if rid in skipped_ids:
+                continue
             record = self.sudo().browse(rid)
             old_val = old_values.get(rid, {}).get(name)
 
@@ -962,6 +1123,12 @@ def patched_flush(self, fnames=None):
                 new_value_raw = _maybe_strip_html(self, name, new_value_raw)
                 old_val_display = _maybe_strip_html(self, name, old_val_display)
                 new_val_display = _maybe_strip_html(self, name, new_val_display)
+                # A scalar write is the main leak path: a rotation puts BOTH the old and the
+                # new credential in one row.
+                old_value_raw = _maybe_redact(self, field, old_value_raw, record)
+                new_value_raw = _maybe_redact(self, field, new_value_raw, record)
+                old_val_display = _maybe_redact(self, field, old_val_display, record)
+                new_val_display = _maybe_redact(self, field, new_val_display, record)
 
                 logs.append(
                     {
