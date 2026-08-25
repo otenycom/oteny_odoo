@@ -105,7 +105,14 @@ def migrate(cr, version):
     total += _scrub_secret_named_fields(cr)
     total += _scrub_secret_config_parameters(cr)
     if total:
-        _logger.warning(
+        # INFO, not WARNING, on purpose. This migration replays on every copy of the
+        # database — each staging rebuild, each production restore into test1/test2, each
+        # laptop restore — and re-redacts the same rows the restore just brought back. At
+        # WARNING it turns every odoo.sh build amber for work nobody can do on that copy,
+        # and a build that is always amber is one nobody reads. The rotation is a one-time
+        # human task, and it is tracked where a human will find it: the `oteny-audit` skill
+        # roadmap, "Rotate the credentials that were exposed", with the key list and an owner.
+        _logger.info(
             "post-migrate 19.0.1.519: redacted %d audit log rows that held a credential in "
             "cleartext. Every credential involved must still be ROTATED — redacting the log "
             "does not un-expose a value every internal user could already read.",
