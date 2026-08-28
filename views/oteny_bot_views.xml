@@ -9,8 +9,8 @@
                 <field name="name"/>
                 <field name="bot_user_id"/>
                 <field name="discuss_channel_id"/>
-                <field name="uplink_ref"/>
-                <field name="session_count"/>
+                <field name="uplink_ref" optional="hide"/>
+                <field name="session_count" optional="hide"/>
             </list>
         </field>
     </record>
@@ -20,6 +20,17 @@
         <field name="model">oteny.bot</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <field name="login_dance_is_active" invisible="1"/>
+                    <button name="action_open_discuss_channel" type="object"
+                            string="Open Discuss"
+                            invisible="not discuss_channel_id"
+                            groups="oteny_bot.group_oteny_bot_manager"/>
+                    <button name="action_login_dance_force_clear" type="object"
+                            string="Clear login dance"
+                            invisible="not login_dance_is_active"
+                            groups="oteny_bot.group_oteny_bot_manager"/>
+                </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_open_sessions" type="object" class="oe_stat_button" icon="fa-comments-o">
@@ -32,12 +43,17 @@
                         <code>uplink_status</code> (<code>auth_failed</code> → re-mint / re-provision).
                         Website login is not the Talent debug path.
                     </div>
-                    <group>
+                    <group name="identity">
                         <field name="name"/>
                         <field name="bot_user_id"/>
                         <field name="discuss_channel_id"/>
                         <field name="uplink_ref"/>
                         <field name="active"/>
+                    </group>
+                    <group name="login_dance" string="Login dance"
+                           invisible="not login_dance_is_active">
+                        <field name="login_dance_user_id"/>
+                        <field name="login_dance_until"/>
                     </group>
                     <notebook>
                         <page string="Role Channels" name="role_channels">
@@ -209,6 +225,7 @@
 
     <!-- menu (manager-gated) -->
     <menuitem id="oteny_bot_menu_root" name="Oteny Bots" sequence="90"
+              web_icon="oteny_bot,static/description/icon.png"
               groups="oteny_bot.group_oteny_bot_manager"/>
     <menuitem id="oteny_bot_menu_bots" name="Bots" parent="oteny_bot_menu_root"
               action="oteny_bot_action" sequence="10"/>

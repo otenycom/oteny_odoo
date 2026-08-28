@@ -115,6 +115,12 @@ class OtenyBot(models.Model):
         "that release it are per-user and per-record, so 'stop the dance' must mean 'stop MY "
         "dance' — without the epoch, anyone's Cancel would release whoever's dance was live and "
         "re-open the run/login overlap the latch exists to close. Same fence as bot_claim_token.")
+    login_dance_is_active = fields.Boolean(
+        compute="_compute_login_dance_is_active",
+        help="True while a login dance latch is in the future. The form uses this "
+        "to show Clear login dance. Prefer this over the lock so a list read "
+        "never waits.",
+    )
 
     @api.depends("session_ids")
     def _compute_session_count(self):
@@ -206,6 +212,37 @@ class OtenyBot(models.Model):
             "login_dance_token": token,
         })
         return token
+
+    @api.depends("login_dance_until")
+    def _compute_login_dance_is_active(self):
+        now = fields.Datetime.now()
+        for bot in self:
+            bot.login_dance_is_active = bool(
+                bot.login_dance_until and bot.login_dance_until > now
+            )
+
+    def login_dance_force_clear(self):
+        """Manager override: empty the dance latch without the epoch token.
+
+        ``login_dance_stop`` is compare-and-clear. A stuck latch whose token
+        is gone would no-op and look like a hang. Take the mutex, then write
+        the three fields empty. Manager group only.
+        """
+        self.ensure_one()
+        if not self.env.user.has_group("oteny_bot.group_oteny_bot_manager"):
+            raise UserError(_(
+                "Only an Oteny Bot Manager can clear a login dance."
+            ))
+        self.login_dance_hold()
+        self.sudo().write({
+            "login_dance_until": False,
+            "login_dance_user_id": False,
+            "login_dance_token": False,
+        })
+
+    def action_login_dance_force_clear(self):
+        self.login_dance_force_clear()
+        return True
 
     def login_dance_stop(self, token):
         """COMPARE-and-clear: release the latch ONLY if ``token`` is the CURRENT dance's epoch.

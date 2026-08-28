@@ -777,3 +777,46 @@ class TestOtenyBot(TransactionCase):
                               ("record_id", "in", session.turn_ids.ids)]),
             0,
             "an activity turn must not produce audit log rows")
+
+    def test_login_dance_is_active_true_false(self):
+        bot = self.env["oteny.bot"].create({"name": "DanceActive"})
+        self.assertFalse(bot.login_dance_is_active)
+        bot.login_dance_start()
+        self.assertTrue(bot.login_dance_is_active)
+        bot.sudo().login_dance_until = fields.Datetime.now() - timedelta(seconds=1)
+        self.assertFalse(bot.login_dance_is_active)
+
+    def test_login_dance_force_clear_empties_latch(self):
+        bot = self.env["oteny.bot"].create({"name": "DanceClear"})
+        bot.login_dance_start()
+        self.assertTrue(bot.login_dance_is_active)
+        bot.login_dance_force_clear()
+        self.assertFalse(bot.login_dance_until)
+        self.assertFalse(bot.login_dance_user_id)
+        self.assertFalse(bot.login_dance_token)
+        self.assertFalse(bot.login_dance_is_active)
+
+    def test_login_dance_stop_stale_token_noops(self):
+        bot = self.env["oteny.bot"].create({"name": "DanceStale"})
+        token = bot.login_dance_start()
+        self.assertFalse(bot.login_dance_stop("stale-token-not-epoch"))
+        self.assertTrue(bot.login_dance_active())
+        self.assertTrue(bot.login_dance_stop(token))
+        self.assertFalse(bot.login_dance_active())
+
+    def test_login_dance_force_clear_manager_only(self):
+        bot = self.env["oteny.bot"].create({"name": "DanceMgr"})
+        bot.login_dance_start()
+        user = self.env["res.users"].create({
+            "name": "Plain Dance",
+            "login": "plain_dance_clear",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])],
+        })
+        with self.assertRaises(UserError):
+            bot.with_user(user).login_dance_force_clear()
+        self.assertTrue(bot.login_dance_active())
+
+    def test_oteny_bots_app_uses_brand_icon(self):
+        menu = self.env.ref("oteny_bot.oteny_bot_menu_root")
+        self.assertEqual(menu.web_icon, "oteny_bot,static/description/icon.png")
+        self.assertTrue(menu.web_icon_data)
