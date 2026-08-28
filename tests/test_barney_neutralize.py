@@ -17,7 +17,7 @@ from odoo.addons.oteny_bot.models.oteny_broker import (
     TOKEN_REPLAY_VIEW_PARAM,
 )
 
-LOGIN_URL_PARAM = "oteny.portal_login_url"
+LOGIN_URL_PARAM = "posted_workers_nl_url"
 NEUTRALIZE_SQL = Path(__file__).resolve().parents[1] / "data" / "neutralize.sql"
 
 # Every broker / portal param the client + provisioner write — the SQL must name them all.

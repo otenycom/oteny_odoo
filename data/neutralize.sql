@@ -10,7 +10,8 @@ DELETE FROM ir_config_parameter
        'oteny.broker_token',
        'oteny.broker_token_live_watch',
        'oteny.broker_token_replay_view',
-       'oteny.portal_login_url'
+       'oteny.portal_login_url',
+       'posted_workers_nl_url'
 );
 
 UPDATE oteny_bot
