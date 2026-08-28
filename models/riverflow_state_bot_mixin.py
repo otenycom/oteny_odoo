@@ -108,7 +108,13 @@ class RiverflowStateBotMixin(models.AbstractModel):
                 self.env["riverflow.state"].browse(vals["state_id"]) if vals["state_id"] else False
             )
             in_progress = bool(new_state and new_state.bot_stage == "in_progress")
-            vals["bot_work_started_at"] = fields.Datetime.now() if in_progress else False
+            queue_sla = bool(
+                new_state
+                and new_state.bot_stage == "queue"
+                and new_state.bot_timeout_minutes > 0
+            )
+            stamp_clock = in_progress or queue_sla
+            vals["bot_work_started_at"] = fields.Datetime.now() if stamp_clock else False
             vals["bot_claim_token"] = secrets.token_urlsafe(9) if in_progress else False
             vals["bot_run_started_at"] = False
 
@@ -521,18 +527,20 @@ class RiverflowStateBotMixin(models.AbstractModel):
 
     @api.model
     def _bot_reap_timeouts(self):
-        """Escalate bot in-progress records stuck past their state's SLA — the timeout reaper, run by
-        an ir.cron on each concrete workflow-bearing model. For every ``in_progress`` state with a
-        positive ``bot_timeout_minutes``, any record whose ``bot_work_started_at`` is older than the
-        SLA is advanced through that state's ``is_bot_timeout`` transition (the reaper's exit,
-        distinct from the agent's own escalate). The reaper passes the token it READS as its
-        ``work_token``: ``bot_claim`` re-checks it under the row lock, so a record whose run
-        completed (or whose token rotated) between the read and the lock is a clean no-op — the
-        reaper can never revert a just-completed record. Returns the count reaped. This is the
-        backstop for a harness that died mid-run and never reported back."""
+        """Escalate bot records stuck past their state's SLA — the timeout reaper, run by
+        an ir.cron on each concrete workflow-bearing model. For every ``in_progress`` or
+        timeout-enabled ``queue`` state with a positive ``bot_timeout_minutes``, any record
+        whose ``bot_work_started_at`` is older than the SLA is advanced through that state's
+        ``is_bot_timeout`` transition (the reaper's exit, distinct from the agent's own
+        escalate). The reaper passes the token it READS as its ``work_token``: ``bot_claim``
+        re-checks it under the row lock, so a record whose run completed (or whose token
+        rotated) between the read and the lock is a clean no-op — the reaper can never
+        revert a just-completed record. A queue state has no claim token, so the fence
+        does not apply. Returns the count reaped. This is the backstop for a harness that
+        died mid-run and never reported back, and for a login-hold queue that froze."""
         now = fields.Datetime.now()
         states = self.env["riverflow.state"].search([
-            ("bot_stage", "=", "in_progress"),
+            ("bot_stage", "in", ("in_progress", "queue")),
             ("bot_timeout_minutes", ">", 0),
         ])
         reaped = 0

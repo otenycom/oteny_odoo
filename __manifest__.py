@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "19.0.1.1214",  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
+    "version": "19.0.1.1215",  # 19.0.1.1215: hide claim/work from HR; no primary on bot queue/fill; live claim shows a working note; queue SLA reaper.  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
     "depends": ["base", "mail", "documents", "oteny_shortcut"],
     "author": "Vriend Studio",
     "category": "Workflow",
