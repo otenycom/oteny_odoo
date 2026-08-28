@@ -64,6 +64,10 @@ _logger = logging.getLogger(__name__)
 # per epoch, so a re-post that races a live pickup is dropped (never a double side effect).
 _BOT_REDISPATCH_GRACE_MINUTES = 3
 _BOT_REDISPATCH_CEILING_MINUTES = 30
+# A leftover SLA-less login park older than this stays human-owned.
+# Drain resumes only a fresh park so a forgotten card cannot steal
+# the slot (the 24836 class). The cron belt does not promote parks.
+_BOT_LOGIN_PARK_FRESH_HOURS = 4
 
 
 class RiverflowStateBotMixin(models.AbstractModel):
@@ -126,9 +130,11 @@ class RiverflowStateBotMixin(models.AbstractModel):
         inline dispatch failed (bot unbound, post error) or that were queued before activation.
 
         When a record LEAVES a slot-holding state (``in_progress`` or ``bot_login_hold``),
-        drain the oldest queued peer of the same workflow. The 3-min cron is still the
-        correctness belt; inline drain is latency sugar. Opt out with
-        ``bot_no_inline_dispatch`` (same flag as inline dispatch)."""
+        drain the oldest queued peer of the same workflow. If no queue peer waits,
+        resume one fresh SLA-less login park (``_bot_resume_login_park``). The 3-min
+        cron is still the correctness belt for queue; it does not promote parks.
+        Inline drain is latency sugar. Opt out with ``bot_no_inline_dispatch``
+        (same flag as inline dispatch)."""
         leaving_slot = self.browse()
         if "state_id" in vals and not self.env.context.get("bot_no_inline_dispatch"):
             leaving_slot = self.filtered(
@@ -273,9 +279,11 @@ class RiverflowStateBotMixin(models.AbstractModel):
         always admitted; fresh work is not.
 
         Strict at dispatch for a fresh-work queue (``bot_stage == queue`` and not a
-        login-hold): any other claimed in-progress peer defers. *Register Login* is a
-        queue state AND a login-hold — it uses the relaxed fence so a stray claimed
-        peer cannot deadlock the occupant's resume.
+        login-hold): any other claimed in-progress peer defers, and a login-hold
+        that occupies the slot (SLA or in_progress) defers too. A SLA-less park
+        such as *Needs Login* does not occupy. *Register Login* is a queue state
+        AND a login-hold — it uses the relaxed fence so a stray claimed peer
+        cannot deadlock the occupant's resume.
 
         Relaxed at consume / re-post / login-hold resume: only a consumed, in-SLA peer
         defers (``_bot_claim_is_live``). Two claimed-unconsumed rows from a REPEATABLE
@@ -307,8 +315,11 @@ class RiverflowStateBotMixin(models.AbstractModel):
         ])
         if not others:
             return False
+        # A SLA-less login park (Needs Login) must not freeze the fleet.
+        # The dance latch covers a live sign-in. Register Login / Relogin
+        # carry a clock, so they still occupy the slot.
         if (not self.state_id.bot_login_hold
-                and any(o.state_id.bot_login_hold for o in others)):
+                and any(o._bot_login_hold_occupies_slot() for o in others)):
             return True
         claimed = others.filtered(
             lambda o: o.active and o.state_id.bot_stage == "in_progress"
@@ -317,13 +328,120 @@ class RiverflowStateBotMixin(models.AbstractModel):
             return bool(claimed)
         return any(o._bot_claim_is_live() for o in claimed)
 
+    def _bot_login_hold_occupies_slot(self):
+        """True when THIS login-hold should block a sibling's fresh work.
+
+        Needs Login is human-owned and has no SLA. Treating it as an occupant
+        parks every new Hand until someone clears that card — an unbounded
+        block. Register Login (queue + SLA) and Relogin (in_progress) occupy.
+        """
+        self.ensure_one()
+        state = self.state_id
+        if not state.bot_login_hold:
+            return False
+        if state.bot_stage == "in_progress":
+            return True
+        return state.bot_timeout_minutes > 0
+
+    def _bot_one_live_slot_occupant(self):
+        """The sibling that occupies the one live slot, or empty."""
+        self.ensure_one()
+        if not self.active:
+            return self.browse()
+        workflow = self.state_id.workflow_id
+        if not workflow or not workflow.active:
+            return self.browse()
+        peer_states = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("active", "=", True),
+            "|",
+            ("bot_stage", "=", "in_progress"),
+            ("bot_login_hold", "=", True),
+        ])
+        if not peer_states:
+            return self.browse()
+        others = self.search([
+            ("state_id", "in", peer_states.ids),
+            ("id", "!=", self.id),
+            ("active", "=", True),
+        ])
+        for other in others:
+            if other._bot_login_hold_occupies_slot():
+                return other
+        claimed = others.filtered(
+            lambda o: o.active and o.state_id.bot_stage == "in_progress"
+        )
+        if self.state_id.bot_stage == "queue" and not self.state_id.bot_login_hold:
+            return claimed[:1]
+        live = claimed.filtered(lambda o: o._bot_claim_is_live())
+        return live[:1]
+
+    @api.model
+    def _bot_one_live_slot_occupant_of_workflow(self, workflow):
+        """The record that occupies the one live slot for ``workflow``, or empty.
+
+        Same occupy rules as ``_bot_one_live_slot_occupant``, without
+        exclude-self. A SLA-less login park is not an occupant. *Register
+        Login* and *Relogin* occupy. A claimed ``in_progress`` record
+        occupies. Used by the operator UI so it does not start from one
+        service.
+        """
+        if not workflow or not workflow.active:
+            return self.browse()
+        peer_states = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("active", "=", True),
+            "|",
+            ("bot_stage", "=", "in_progress"),
+            ("bot_login_hold", "=", True),
+        ])
+        if not peer_states:
+            return self.browse()
+        records = self.search([
+            ("state_id", "in", peer_states.ids),
+            ("active", "=", True),
+        ])
+        for rec in records:
+            if rec._bot_login_hold_occupies_slot():
+                return rec
+        claimed = records.filtered(
+            lambda r: r.active and r.state_id.bot_stage == "in_progress"
+        )
+        return claimed[:1]
+
+    @api.model
+    def _bot_one_live_slot_queued_of_workflow(self, workflow, occupant=None):
+        """Queued records of ``workflow`` that wait, occupant excluded.
+
+        Same occupy rules: a *Register Login* occupant is not counted as
+        waiting. A SLA-less leftover park is not ``queue``, so it is not
+        in this set.
+        """
+        if not workflow or not workflow.active:
+            return self.browse()
+        queue_states = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("bot_stage", "=", "queue"),
+            ("active", "=", True),
+        ])
+        if not queue_states:
+            return self.browse()
+        domain = [
+            ("state_id", "in", queue_states.ids),
+            ("active", "=", True),
+        ]
+        if occupant:
+            domain.append(("id", "!=", occupant.id))
+        return self.search(domain)
+
     def _bot_drain_peers(self):
         """Dispatch the oldest queued peer of the same workflow.
 
         Called after a record leaves a slot-holding state. Each peer goes through
         ``_bot_dispatch_inline`` (savepoint per record, swallow-and-log). A failed
-        drain never rolls back the exit that freed the slot. The cron belt retries.
-        One attempt is enough: the claimed peer drains the next one when it exits.
+        drain never rolls back the exit that freed the slot. The cron belt retries
+        queue. One attempt is enough: the claimed peer drains the next one when
+        it exits. If no queue peer waits, resume one fresh SLA-less login park.
         """
         if self.env.context.get("bot_no_inline_dispatch"):
             return
@@ -340,15 +458,77 @@ class RiverflowStateBotMixin(models.AbstractModel):
             ("bot_stage", "=", "queue"),
             ("active", "=", True),
         ])
-        if not queue_states:
+        if queue_states:
+            peer = self.search([
+                ("state_id", "in", queue_states.ids),
+                ("id", "!=", self.id),
+                ("active", "=", True),
+            ], order="id asc", limit=1)
+            if peer:
+                peer._bot_dispatch_inline()
+                return
+        self._bot_drain_login_park()
+
+    def _bot_sla_less_login_hold_states(self, workflow):
+        """States that park a human without occupying the one live slot."""
+        holds = self.env["riverflow.state"].search([
+            ("workflow_id", "=", workflow.id),
+            ("bot_login_hold", "=", True),
+            ("active", "=", True),
+        ])
+        return holds.filtered(
+            lambda s: s.bot_stage != "in_progress" and s.bot_timeout_minutes <= 0
+        )
+
+    def _bot_login_park_since(self):
+        """Cutoff for a leftover SLA-less login park. Tests patch this."""
+        return fields.Datetime.now() - timedelta(hours=_BOT_LOGIN_PARK_FRESH_HOURS)
+
+    def _bot_drain_login_park(self):
+        """Resume one fresh SLA-less login park after a sibling freed the slot.
+
+        Queue peers win. A leftover park older than
+        ``_BOT_LOGIN_PARK_FRESH_HOURS`` stays human-owned so a forgotten
+        card cannot steal the slot (24836 class). The cron belt does not
+        promote parks. HR Continue after login still works.
+        """
+        self.ensure_one()
+        if (self.state_id.bot_stage == "in_progress"
+                or self._bot_login_hold_occupies_slot()):
             return
-        peer = self.search([
-            ("state_id", "in", queue_states.ids),
+        if self._bot_one_live_slot_occupant():
+            return
+        workflow = self.state_id.workflow_id
+        if not workflow or not workflow.active:
+            return
+        park_states = self._bot_sla_less_login_hold_states(workflow)
+        if not park_states:
+            return
+        since = self._bot_login_park_since()
+        park = self.search([
+            ("state_id", "in", park_states.ids),
             ("id", "!=", self.id),
             ("active", "=", True),
-        ], order="id asc", limit=1)
-        if peer:
-            peer._bot_dispatch_inline()
+            ("write_date", ">=", since),
+        ], order="write_date desc, id desc", limit=1)
+        if not park:
+            return
+        try:
+            with self.env.cr.savepoint():
+                park.sudo()._bot_resume_login_park()
+        except Exception:  # noqa: BLE001
+            _logger.exception(
+                "login-park resume failed for %s(%s) after %s(%s) freed the slot",
+                park._name, park.id, self._name, self.id,
+            )
+
+    def _bot_resume_login_park(self):
+        """Domain hook: advance this SLA-less login park into its resume queue.
+
+        Base is a no-op. An app writes the park into the login-resume queue
+        state so ``_bot_dispatch_inline`` claims it. Do not mint a claim here.
+        """
+        return False
 
     def _bot_dispatch_gate(self):
         """Domain hook: may a NEW isolated run be dispatched — or a dispatched one START — for this
@@ -511,17 +691,28 @@ class RiverflowStateBotMixin(models.AbstractModel):
         return {"ok": True, "state": record.state_id.name}
 
     @api.model
-    def bot_token_check(self, res_id, work_token):
+    def bot_token_check(self, res_id=None, work_token=None, **_unused):
         """Read-only epoch probe for the RUNNING agent: ``{ok: True}`` iff the record is still in
         a bot ``in_progress`` state and ``work_token`` is its current ``bot_claim_token``. The
         skill runs this immediately before any irreversible action (portal submit) — not ok means
-        the run was timed out/reaped and the work re-assigned, so it must STOP."""
-        record = self.browse(res_id).exists()
+        the run was timed out/reaped and the work re-assigned, so it must STOP.
+
+        ``res_id`` plus ``work_token`` is the documented call. A call that only
+        sends ``work_token`` still resolves: the token names one claim epoch.
+        Extra kwargs are ignored so a leftover ``number`` from
+        ``bot_set_mfnl_concept_number`` cannot 422.
+        """
+        if not work_token:
+            return {"ok": False, "reason": "missing work token"}
+        if res_id:
+            record = self.browse(res_id).exists()
+        else:
+            record = self.search([("bot_claim_token", "=", work_token)], limit=1)
         if not record:
             return {"ok": False, "reason": "unknown record"}
         if record.state_id.bot_stage != "in_progress":
             return {"ok": False, "state": record.state_id.name, "reason": "not in progress"}
-        if not work_token or work_token != record.bot_claim_token:
+        if work_token != record.bot_claim_token:
             return {"ok": False, "reason": "stale work token"}
         return {"ok": True, "state": record.state_id.name}
 
