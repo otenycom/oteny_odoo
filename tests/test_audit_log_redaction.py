@@ -230,7 +230,7 @@ class TestAuditLogRedaction(TransactionCase):
             self.assertTrue(is_secret_param_key(key), key)
         # The last four are why the match is on WORDS, not substrings: `tokens` is not
         # `token`, `keys` is not `key`, and two real keys are explicit exceptions.
-        for key in ("web.base.url", "oteny.broker_base_url", "oteny.portal_login_url",
+        for key in ("web.base.url", "oteny.broker_base_url", "posted_workers_nl_url",
                     "mfnl_stub.require_login", "database.uuid", "", None,
                     "wilma.llm_max_tokens", "portal.allow_api_keys",
                     "auth_signup.reset_password", "recaptcha_public_key"):
