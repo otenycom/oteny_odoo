@@ -1,6 +1,6 @@
 """HR never sees claim/work. Live claim shows a working note. Queue has no primary."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from odoo import fields
 from odoo.tests import tagged
@@ -105,6 +105,19 @@ class TestTransitionButtonsBotHide(TransactionCase):
         payload = rec.transition_buttons_json
         self.assertEqual(payload["buttons"], [])
         self.assertIn("working", (payload.get("working_note") or "").lower())
+
+    def test_working_note_uses_user_timezone(self):
+        rec = self._make("TzNote", self.state_run)
+        rec.bot_work_started_at = datetime(2026, 8, 29, 19, 4, 33)
+        self.env.user.tz = "UTC"
+        utc_note = rec.with_context(tz="UTC")._bot_working_note()
+        self.assertIn("2026-08-29 19:04:33", utc_note)
+        self.assertIn("2026-08-29 19:34:33", utc_note)
+        self.env.user.tz = "Europe/Amsterdam"
+        ams_note = rec.with_context(tz="Europe/Amsterdam")._bot_working_note()
+        self.assertIn("2026-08-29 21:04:33", ams_note)
+        self.assertIn("2026-08-29 21:34:33", ams_note)
+        self.assertNotIn("2026-08-29 19:04:33", ams_note)
 
     def test_queue_with_sla_stamps_the_clock(self):
         rec = self._make("SlaQ", self.state_queue)

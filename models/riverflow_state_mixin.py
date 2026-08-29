@@ -163,6 +163,17 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             )
         )
 
+    def _format_bot_working_clock(self, when):
+        """Naive UTC Datetime as the viewing user's wall clock.
+
+        Form widgets already convert via ``env.tz``. The working-note banner
+        interpolates the same instants as text, so it must convert too.
+        """
+        if not when:
+            return ""
+        local = fields.Datetime.context_timestamp(self, when)
+        return fields.Datetime.to_string(local) or ""
+
     def _bot_working_note(self):
         """Generic strip when a live claim hides every button."""
         self.ensure_one()
@@ -172,8 +183,8 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
         return _(
             "The bot is working. Started %(started)s. It is handed back at "
             "%(deadline)s if it does not finish.",
-            started=started or "",
-            deadline=deadline or "",
+            started=self._format_bot_working_clock(started),
+            deadline=self._format_bot_working_clock(deadline),
         )
 
     @api.depends(
