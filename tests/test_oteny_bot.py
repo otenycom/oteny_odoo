@@ -2,9 +2,11 @@
 
 from datetime import timedelta
 
+from PIL import Image
 from psycopg2 import IntegrityError
 
 from odoo import Command, fields
+from odoo.tools import file_open
 from odoo.addons.oteny_bot.models.oteny_bot import (
     ISOLATED_TURN_SENTINEL,
     VERBOSE_SENTINEL,
@@ -820,3 +822,40 @@ class TestOtenyBot(TransactionCase):
         menu = self.env.ref("oteny_bot.oteny_bot_menu_root")
         self.assertEqual(menu.web_icon, "oteny_bot,static/description/icon.png")
         self.assertTrue(menu.web_icon_data)
+        # Flat-top cell: the sharp points are left and right. A clipped
+        # source turns those points into a tall vertical chord. The mark
+        # must also fill most of the tile — the home menu already pads.
+        with file_open("oteny_bot/static/description/icon.png", "rb") as icon_file:
+            im = Image.open(icon_file).convert("RGBA")
+        width, height = im.size
+        self.assertEqual(width, height)
+        pixels = im.load()
+
+        def is_paint(pixel):
+            return pixel[3] > 16
+
+        min_x, min_y, max_x, max_y = width, height, -1, -1
+        left_ys = []
+        right_ys = []
+        for y in range(height):
+            for x in range(width):
+                if is_paint(pixels[x, y]):
+                    if x < min_x:
+                        min_x = x
+                    if y < min_y:
+                        min_y = y
+                    if x > max_x:
+                        max_x = x
+                    if y > max_y:
+                        max_y = y
+        for y in range(height):
+            if is_paint(pixels[min_x, y]):
+                left_ys.append(y)
+            if is_paint(pixels[max_x, y]):
+                right_ys.append(y)
+        content_w = max_x - min_x + 1
+        self.assertGreaterEqual(content_w / width, 0.80)
+        self.assertGreaterEqual(min_x, 4)
+        self.assertGreaterEqual(width - 1 - max_x, 4)
+        self.assertLessEqual(max(left_ys) - min(left_ys) + 1, 8)
+        self.assertLessEqual(max(right_ys) - min(right_ys) + 1, 8)
