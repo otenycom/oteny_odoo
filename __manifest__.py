@@ -1,6 +1,6 @@
 {
     "name": "Riverflow",
-    "version": "19.0.1.1233",  # 19.0.1.1224: working-note clocks use the viewing user's timezone.  # 19.0.1.1218: occupant-of-workflow + queued search for the operator UI.  # 19.0.1.1217: drain resumes a fresh SLA-less login park; bot_token_check accepts work_token-only.  # 19.0.1.1216: a SLA-less login park does not occupy the one-live-slot.  # 19.0.1.1215: hide claim/work from HR; no primary on bot queue/fill; live claim shows a working note; queue SLA reaper.  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
+    "version": "19.0.1.1234",  # 19.0.1.1224: working-note clocks use the viewing user's timezone.  # 19.0.1.1218: occupant-of-workflow + queued search for the operator UI.  # 19.0.1.1217: drain resumes a fresh SLA-less login park; bot_token_check accepts work_token-only.  # 19.0.1.1216: a SLA-less login park does not occupy the one-live-slot.  # 19.0.1.1215: hide claim/work from HR; no primary on bot queue/fill; live claim shows a working note; queue SLA reaper.  # 19.0.1.1203: bot_login_hold on riverflow.state + one-live-slot drain
     "depends": ["base", "mail", "documents", "oteny_shortcut"],
     "author": "Vriend Studio",
     "category": "Workflow",
