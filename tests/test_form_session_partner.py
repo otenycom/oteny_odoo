@@ -5,6 +5,7 @@ A bot browses the same list and form a person already has on
 ``odoo.tests.form.Form``. It does not import riverflow.
 """
 
+from odoo import Command
 from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
 
@@ -23,6 +24,11 @@ class TestFormSessionPartner(TransactionCase):
         self.assertIn("base.action_partner_form", xmlids)
         self.assertIn("base.view_partner_tree", xmlids)
         self.assertIn("base.view_partner_form", xmlids)
+        aliased = self.Session.views(res_model="res.partner")
+        self.assertEqual(
+            {row.get("xmlid") for row in aliased.get("actions", [])},
+            {row.get("xmlid") for row in result.get("actions", [])},
+        )
 
     def test_list_partner_visible_columns(self):
         partner = self.env["res.partner"].create({
@@ -48,7 +54,7 @@ class TestFormSessionPartner(TransactionCase):
 
     def test_create_partner(self):
         photo = self.Session.open(
-            action="base.action_partner_form",
+            xmlid="base.action_partner_form",
         )
         handle = photo["handle"]
         names = {field["name"] for field in photo["fields"]}
@@ -118,3 +124,41 @@ class TestFormSessionPartner(TransactionCase):
         with self.assertRaises(UserError) as ctx:
             self.Session.set(handle, {"name": "gone"})
         self.assertIn("handle-expired", str(ctx.exception))
+
+    def test_views_without_catalog_acl(self):
+        """A seam login may not search actions or views. The catalog still lists."""
+        user = self.env["res.users"].create({
+            "name": "Form Session Seam",
+            "login": "form_session_seam",
+            "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("base.group_partner_manager").id,
+            ])],
+        })
+        catalog_models = [
+            self.env.ref("base.model_ir_actions_act_window").id,
+            self.env.ref("base.model_ir_ui_view").id,
+        ]
+        self.env["ir.model.access"].search([
+            ("model_id", "in", catalog_models),
+            ("perm_read", "=", True),
+        ]).write({
+            "perm_read": False,
+            "perm_write": False,
+            "perm_create": False,
+            "perm_unlink": False,
+        })
+        session = self.Session.with_user(user)
+        result = session.views("res.partner")
+        xmlids = {row.get("xmlid") for row in result.get("actions", [])}
+        xmlids.update(row.get("xmlid") for row in result.get("views", []))
+        self.assertIn("base.action_partner_form", xmlids)
+        self.assertIn("base.view_partner_form", xmlids)
+        photo = session.open(action="base.action_partner_form")
+        handle = photo["handle"]
+        session.set(handle, {"name": "Form Session Seam Ada"})
+        saved = session.save(handle)
+        partner = self.env["res.partner"].browse(saved["res_id"])
+        self.assertEqual(partner.name, "Form Session Seam Ada")
+        session.unlink_record(handle)
+        self.assertFalse(partner.exists())

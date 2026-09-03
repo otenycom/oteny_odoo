@@ -38,15 +38,26 @@ class OtenyFormSession(models.TransientModel):
     fields_spec = fields.Json()
 
     @api.model
-    def views(self, model):
-        """Return act_windows and list/form xmlids the user may open."""
+    def views(self, model=None, res_model=None):
+        """Return act_windows and list/form xmlids the user may open.
+
+        The catalog lives on ``ir.actions.act_window`` and ``ir.ui.view``.
+        A seam login often cannot search those tables. Read them as sudo,
+        then keep only rows this user may open.
+
+        ``res_model`` is an alias for ``model``. ``odoo_client`` already
+        uses ``model`` for the host, so a kwargs ``model`` used to collide.
+        """
+        model = res_model or model
+        if not model:
+            raise UserError(_("views needs a model."))
         Model = self._model(model)
         Model.check_access("read")
         actions = []
-        for action in self.env["ir.actions.act_window"].search([
+        for action in self._catalog("ir.actions.act_window").search([
             ("res_model", "=", model),
         ]):
-            if action.group_ids and not (action.group_ids & self.env.user.all_group_ids):
+            if not self._user_may_open_action(action):
                 continue
             xmlid = action.xml_id or action.get_external_id().get(action.id) or ""
             actions.append({
@@ -55,10 +66,12 @@ class OtenyFormSession(models.TransientModel):
                 "view_mode": action.view_mode,
             })
         views = []
-        for view in self.env["ir.ui.view"].search([
+        for view in self._catalog("ir.ui.view").search([
             ("model", "=", model),
             ("type", "in", ("list", "form", "tree")),
         ]):
+            if not self._user_may_open_view(view):
+                continue
             xmlid = view.xml_id or view.get_external_id().get(view.id) or ""
             views.append({
                 "xmlid": xmlid,
@@ -68,10 +81,12 @@ class OtenyFormSession(models.TransientModel):
         return {"actions": actions, "views": views}
 
     @api.model
-    def list(self, action=None, model=None, view=None, domain=None, limit=80):
+    def list(self, action=None, model=None, view=None, domain=None, limit=80,
+             res_model=None, xmlid=None):
         """Open a list view. Visible scalar columns only."""
+        action, view = self._xmlid_pair(xmlid, action, view)
         resolved = self._resolve(
-            action=action, model=model, view=view, view_type="list",
+            action=action, model=res_model or model, view=view, view_type="list",
         )
         Model = self.env[resolved["model"]].with_context(resolved["context"])
         Model.check_access("read")
@@ -95,10 +110,12 @@ class OtenyFormSession(models.TransientModel):
         }
 
     @api.model
-    def open(self, action=None, model=None, view=None, res_id=None):
+    def open(self, action=None, model=None, view=None, res_id=None,
+             res_model=None, xmlid=None):
         """Open a form. No ``res_id`` runs the first ``onchange``."""
+        action, view = self._xmlid_pair(xmlid, action, view)
         resolved = self._resolve(
-            action=action, model=model, view=view, view_type="form",
+            action=action, model=res_model or model, view=view, view_type="form",
         )
         Model = self.env[resolved["model"]].with_context(resolved["context"])
         processed = self._process_form_view(Model, resolved["view_id"])
@@ -119,7 +136,9 @@ class OtenyFormSession(models.TransientModel):
             warning = result.get("warning")
         if res_id:
             warning = None
-        session = self.create({
+        # The Many2one targets are catalog rows. Create as sudo so a
+        # seam login can hold the handle. Later verbs run as the user.
+        session = self.sudo().create({
             "model_name": resolved["model"],
             "res_id": res_id or 0,
             "view_id": resolved["view_id"],
@@ -137,7 +156,7 @@ class OtenyFormSession(models.TransientModel):
                 "context": resolved["context"],
             },
         })
-        return session._photo(warning=warning)
+        return self.browse(session.id)._photo(warning=warning)
 
     @api.model
     def set(self, handle, values):
@@ -232,12 +251,14 @@ class OtenyFormSession(models.TransientModel):
             raise UserError(_(
                 "handle-expired: this form session is gone. Open the form again."
             ))
-        session = self.browse(session_id)
+        # Created as sudo so the catalog Many2ones stick. Re-enter as
+        # the calling user so later verbs keep the target-model ACL.
+        session = self.sudo().browse(session_id)
         if not session.exists():
             raise UserError(_(
                 "handle-expired: this form session is gone. Open the form again."
             ))
-        return session
+        return session.with_user(self.env.user)
 
     def _state(self):
         self.ensure_one()
@@ -367,10 +388,11 @@ class OtenyFormSession(models.TransientModel):
         return ctx if isinstance(ctx, dict) else {}
 
     def _view_forbids_delete(self):
-        if not self.view_id:
+        view_pk = self.sudo().view_id.id
+        if not view_pk:
             return False
         Model = self._target()
-        views = Model.get_views([(self.view_id.id, "form")])
+        views = Model.get_views([(view_pk, "form")])
         arch = views["views"]["form"]["arch"]
         tree = etree.fromstring(arch)
         return tree.get("delete") in ("false", "0", "False")
@@ -508,13 +530,46 @@ class OtenyFormSession(models.TransientModel):
         }
 
     @api.model
+    def _xmlid_pair(self, xmlid, action, view):
+        """Accept the skill word ``xmlid`` as ``action`` or ``view``."""
+        if not xmlid or action or view:
+            return action, view
+        record = self.sudo().env.ref(xmlid, raise_if_not_found=False)
+        if record and record._name == "ir.actions.act_window":
+            return xmlid, view
+        if record and record._name == "ir.ui.view":
+            return action, xmlid
+        raise UserError(_("Unknown xmlid %s.") % xmlid)
+
+    @api.model
+    def _catalog(self, model):
+        """Read a catalog table the seam login may not search."""
+        return self.env[model].sudo()
+
+    @api.model
+    def _user_may_open_action(self, action):
+        if action.group_ids and not (action.group_ids & self.env.user.all_group_ids):
+            return False
+        return True
+
+    @api.model
+    def _user_may_open_view(self, view):
+        if view.group_ids and not (view.group_ids & self.env.user.all_group_ids):
+            return False
+        return True
+
+    @api.model
     def _browse_xmlid(self, ref, expected_model):
         if isinstance(ref, str):
-            record = self.env.ref(ref)
+            record = self.sudo().env.ref(ref, raise_if_not_found=False)
         else:
-            record = self.env[expected_model].browse(int(ref))
-        if not record.exists() or record._name != expected_model:
+            record = self._catalog(expected_model).browse(int(ref))
+        if not record or not record.exists() or record._name != expected_model:
             raise UserError(_("Unknown %s %s.") % (expected_model, ref))
+        if expected_model == "ir.actions.act_window" and not self._user_may_open_action(record):
+            raise UserError(_("You may not open action %s.") % ref)
+        if expected_model == "ir.ui.view" and not self._user_may_open_view(record):
+            raise UserError(_("You may not open view %s.") % ref)
         return record
 
     @api.model

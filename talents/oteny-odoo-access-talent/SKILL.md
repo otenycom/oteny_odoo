@@ -62,15 +62,20 @@ and wipes a live request cache.
 
 ## Verbs
 
-Call these on `oteny.form.session` through `odoo_client`. The handle
-is the transient row id. A verb on a dead handle returns
+Call these on `oteny.form.session` through `odoo_client`. Pass
+`model='oteny.form.session'` on the tool. Put the business model in
+`kwargs` as `res_model` or `model` (`kwargs={'res_model':
+'res.partner'}`). Do not put `res.partner` in the tool's own
+`model` argument. That argument is the host.
+
+The handle is the transient row id. A verb on a dead handle returns
 `handle-expired`. Open the form again.
 
 | Verb | Job |
 | --- | --- |
 | `views` | Given a model, return the act_windows and list/form xmlids the bot user may open. Name, `view_mode`, xmlid. No arch. |
 | `list` | Open a list view. Visible scalar columns only. Domain and limit. |
-| `open` | Open a form. Pass an xmlid or a prepared `ir.actions.act_window` dict. The dict keeps wizard context. No `res_id` = first `onchange` (new). With `res_id` = `web_read` then a handle. |
+| `open` | Open a form. Pass `action`, `view`, or `xmlid` (the same token), or a prepared `ir.actions.act_window` dict. The dict keeps wizard context. No `res_id` = first `onchange` (new). With `res_id` = `web_read` then a handle. |
 | `set` | Overlay visible amendable fields. Run `onchange`. Return the photo. Surface `warning`. |
 | `save` | `web_save`. Create or write the business row. |
 | `discard` | Drop the handle. No `write`. |
