@@ -7,6 +7,10 @@ class RiverflowTransitionMixin(models.AbstractModel):
     _name = "riverflow.transition.mixin"
     _description = "Base class with function to create an action to open a transition action wizard"
 
+    def prepare_transition_action(self):
+        """Public /json/2/ door. Underscore methods are private on that pipe."""
+        return self._prepare_transition_action()
+
     def _prepare_transition_action(self):
         transition_id = self.env.context.get("transition_id")
         transition = self.env["riverflow.transition"].browse(transition_id)
@@ -60,10 +64,13 @@ class RiverflowTransitionMixin(models.AbstractModel):
             # etc.) must not leak into context where they pollute create() calls
             # on unrelated models during action_save.
             wizard_fields = set(self.env[res_model]._fields.keys())
-            for field_name in self._fields:
-                field = self._fields[field_name]
-                value = getattr(self, field_name)
-                converted_value = field.convert_to_cache(value, self)
+            # A seam login often cannot read catalog rows (ir.model).
+            # Read defaults as sudo. Later verbs still run as the user.
+            source = self.sudo()
+            for field_name in source._fields:
+                field = source._fields[field_name]
+                value = getattr(source, field_name)
+                converted_value = field.convert_to_cache(value, source)
                 if field_name in wizard_fields:
                     defaults_context["default_" + field_name] = converted_value
 

@@ -10,7 +10,7 @@ This file names no client workflow.
 
 from datetime import timedelta
 
-from odoo import fields
+from odoo import Command, fields
 from odoo.exceptions import UserError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -115,7 +115,11 @@ class TestBotExecute(TransactionCase):
         ctx = {"transition_id": transition.id}
         if bot_caller:
             ctx["riverflow_bot_caller"] = True
-        return service.with_context(**ctx)._prepare_transition_action()
+        private = service.with_context(**ctx)._prepare_transition_action()
+        public = service.with_context(**ctx).prepare_transition_action()
+        self.assertEqual(private.get("res_model"), public.get("res_model"))
+        self.assertEqual(private.get("context"), public.get("context"))
+        return public
 
     def _session(self):
         if "oteny.form.session" not in self.env:
@@ -152,6 +156,26 @@ class TestBotExecute(TransactionCase):
         extras = service.transition_buttons_json["buttons"][0]
         self.assertFalse(extras["has_visible_fields"])
         self.assertIn("set_deadline_to_today", extras["action_context_keys"])
+
+    def test_prepare_without_ir_model_acl(self):
+        user = self.env["res.users"].create({
+            "name": "Execute Seam",
+            "login": "execute_seam",
+            "group_ids": [Command.set([
+                self.env.ref("base.group_user").id,
+                self.env.ref("riverflow.group_service_writer").id,
+            ])],
+        })
+        self.env["ir.model.access"].search([
+            ("model_id", "=", self.env.ref("base.model_ir_model").id),
+            ("perm_read", "=", True),
+        ]).write({"perm_read": False})
+        service = self._make("Seam prepare", self.state_draft)
+        action = service.with_user(user).with_context(
+            transition_id=self.trans_mark_today.id,
+        ).prepare_transition_action()
+        self.assertEqual(action["type"], "ir.actions.act_window")
+        self.assertTrue(action.get("res_model"))
 
     def test_open_uses_prepare_then_form_session(self):
         service = self._make("Open door", self.state_draft)

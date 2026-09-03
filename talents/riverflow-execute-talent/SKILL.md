@@ -41,7 +41,7 @@ JSON into the DTO `search_read` the Talent already does.
 | The job is… | Do |
 | --- | --- |
 | See the same buttons a person sees | Read `transition_buttons_json` on the card. |
-| Open the wizard | Call `_prepare_transition_action`. Then part 1 `open` on that dict. |
+| Open the wizard | Call `prepare_transition_action`. Then part 1 `open` on that dict. |
 | Change a visible wizard field | Part 1 `set` on that handle. |
 | Confirm | Part 1 `save`, then wizard `action_save`. |
 | Cancel | Part 1 `discard`. |
@@ -52,7 +52,7 @@ JSON into the DTO `search_read` the Talent already does.
 
 1. Read `transition_buttons_json` on the card.
 2. Pick the button by `index` / `caption` / `context.transition_id`.
-3. Call `_prepare_transition_action` on the card.
+3. Call `prepare_transition_action` on the card.
 4. Call `oteny.form.session` `open` with the returned
    `ir.actions.act_window` dict. Keep the context.
 5. Copy `effects` from that dict onto the photo.
@@ -86,10 +86,11 @@ Do not add `bot_list_transitions`. Do not `search_read`
 
 ## Open
 
-Call `_prepare_transition_action` on the card. Then call
+Call `prepare_transition_action` on the card. Then call
 `oteny.form.session` `open` with the returned
 `ir.actions.act_window` dict. Do not open an xmlid and drop the
-context.
+context. `/json/2/` refuses the underscore name. Python still
+calls `_prepare_transition_action`.
 
 The prepare step refuses a from-state mismatch. It copies
 `riverflow_bot_caller` into the wizard context when the caller set
@@ -128,7 +129,7 @@ A tester who skips the look still uses `_fire_transition`
 ## Human fence
 
 `_bot_assert_human_transition_allowed` runs at
-`_prepare_transition_action` and at `action_save`. A person who
+`prepare_transition_action` and at `action_save`. A person who
 clicks while a live claim is on the card is refused. The claiming
 bot passes both points when `riverflow_bot_caller` is set.
 
