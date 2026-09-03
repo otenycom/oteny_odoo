@@ -11,7 +11,7 @@ This module does not import ``odoo.tests.form.Form``. It calls the live
 
 from lxml import etree
 
-from odoo import _, api, fields, models
+from odoo import Command, _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import html2plaintext
 from odoo.tools.safe_eval import safe_eval
@@ -328,14 +328,30 @@ class OtenyFormSession(models.TransientModel):
         fields_info = state.get("fields") or {}
         modifiers = state.get("modifiers") or {}
         changed = set(state.get("changed") or [])
+        create = not self.res_id
+        names = list(values) if create else list(changed)
         vals = {}
-        for fname in changed:
-            info = fields_info.get(fname) or {}
+        for fname in names:
             if fname == "id":
                 continue
-            if info.get("type") in _X2MANY_TYPES:
+            info = fields_info.get(fname) or {}
+            if create and fname not in fields_info and fname not in changed:
                 continue
             if self._eval_modifier(modifiers.get(fname, {}).get("readonly"), values):
+                continue
+            if info.get("type") in _X2MANY_TYPES:
+                if create:
+                    raw = values.get(fname) or []
+                    ids = []
+                    for item in raw:
+                        if isinstance(item, int):
+                            ids.append(item)
+                        elif isinstance(item, dict) and item.get("id"):
+                            ids.append(item["id"])
+                    if ids:
+                        vals[fname] = [Command.set(ids)]
+                continue
+            if not create and fname not in changed:
                 continue
             vals[fname] = values.get(fname)
         return vals
@@ -417,6 +433,8 @@ class OtenyFormSession(models.TransientModel):
 
     @api.model
     def _resolve(self, action=None, model=None, view=None, view_type="form"):
+        if isinstance(action, dict):
+            return self._resolve_action_dict(action, view=view, view_type=view_type)
         action_rec = False
         context = {}
         domain = []
@@ -445,6 +463,47 @@ class OtenyFormSession(models.TransientModel):
             "action_id": action_rec.id if action_rec else False,
             "context": context,
             "domain": domain,
+            "description": description,
+        }
+
+    @api.model
+    def _resolve_action_dict(self, action, view=None, view_type="form"):
+        """Open from a prepared ``ir.actions.act_window`` dict.
+
+        A bot that already called a host method which returns that dict
+        must not store a second xmlid. Context travels with the dict.
+        """
+        model = action.get("res_model") or action.get("model")
+        context = dict(action.get("context") or {})
+        description = action.get("name") or ""
+        view_id = False
+        for pair in action.get("views") or []:
+            if not pair:
+                continue
+            pair_id = pair[0]
+            pair_type = pair[1] if len(pair) > 1 else view_type
+            if pair_id and pair_type == view_type:
+                view_id = pair_id
+                break
+        if view:
+            view_rec = self._browse_xmlid(view, "ir.ui.view")
+            model = model or view_rec.model
+            view_id = view_rec.id
+        if not model:
+            raise UserError(_("Open needs a model, a view, or an action."))
+        Model = self._model(model)
+        if not view_id:
+            got = Model.get_views([(False, view_type)])
+            view_id = got["views"][view_type].get("id") or False
+        domain = action.get("domain") or []
+        if not isinstance(domain, list):
+            domain = []
+        return {
+            "model": model,
+            "view_id": view_id,
+            "action_id": False,
+            "context": context,
+            "domain": list(domain),
             "description": description,
         }
 
