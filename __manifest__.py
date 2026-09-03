@@ -1,7 +1,7 @@
 {
     "name": "Oteny Business Bot",
-    "version": "19.0.1.49",  # 19.0.1.44: render the official cell so the left/right points stay sharp on the Oteny Bots tile.  # 19.0.1.32: Oteny honeycomb on the Oteny Bots app tile.  # 19.0.1.31: login_dance_is_active + manager force-clear; dance chrome on the bot form.  # 19.0.1.19: OtenyBotSession._markdown_to_html — a consumer view can render response/request as sanitized HTML instead of literal ** markers.  # 19.0.1.18: drop Request expander chrome that leaked under Response.  # 19.0.1.17: full-width Summary request/response + generic Discuss home-channel action.  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
-    "depends": ["base", "mail"],
+    "version": "19.0.1.50",  # 19.0.1.50: oteny.form.session list/form adapter.  # 19.0.1.44: render the official cell so the left/right points stay sharp on the Oteny Bots tile.  # 19.0.1.32: Oteny honeycomb on the Oteny Bots app tile.  # 19.0.1.31: login_dance_is_active + manager force-clear; dance chrome on the bot form.  # 19.0.1.19: OtenyBotSession._markdown_to_html — a consumer view can render response/request as sanitized HTML instead of literal ** markers.  # 19.0.1.18: drop Request expander chrome that leaked under Response.  # 19.0.1.17: full-width Summary request/response + generic Discuss home-channel action.  # 19.0.1.16: last-session helpers + Summary/Technical Bot Activity form.  # 19.0.1.15: a bot may not authorize its own room.
+    "depends": ["base", "mail", "web"],
     "external_dependencies": {"python": ["mistune"]},
     "author": "Oteny",
     "category": "Productivity",

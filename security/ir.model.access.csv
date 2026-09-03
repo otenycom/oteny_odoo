@@ -7,3 +7,4 @@ access_oteny_bot_session_user,oteny.bot.session user read,model_oteny_bot_sessio
 access_oteny_bot_session_manager,oteny.bot.session manager,model_oteny_bot_session,oteny_bot.group_oteny_bot_manager,1,1,1,1
 access_oteny_bot_turn_user,oteny.bot.turn user read,model_oteny_bot_turn,base.group_user,1,0,0,0
 access_oteny_bot_turn_manager,oteny.bot.turn manager,model_oteny_bot_turn,oteny_bot.group_oteny_bot_manager,1,1,1,1
+access_oteny_form_session_user,oteny.form.session user,model_oteny_form_session,base.group_user,1,1,1,1
