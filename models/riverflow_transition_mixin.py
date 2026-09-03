@@ -11,6 +11,28 @@ class RiverflowTransitionMixin(models.AbstractModel):
         """Public /json/2/ door. Underscore methods are private on that pipe."""
         return self._prepare_transition_action()
 
+    def _check_wizard_carries_this_model(self, transition, res_model):
+        """Refuse a wizard that cannot carry this record.
+
+        A transition wizard resolves its records through ``_workflow_model``. A
+        wizard for another model sees no records, builds an empty in-memory
+        record, and then fails the state check with the misleading "Another
+        user just updated this record". Name the real cause at the button.
+        A wizard that starts a transition (``self._transient``) has no record.
+        """
+        if self._transient:
+            return
+        wizard_model = getattr(self.env[res_model], "_workflow_model", None)
+        if not wizard_model or wizard_model == "definedInDerivedClass":
+            return
+        if wizard_model != self._name:
+            raise UserError(_(
+                "Transition %(transition)s opens a %(wizard)s wizard, but this "
+                "record is a %(record)s. Give the transition an action whose "
+                "wizard applies to %(record)s.",
+                transition=transition.name, wizard=wizard_model, record=self._name,
+            ))
+
     def _prepare_transition_action(self):
         transition_id = self.env.context.get("transition_id")
         transition = self.env["riverflow.transition"].browse(transition_id)
@@ -45,6 +67,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
             odoo_view = f"riverflow.{odoo_view}"
         view = self.sudo().env.ref(odoo_view)
         res_model = view.model
+        self._check_wizard_carries_this_model(transition, res_model)
 
         defaults_context = {}
         if isWizard:
