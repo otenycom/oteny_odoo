@@ -559,13 +559,15 @@ class RiverflowStateBotMixin(models.AbstractModel):
         record that says cancelled. There is no way to un-submit, so the only correct answer is to
         make the human wait for the run — a few minutes, never open-ended.
 
-        Called from the transition-execution choke point (the transition wizard's button-click and
-        its OK), which is the HUMAN path by construction: the bot advances through ``bot_claim`` over
-        ``/json/2/`` and the reaper through ``bot_claim`` too, so neither can reach this and neither
-        needs excluding by role. The bound is the run finishing or the SLA reaper handing the record
-        back; the message says so, because a refusal whose end the user cannot see is
+        Called from the transition-execution choke points (the button and the wizard
+        OK). A person is refused. ``bot_claim`` and a flagged bot open/OK pass
+        ``riverflow_bot_caller`` so the claiming bot's own wizard still runs. The
+        bound is the run finishing or the SLA reaper handing the record back; the
+        message says so, because a refusal whose end the user cannot see is
         indistinguishable from a hang."""
         self.ensure_one()
+        if self.env.context.get("riverflow_bot_caller"):
+            return
         if not self._bot_claim_is_live():
             return
         raise UserError(_(
@@ -607,9 +609,10 @@ class RiverflowStateBotMixin(models.AbstractModel):
           it under us);
         * exiting a bot ``in_progress`` state whose stored ``bot_claim_token`` doesn't match
           ``work_token`` → ``{ok: False, reason: 'stale work token'}`` — the zombie-run fence;
-        * else the normal ORM ``record.write()`` (keeps ``_sync_workflow_with_state``, mail
-          tracking, oteny_audit) → ``{ok: True, state}`` + ``token`` when the target is a bot
-          ``in_progress`` state (the freshly minted epoch — only the claim WINNER sees it).
+        * else open-and-save the transition wizard with no pause (same
+          ``action_save`` pipeline a person uses) → ``{ok: True, state}`` +
+          ``token`` when the target is a bot ``in_progress`` state (the
+          freshly minted epoch — only the claim WINNER sees it).
 
         Kwargs are never named ``ids`` (the /json/2/ recordset selector); ``res_id`` names the
         record on THIS model (the model is implied by the /json/2/<model>/bot_claim endpoint)."""
@@ -635,15 +638,36 @@ class RiverflowStateBotMixin(models.AbstractModel):
         guard = record._bot_claim_guard(transition)
         if guard:
             return {"ok": False, "state": record.state_id.name, "reason": guard}
-        vals = {"state_id": transition.to_state_id.id}
-        if transition.to_responsible_team_id:
-            vals["responsible_team_id"] = transition.to_responsible_team_id.id
-        record.write(vals)
+        try:
+            record._bot_claim_run_wizard(transition)
+        except UserError as exc:
+            return {"ok": False, "state": record.state_id.name, "reason": str(exc)}
         result = {"ok": True, "state": record.state_id.name}
         if record.bot_claim_token:
             # the target is a bot in_progress state — hand the WINNER its fresh epoch
             result["token"] = record.bot_claim_token
         return result
+
+    def _bot_claim_run_wizard(self, transition):
+        """Open-and-save the transition wizard. No pause. No deadline-key copy."""
+        self.ensure_one()
+        record = self.with_context(
+            transition_id=transition.id,
+            riverflow_bot_caller=True,
+            active_model=self._name,
+            active_id=self.id,
+            active_ids=self.ids,
+        )
+        action = record._prepare_transition_action()
+        wizard_ctx = dict(action.get("context") or {})
+        wizard_ctx["active_model"] = self._name
+        wizard_ctx["active_id"] = self.id
+        wizard_ctx["active_ids"] = self.ids
+        wizard_ctx["riverflow_bot_caller"] = True
+        Wizard = self.env[action["res_model"]].with_context(**wizard_ctx)
+        defaults = Wizard.default_get(list(Wizard._fields))
+        wizard = Wizard.create(defaults)
+        wizard.action_save()
 
     def _bot_claim_guard(self, transition):
         """Server-side precondition for a bot advance — the ONE place a domain layer can REFUSE

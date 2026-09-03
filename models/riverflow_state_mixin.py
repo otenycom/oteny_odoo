@@ -1,6 +1,7 @@
 from odoo import _, fields, models, api
 from odoo.addons.riverflow.models.riverflow_transition_mixin import RiverflowTransitionMixin  # type: ignore
 from datetime import timedelta
+import ast
 import json
 
 
@@ -235,19 +236,19 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                             continue
 
                     primary = (not no_primary) and index == 0
-                    transition_buttons["buttons"].append(
-                        {
-                            "index": index,
-                            "caption": transition.name,
-                            "help": transition.description,
-                            "action": "action_button_click",
-                            "primary": primary,
-                            # context is posted back to the server side action method
-                            "context": {
-                                "transition_id": transition_id,
-                            },
-                        }
-                    )
+                    button = {
+                        "index": index,
+                        "caption": transition.name,
+                        "help": transition.description,
+                        "action": "action_button_click",
+                        "primary": primary,
+                        # context is posted back to the server side action method
+                        "context": {
+                            "transition_id": transition_id,
+                        },
+                    }
+                    button.update(record._transition_button_extras(transition))
+                    transition_buttons["buttons"].append(button)
                     index += 1
 
             record.transition_buttons_json = transition_buttons
@@ -307,6 +308,36 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 )
 
             record.state_id_statusbar_json = json
+
+    def _transition_button_extras(self, transition):
+        """Keys the form widget ignores. A bot reads them from the same JSON."""
+        keys = self._transition_action_context_keys(transition)
+        parsed = {key: True for key in keys}
+        default = self.env.ref(
+            "riverflow.transition_action_default", raise_if_not_found=False
+        )
+        if default and transition.action_id == default:
+            visible = bool(
+                parsed.get("followup_in_days") or parsed.get("snooze_deadline_days")
+            )
+        else:
+            visible = True
+        return {
+            "has_visible_fields": visible,
+            "action_context_keys": keys,
+        }
+
+    def _transition_action_context_keys(self, transition):
+        raw = transition.action_context
+        if not raw:
+            return []
+        try:
+            parsed = ast.literal_eval(raw) or {}
+        except (ValueError, SyntaxError):
+            return []
+        if not isinstance(parsed, dict):
+            return []
+        return list(parsed.keys())
 
     def action_button_click(self):
 

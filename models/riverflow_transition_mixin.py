@@ -30,6 +30,9 @@ class RiverflowTransitionMixin(models.AbstractModel):
 
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
+        effects = list(action_context.keys())
+        if self.env.context.get("riverflow_bot_caller"):
+            action_context["riverflow_bot_caller"] = True
 
         # Resolve the wizard model before building defaults, so we can
         # filter to only fields the wizard declares.
@@ -46,6 +49,9 @@ class RiverflowTransitionMixin(models.AbstractModel):
                 if key.startswith("default_"):
                     defaults_context[key] = value
         elif len(self.ids) == 1:
+            action_context["active_model"] = self._name
+            action_context["active_id"] = self.id
+            action_context["active_ids"] = self.ids
             # Pre-populate the wizard with current entity field values.
             # Access ALL entity fields (getattr triggers stored computes that
             # must fire for state_record tracker consistency), but only include
@@ -72,6 +78,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
             "views": [(view.id, "form")],
             "target": "new",
             "context": action_context,
+            "effects": [key for key in effects if key != "transition_id"],
         }
 
         return action

@@ -117,13 +117,11 @@ class TransitionWizard(models.AbstractModel):
                 if expected_state and current_state != expected_state:
                     raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
-                # The bot fence (the HUMAN path's choke point — the bot and the timeout reaper
-                # both advance via bot_claim over /json/2/ and never reach here). A human may
-                # not move a record out from under a LIVE agent run: the run's irreversible act
-                # and the record catching up with it are seconds apart, and a transition landing
-                # in between leaves the record disagreeing with the real world. Re-checked HERE
-                # and not only at the button click, because the run can start while the wizard
-                # sits open. hasattr: the wizard also drives pre-bot-layer models.
+                # The bot fence. A person may not move a record under a live
+                # claim. bot_claim and a flagged bot open/OK reach this method
+                # so the wizard still runs. Re-checked here, not only at the
+                # button, because a run can start while the wizard sits open.
+                # hasattr: the wizard also drives pre-bot-layer models.
                 if hasattr(record, "_bot_assert_human_transition_allowed"):
                     record._bot_assert_human_transition_allowed(transition)
 
@@ -149,6 +147,15 @@ class TransitionWizard(models.AbstractModel):
                         write_vals["use_project_deadline_from"] = "self"
                         write_vals["project_deadline"] = followup_deadline
                         write_vals["days_relative_to_project"] = 0
+                elif self.env.context.get("set_deadline_relative"):
+                    spec = self.env.context.get("set_deadline_relative")
+                    if not isinstance(spec, dict) or "from" not in spec or "days" not in spec:
+                        raise UserError(_(
+                            "set_deadline_relative must be a dict with from and days."
+                        ))
+                    write_vals["use_project_deadline_from"] = spec["from"]
+                    write_vals["days_relative_to_project"] = int(spec["days"])
+                    write_vals.pop("project_deadline", None)
 
                 if not createNewRecord:
                     record.write(write_vals)
