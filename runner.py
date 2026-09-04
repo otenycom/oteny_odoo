@@ -2,9 +2,10 @@
 Worker subprocess management for parallel test execution.
 
 Each worker is a full odoo-bin process targeting a cloned database.
-The ODOO_PARALLEL_BATCH env var tells the worker which test classes
-to run (our patch in the worker filters the suite accordingly).
-Results are communicated back via a JSON file per worker.
+The ODOO_PARALLEL_QUEUE env var points the worker at the shared work queue
+(see queue.py); the worker's patched run_suite pulls one class at a time
+until the queue is empty. Results are communicated back via a JSON file
+per worker.
 """
 
 import json
@@ -12,7 +13,6 @@ import logging
 import os
 import subprocess
 import sys
-import tempfile
 import threading
 
 _logger = logging.getLogger(__name__)
@@ -90,37 +90,35 @@ def _build_worker_command(clone_db, port):
     return cmd
 
 
-def spawn_workers(clone_names, batch_specs):
+def spawn_workers(clone_names, queue_dir, tmpdir):
     """
     Spawn worker subprocesses, one per clone database.
 
     Each worker gets:
-    - ODOO_PARALLEL_BATCH: comma-separated list of qualified class names
+    - ODOO_PARALLEL_QUEUE: the shared work-queue directory
+    - ODOO_PARALLEL_WORKER: its index (its claim directory under the queue)
     - ODOO_PARALLEL_RESULT: path to write JSON test results
     - ODOO_TEST_PARALLEL=never: prevent recursive parallelization
 
     Returns list of (process, output_path, result_path, worker_index) tuples.
     """
-    tmpdir = tempfile.mkdtemp(prefix="odoo_parallel_tests_")
     _logger.info("Worker output directory: %s", tmpdir)
     base_port = 9000
     workers = []
 
-    for i, (clone_db, batch_spec) in enumerate(zip(clone_names, batch_specs)):
+    for i, clone_db in enumerate(clone_names):
         output_path = os.path.join(tmpdir, f"worker_{i}.log")
         result_path = os.path.join(tmpdir, f"worker_{i}.json")
 
         cmd = _build_worker_command(clone_db, base_port + i)
 
         env = os.environ.copy()
-        env["ODOO_PARALLEL_BATCH"] = batch_spec
+        env["ODOO_PARALLEL_QUEUE"] = queue_dir
+        env["ODOO_PARALLEL_WORKER"] = str(i)
         env["ODOO_PARALLEL_RESULT"] = result_path
         env["ODOO_TEST_PARALLEL"] = "never"
 
-        class_count = len(batch_spec.split(","))
-        _logger.info(
-            "Starting worker %d on %s (%d classes)", i, clone_db, class_count
-        )
+        _logger.info("Starting worker %d on %s", i, clone_db)
         _logger.debug("Worker %d command: %s", i, " ".join(cmd))
 
         out_fh = open(output_path, "w")

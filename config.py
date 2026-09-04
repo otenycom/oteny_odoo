@@ -10,13 +10,18 @@ import os
 
 def get_worker_count():
     """
-    Number of parallel test workers. Defaults to 120% of CPU cores,
-    with a minimum of 2 and a maximum of 32.
+    Number of parallel test workers. Defaults to the CPU core count, with a
+    minimum of 2 and a maximum of 32.
+
+    With the work queue every worker stays busy until the queue is empty,
+    so more workers than cores only add contention: on a 16-core machine
+    the full suite took 108.8 s with 19 workers (120% of cores, the old
+    default) and 69.7 s with 16, because the biggest class ran 92 s under
+    19 workers and 52 s under 16. Static batches used to hide this: the
+    early finishers thinned the load over the last third of the run.
     """
     cores = multiprocessing.cpu_count()
-    # Calculate 120% of available cores, rounding down
-    calculated = max(2, int(cores * 1.2))
-    default = min(32, calculated)
+    default = min(32, max(2, cores))
     return int(os.environ.get("ODOO_TEST_WORKERS", default))
 
 

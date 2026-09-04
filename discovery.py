@@ -2,9 +2,9 @@
 Test discovery utilities.
 
 Groups test cases from an OdooSuite by their test class so each class
-(and its setUpClass data) runs entirely on a single worker. Distributes
-class groups across workers using either duration-based LPT balancing
-(when stats from a prior run are available) or round-robin fallback.
+(and its setUpClass data) runs entirely on a single worker, and orders the
+classes for the work queue: longest first, from the timing stats of prior
+runs, so the big classes start early and the small ones fill the tail.
 """
 
 import collections
@@ -16,6 +16,10 @@ _logger = logging.getLogger(__name__)
 def get_test_class_key(test):
     """Unique string key for a test's class: module.qualname."""
     cls = type(test)
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def class_key(cls):
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
@@ -34,73 +38,30 @@ def group_tests_by_class(suite):
     return groups
 
 
-def build_batches(class_groups, worker_count, class_durations=None):
+def order_classes_longest_first(class_groups, class_durations=None):
     """
-    Distribute class groups across N workers.
+    The queue order: classes sorted by estimated duration, longest first.
 
-    If class_durations (a {class_key: seconds} dict) is provided and covers
-    at least some of the classes, uses Longest-Processing-Time-first (LPT)
-    greedy balancing. Otherwise falls back to round-robin.
+    With a queue the estimates only decide the order, not the assignment,
+    so a stale or missing estimate costs little. A class without stats gets
+    the median of the known durations (or 1s when nothing is known), which
+    puts it in the middle of the queue rather than at either end.
 
-    Each batch is a list of (test_class, [test_cases]) tuples.
-    Returns a list of batches, one per worker (empty batches removed).
+    Returns a list of (test_class, [test_cases]) tuples.
     """
-    if class_durations:
-        return _build_batches_lpt(class_groups, worker_count, class_durations)
-    return _build_batches_round_robin(class_groups, worker_count)
+    class_durations = class_durations or {}
+    known = [class_durations[class_key(cls)] for cls in class_groups if class_key(cls) in class_durations]
+    default_duration = sorted(known)[len(known) // 2] if known else 1.0
 
-
-def _build_batches_round_robin(class_groups, worker_count):
-    """Simple round-robin distribution (no duration data available)."""
-    batches = [[] for _ in range(worker_count)]
-    for i, (cls, tests) in enumerate(class_groups.items()):
-        batches[i % worker_count].append((cls, tests))
-    return [b for b in batches if b]
-
-
-def _build_batches_lpt(class_groups, worker_count, class_durations):
-    """
-    Longest-Processing-Time-first greedy algorithm for makespan minimization.
-
-    Sort classes by known duration descending, then assign each class to the
-    worker with the smallest total assigned time. Classes without stats data
-    get a default estimate (median of known durations, or 1s if nothing is known).
-    """
-    # Compute a default estimate for classes without prior stats
-    known_values = [
-        class_durations[f"{cls.__module__}.{cls.__qualname__}"]
-        for cls in class_groups
-        if f"{cls.__module__}.{cls.__qualname__}" in class_durations
+    items = [
+        (cls, tests, class_durations.get(class_key(cls), default_duration))
+        for cls, tests in class_groups.items()
     ]
-    if known_values:
-        default_duration = sorted(known_values)[len(known_values) // 2]  # median
-    else:
-        default_duration = 1.0
-
-    # Build (class, tests, duration) list and sort by duration descending
-    items = []
-    for cls, tests in class_groups.items():
-        key = f"{cls.__module__}.{cls.__qualname__}"
-        duration = class_durations.get(key, default_duration)
-        items.append((cls, tests, duration))
     items.sort(key=lambda x: x[2], reverse=True)
 
-    # Greedily assign each class to the least-loaded worker
-    worker_loads = [0.0] * worker_count
-    batches = [[] for _ in range(worker_count)]
-    for cls, tests, duration in items:
-        lightest = min(range(worker_count), key=lambda w: worker_loads[w])
-        batches[lightest].append((cls, tests))
-        worker_loads[lightest] += duration
-
-    hit = len(known_values)
-    total = len(class_groups)
+    total = sum(d for _cls, _tests, d in items)
     _logger.info(
-        "LPT balancing: %d/%d classes with stats, estimated per-worker: %.1fs..%.1fs",
-        hit,
-        total,
-        min(worker_loads),
-        max(worker_loads),
+        "Queue order: %d/%d classes with stats, %.1fs estimated in total, longest %.1fs",
+        len(known), len(class_groups), total, items[0][2] if items else 0.0,
     )
-
-    return [b for b in batches if b]
+    return [(cls, tests) for cls, tests, _d in items]

@@ -2,8 +2,10 @@
 Monkey-patch for Odoo's test loader to enable parallel test execution.
 
 Applied on module import (via __init__.py). Patches loader.run_suite to:
-  - In master mode: detect multiple test classes, clone DB, spawn workers
-  - In worker mode: filter the suite to assigned classes and run sequentially
+  - In master mode: detect multiple test classes, clone DB, write the work
+    queue (one entry per class, longest first), spawn workers
+  - In worker mode: pull one class at a time from the queue and run it,
+    until the queue is empty
 
 Only parallelizes during the post-install test phase (not at-install),
 detected by checking the call stack for load_module_graph.
@@ -15,10 +17,12 @@ import logging
 import os
 import re
 import sys
+import tempfile
 import time
 
 from . import config
-from .discovery import get_test_class_key, group_tests_by_class, build_batches
+from .discovery import class_key, get_test_class_key, group_tests_by_class, order_classes_longest_first
+from .queue import claim_next, create_queue
 
 _logger = logging.getLogger(__name__)
 
@@ -91,50 +95,56 @@ def _should_parallelize(suite):
 # ---------------------------------------------------------------------------
 
 
-def _worker_run(suite, batch_spec, global_report):
+def _worker_run(suite, queue_dir, global_report):
     """
-    Called in a worker subprocess. Filters the discovered suite to only
-    the test classes assigned to this worker, runs them with the original
-    run_suite, and writes results to a JSON file for the master to read.
+    Called in a worker subprocess. Pulls one test class at a time from the
+    shared queue, runs that class with the original run_suite, and repeats
+    until nothing claimable is left. Writes the summed results (and the
+    per-class timing the master feeds back into the stats file) to a JSON
+    file for the master to read.
     """
     from odoo.tests.suite import OdooSuite
     from odoo.tests.result import OdooTestResult
+    from .stats import extract_class_durations
 
-    allowed = set(batch_spec.split(","))
-    filtered = [t for t in suite if get_test_class_key(t) in allowed]
+    worker_id = os.environ.get("ODOO_PARALLEL_WORKER", "0")
+    by_key = {class_key(cls): tests for cls, tests in group_tests_by_class(suite).items()}
 
-    if not filtered:
-        _logger.info("Worker: no matching tests for batch — skipping")
-        return OdooTestResult()
+    total = OdooTestResult()
+    class_durations = {}
+    classes_run = []
+    while True:
+        key = claim_next(queue_dir, worker_id, wanted=set(by_key))
+        if key is None:
+            break
+        result = _original_run_suite(OdooSuite(by_key[key]), global_report=global_report)
+        total.failures_count += result.failures_count
+        total.errors_count += result.errors_count
+        total.testsRun += result.testsRun
+        total.skipped += result.skipped
+        class_durations.update(extract_class_durations(result))
+        classes_run.append(key)
 
     _logger.info(
-        "Worker running %d tests from %d classes",
-        len(filtered),
-        len(allowed),
+        "Worker %s ran %d tests from %d classes", worker_id, total.testsRun, len(classes_run)
     )
 
-    filtered_suite = OdooSuite(filtered)
-    result = _original_run_suite(filtered_suite, global_report=global_report)
-
-    # Write structured result for the master process, including per-class
-    # timing so the master can update the stats file for future balancing
     result_file = os.environ.get("ODOO_PARALLEL_RESULT")
     if result_file:
-        from .stats import extract_class_durations
-
         with open(result_file, "w") as f:
             json.dump(
                 {
-                    "failures_count": result.failures_count,
-                    "errors_count": result.errors_count,
-                    "testsRun": result.testsRun,
-                    "skipped": result.skipped,
-                    "class_durations": extract_class_durations(result),
+                    "failures_count": total.failures_count,
+                    "errors_count": total.errors_count,
+                    "testsRun": total.testsRun,
+                    "skipped": total.skipped,
+                    "class_durations": class_durations,
+                    "classes_run": classes_run,
                 },
                 f,
             )
 
-    return result
+    return total
 
 
 # ---------------------------------------------------------------------------
@@ -169,22 +179,19 @@ def _parallel_run(suite, global_report):
         worker_count,
     )
 
-    # Load prior timing stats for duration-based balancing (LPT);
-    # falls back to round-robin if no stats file exists yet
+    # Prior timing stats decide the queue order (longest first); the queue
+    # itself decides who runs what, so a stale estimate costs little.
     from .stats import load_stats, save_stats
 
     class_durations = load_stats()
+    ordered = order_classes_longest_first(class_groups, class_durations)
 
-    batches = build_batches(class_groups, worker_count, class_durations)
-    actual_workers = len(batches)
+    actual_workers = min(worker_count, len(ordered))
     if actual_workers < worker_count:
         _logger.info("Using %d workers (fewer classes than requested)", actual_workers)
 
-    # Build batch specs: comma-separated qualified class names per worker
-    batch_specs = []
-    for batch in batches:
-        keys = [f"{cls.__module__}.{cls.__qualname__}" for cls, _tests in batch]
-        batch_specs.append(",".join(keys))
+    tmpdir = tempfile.mkdtemp(prefix="odoo_parallel_tests_")
+    queue_dir = create_queue(tmpdir, [class_key(cls) for cls, _tests in ordered])
 
     # Clone databases
     t_clone = time.time()
@@ -193,7 +200,7 @@ def _parallel_run(suite, global_report):
 
     # Spawn workers
     t_run = time.time()
-    workers = spawn_workers(clone_names, batch_specs)
+    workers = spawn_workers(clone_names, queue_dir, tmpdir)
 
     # Wait and collect
     worker_results = wait_for_workers(workers)
@@ -240,6 +247,11 @@ def _parallel_run(suite, global_report):
             if m:
                 all_failed_tests.append((m.group(1), m.group(2), idx))
 
+    per_worker = ", ".join(
+        f"W{wr['index']}:{len((wr.get('test_result') or {}).get('classes_run', []))}"
+        for wr in worker_results
+    )
+    _logger.info("Classes per worker: %s", per_worker)
     _logger.info(
         "Parallel run complete in %.1fs: %s",
         elapsed,
@@ -283,14 +295,14 @@ def _patched_run_suite(suite, global_report=None):
     Drop-in replacement for odoo.tests.loader.run_suite.
 
     Three paths:
-    1. Worker mode (ODOO_PARALLEL_BATCH set): filter and run assigned tests
+    1. Worker mode (ODOO_PARALLEL_QUEUE set): pull classes from the queue
     2. Post-install phase with multiple classes: parallelize
     3. Everything else: run sequentially with the original function
     """
-    # Path 1: worker subprocess — filter to assigned batch
-    batch = os.environ.get("ODOO_PARALLEL_BATCH")
-    if batch:
-        return _worker_run(suite, batch, global_report)
+    # Path 1: worker subprocess — pull classes from the shared queue
+    queue_dir = os.environ.get("ODOO_PARALLEL_QUEUE")
+    if queue_dir:
+        return _worker_run(suite, queue_dir, global_report)
 
     # Path 2: master, post-install, conditions met — parallelize
     if _is_post_install_phase() and _should_parallelize(suite):

@@ -118,6 +118,7 @@ class TestCloneFilestore(TransactionCase):
 
     def test_fresh_clone_replicates_after_createdb(self):
         with (
+            patch.object(cloner, "_server_version_num", return_value=180003),
             patch.object(cloner, "_filestore_dir", side_effect=self._filestore_dir),
             patch.object(cloner, "_terminate_connections"),
             patch.object(cloner, "_get_pg_env", return_value={}),
@@ -158,8 +159,9 @@ class TestCloneFilestore(TransactionCase):
             patch.object(cloner, "_get_xmlid_fingerprint", return_value="xmlid-a"),
             patch.object(cloner, "_get_module_version_fingerprint", return_value="ver-a"),
             patch.object(cloner, "_load_clone_state", return_value=state),
-            patch.object(cloner, "_clones_exist", return_value=True),
+            patch.object(cloner, "_existing_databases", return_value={"cr-test-worker-0"}),
             patch.object(cloner, "_filestore_dir", side_effect=self._filestore_dir),
+            patch.object(cloner, "_save_clone_state"),
             patch.object(cloner, "_fresh_clone") as fresh,
         ):
             names = cloner.clone_databases("cr-test", 1)

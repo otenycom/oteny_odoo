@@ -5,16 +5,25 @@ Uses PostgreSQL's createdb -T (template clone) which is fast because
 it does a file-level copy. Requires no active connections on the
 template database during cloning.
 
-Clone reuse: after a parallel run, clones are kept. On the next run three
-fingerprints detect whether the base DB has changed:
+Clone reuse: after a parallel run, clones are kept as a POOL. On the next
+run three fingerprints detect whether the base DB has changed:
 1. Schema fingerprint — md5 of all public table columns + types
 2. XML-ID fingerprint — md5 of ir_model_data rows (module.name=model:res_id)
 3. Module-version fingerprint — md5 of ir_module_module name=latest_version
-If all three match AND the right number of clones still exist, cloning is
-skipped entirely (~0s vs ~9s). The XML-ID fingerprint catches the common
-case where noupdate=1 data records are added without schema changes. The
-module-version fingerprint catches a value-only migration: the schema and
-XML-ID set stay the same, but latest_version moves, so clones refresh.
+If all three match, every clone in the pool that still exists is valid: a
+run needing N clones reuses the first N and creates only the ones that are
+missing. A run with fewer classes (fewer workers) never rebuilds the pool,
+and a run with more workers adds to it. The XML-ID fingerprint catches the
+common case where noupdate=1 data records are added without schema changes.
+The module-version fingerprint catches a value-only migration: the schema
+and XML-ID set stay the same, but latest_version moves, so clones refresh.
+
+Copy strategy: on PostgreSQL 15+ a clone is made with
+``CREATE DATABASE ... STRATEGY = FILE_COPY``. The default WAL_LOG strategy
+writes every block of the template through the WAL, and 19 concurrent
+copies of a 115 MB database took 60 s that way; FILE_COPY copies the files
+and takes about 1.5 s for six concurrent copies. Older servers keep
+``createdb -T``.
 
 Filestore: a clone's ir_attachment rows point at files under the BASE DB's
 filestore (asset bundles, install-time fixture PDFs, ...), but Odoo resolves
@@ -65,6 +74,38 @@ def _get_pg_args():
     if tools.config.get("db_port"):
         args.extend(["-p", str(tools.config["db_port"])])
     return args
+
+
+_server_version_num_cache = None
+
+
+def _server_version_num():
+    """PostgreSQL ``server_version_num`` as an int (0 when it cannot be read)."""
+    global _server_version_num_cache
+    if _server_version_num_cache is None:
+        env = _get_pg_env()
+        args = _get_pg_args()
+        cmd = ["psql", "-d", "postgres"] + args + ["-t", "-A", "-c", "SHOW server_version_num"]
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        try:
+            _server_version_num_cache = int(result.stdout.strip()) if result.returncode == 0 else 0
+        except ValueError:
+            _server_version_num_cache = 0
+    return _server_version_num_cache
+
+
+def _create_database_cmd(base_db, clone_name):
+    """The command that clones ``base_db`` into ``clone_name``.
+
+    PostgreSQL 15+ gets ``STRATEGY = FILE_COPY``: it copies the template's
+    files instead of logging every block through the WAL, which is what made
+    a batch of concurrent clones slow. Older servers use ``createdb -T``.
+    """
+    pg_args = _get_pg_args()
+    if _server_version_num() >= 150000:
+        sql = f'CREATE DATABASE "{clone_name}" TEMPLATE "{base_db}" STRATEGY = FILE_COPY;'
+        return ["psql", "-d", "postgres"] + pg_args + ["-q", "-v", "ON_ERROR_STOP=1", "-c", sql]
+    return ["createdb"] + pg_args + ["-T", base_db, clone_name]
 
 
 def _terminate_connections(db_name):
@@ -183,17 +224,11 @@ def _get_module_version_fingerprint(db_name):
     return None
 
 
-def _reuse_key_matches(
-    state,
-    *,
-    base_db,
-    fingerprint,
-    xmlid_fingerprint,
-    version_fingerprint,
-    count,
-    clone_names,
-):
-    """True when saved clone state matches the current schema, XML-ID, and version key."""
+def _reuse_key_matches(state, *, base_db, fingerprint, xmlid_fingerprint, version_fingerprint):
+    """True when the saved pool was cloned from this base at these fingerprints.
+
+    The worker count is deliberately not part of the key: the pool is reused
+    whatever the count, and only missing clones are created."""
     if not fingerprint or not xmlid_fingerprint or not version_fingerprint:
         return False
     return (
@@ -201,13 +236,11 @@ def _reuse_key_matches(
         and state.get("fingerprint") == fingerprint
         and state.get("xmlid_fingerprint") == xmlid_fingerprint
         and state.get("version_fingerprint") == version_fingerprint
-        and state.get("worker_count") == count
-        and state.get("clone_names") == clone_names
     )
 
 
-def _reuse_miss_reasons(state, fingerprint, xmlid_fingerprint, version_fingerprint, count):
-    """Human-readable reasons the saved clone state does not match the current key."""
+def _reuse_miss_reasons(state, fingerprint, xmlid_fingerprint, version_fingerprint):
+    """Human-readable reasons the saved pool does not match the current key."""
     reasons = []
     if state.get("fingerprint") != fingerprint:
         reasons.append("schema changed")
@@ -215,8 +248,6 @@ def _reuse_miss_reasons(state, fingerprint, xmlid_fingerprint, version_fingerpri
         reasons.append("XML IDs changed")
     if state.get("version_fingerprint") != version_fingerprint:
         reasons.append("module versions changed")
-    if state.get("worker_count") != count:
-        reasons.append("worker count changed")
     return reasons
 
 
@@ -252,17 +283,16 @@ def _save_clone_state(
         _logger.warning("Could not save clone state: %s", exc)
 
 
-def _clones_exist(clone_names):
-    """Verify all clone databases exist in PostgreSQL."""
+def _existing_databases():
+    """The names of all databases on the server (empty set when unreadable)."""
     env = _get_pg_env()
     args = _get_pg_args()
     cmd = ["psql", "-d", "postgres"] + args + ["-t", "-A", "-c",
            "SELECT datname FROM pg_database"]
     result = subprocess.run(cmd, env=env, capture_output=True, text=True)
     if result.returncode != 0:
-        return False
-    existing = set(result.stdout.strip().splitlines())
-    return all(name in existing for name in clone_names)
+        return set()
+    return set(result.stdout.strip().splitlines())
 
 
 # ---------------------------------------------------------------------------
@@ -353,18 +383,20 @@ def _replicate_filestore_for(base_db, clone_name, replace=True):
 
 def clone_databases(base_db, count):
     """
-    Provide N worker databases, either by reusing existing clones (when the
-    base DB schema, XML IDs, and module versions have not changed and the
-    right number of clones still exist) or by creating fresh clones via
-    createdb -T.
+    Provide ``count`` worker databases from the clone pool.
 
-    Returns list of clone db names.
+    When the base DB's schema, XML IDs, and module versions are unchanged,
+    every pool clone that still exists is reused and only the missing ones
+    are created (a run needing fewer clones than the pool holds creates
+    nothing). When the base changed, the whole pool is dropped and rebuilt.
+
+    Returns the list of clone db names to use, in worker order.
     Raises RuntimeError if cloning is not possible (e.g. permission issues).
     """
     from . import config
 
     prefix = config.get_clone_prefix().replace("{db}", base_db)
-    clone_names = [f"{prefix}{i}" for i in range(count)]
+    needed = [f"{prefix}{i}" for i in range(count)]
 
     # Pre-flight: verify we have the permissions that createdb needs.
     # Avoids spawning N doomed processes that become zombies on failure.
@@ -373,53 +405,60 @@ def clone_databases(base_db, count):
             "Database cloning unavailable: insufficient PostgreSQL permissions"
         )
 
-    # Check if we can reuse clones from the previous run.
-    # Schema, XML-ID, and module-version fingerprints must all match.
-    # The version check catches a value-only migration: same columns and
-    # same ir_model_data rows, but latest_version moved after -u.
+    fingerprint = xmlid_fingerprint = version_fingerprint = None
+    stale = []
     if config.reuse_clones():
         fingerprint = _get_db_fingerprint(base_db)
         xmlid_fingerprint = _get_xmlid_fingerprint(base_db)
         version_fingerprint = _get_module_version_fingerprint(base_db)
         state = _load_clone_state()
+        pool = [c for c in state.get("clone_names", []) if c.startswith(prefix)]
         if _reuse_key_matches(
             state,
             base_db=base_db,
             fingerprint=fingerprint,
             xmlid_fingerprint=xmlid_fingerprint,
             version_fingerprint=version_fingerprint,
-            count=count,
-            clone_names=clone_names,
-        ) and _clones_exist(clone_names):
+        ):
+            existing = _existing_databases()
+            valid = [c for c in pool if c in existing]
+            reuse = [c for c in needed if c in valid]
+            to_create = [c for c in needed if c not in valid]
             _logger.info(
-                "Reusing %d existing clone databases "
+                "Clone pool: reusing %d of %d valid clone(s), creating %d "
                 "(schema, XML IDs, and module versions unchanged)",
-                count,
+                len(reuse), len(valid), len(to_create),
             )
             # A reused clone keeps its own filestore between runs. A clone
             # from before replication existed, or a replica removed by hand,
             # is topped up from the base without touching the clone's own files.
-            for clone_name in clone_names:
+            for clone_name in reuse:
                 if not has_filestore_replica(_filestore_dir(clone_name)):
                     _replicate_filestore_for(base_db, clone_name, replace=False)
-            return clone_names
+            if to_create:
+                _fresh_clone(base_db, to_create)
+            _save_clone_state(
+                base_db, fingerprint, xmlid_fingerprint, version_fingerprint,
+                sorted(set(valid) | set(needed)),
+            )
+            return needed
         if state:
             reasons = _reuse_miss_reasons(
-                state, fingerprint, xmlid_fingerprint, version_fingerprint, count
+                state, fingerprint, xmlid_fingerprint, version_fingerprint
             )
             _logger.info(
                 "Clone cache miss — %s",
                 ", ".join(reasons) if reasons else "creating fresh clones",
             )
+            stale = [c for c in pool if c not in needed]
         else:
             _logger.info("Clone cache miss — no prior state")
-    else:
-        fingerprint = None
-        xmlid_fingerprint = None
-        version_fingerprint = None
 
-    # Need fresh clones — close connections and clone
-    _fresh_clone(base_db, clone_names)
+    # The base changed (or reuse is off): the pool is stale. Drop the part of
+    # it this run will not recreate, then clone fresh.
+    if stale:
+        drop_databases(stale)
+    _fresh_clone(base_db, needed)
 
     # Save state for future reuse
     if config.reuse_clones():
@@ -431,22 +470,19 @@ def clone_databases(base_db, count):
             version_fingerprint = _get_module_version_fingerprint(base_db)
         if fingerprint and xmlid_fingerprint and version_fingerprint:
             _save_clone_state(
-                base_db,
-                fingerprint,
-                xmlid_fingerprint,
-                version_fingerprint,
-                clone_names,
+                base_db, fingerprint, xmlid_fingerprint, version_fingerprint, needed
             )
 
-    return clone_names
+    return needed
 
 
 def _fresh_clone(base_db, clone_names):
     """
     Drop any existing clones and create fresh ones from the base database.
 
-    Closes Odoo's connection pool first so createdb -T can acquire exclusive
-    access to the template. Launches all operations concurrently.
+    Closes Odoo's connection pool first so the template copy can acquire
+    exclusive access to the template. Launches all operations concurrently;
+    see ``_create_database_cmd`` for the copy strategy.
     """
     import odoo.sql_db
 
@@ -474,7 +510,7 @@ def _fresh_clone(base_db, clone_names):
     clone_procs = []
     for clone_name in clone_names:
         proc = subprocess.Popen(
-            ["createdb"] + pg_args + ["-T", base_db, clone_name],
+            _create_database_cmd(base_db, clone_name),
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
