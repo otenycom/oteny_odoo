@@ -162,6 +162,28 @@ class TestOtenyBot(TransactionCase):
         bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hh6"})
         self.assertFalse(bot.dispatch_isolated_turn("x")["ok"])
 
+    def test_dispatch_is_signed_by_odoobot_whichever_user_fires_it(self):
+        # A drain fires INSIDE the bot's own uplink call (its escalate freed the slot), and
+        # sudo() keeps that user as the author. The bot's gateway drops a message its own
+        # partner authored (the echo guard), so a dispatch signed by the bot is never consumed
+        # and sits until the 3-min belt re-posts it as OdooBot (test1 session 51, 2026-09-05).
+        # OdooBot signs every dispatch, whichever transaction fires it.
+        channel = self.env["discuss.channel"].create({"name": "Bot Room"})
+        bot_user = self.env["res.users"].create({
+            "name": "Seam Bot", "login": "seam.bot.author",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
+        bot = self.env["oteny.bot"].create({
+            "name": "Barney", "uplink_ref": "hh8", "discuss_channel_id": channel.id,
+            "bot_user_id": bot_user.id})
+        res = bot.with_user(bot_user).dispatch_isolated_turn(
+            "File the MFNL for record 43",
+            work={"res_model": "riverflow.service", "res_id": 43, "token": "tok_DRAIN-1"})
+        self.assertTrue(res["ok"])
+        msg = self.env["mail.message"].browse(res["message_id"])
+        self.assertEqual(msg.author_id, self.env.ref("base.partner_root"))
+        self.assertNotEqual(msg.author_id, bot_user.partner_id)
+        self.assertIn("tok_DRAIN-1", msg.body)
+
     def test_dispatch_with_work_renders_the_header_and_token_trailer(self):
         # The WP1 wire: a token-fenced dispatch carries the machine-readable work header
         # (sentinel-adjacent, parsed by the hh-discuss adapter's WORK_HEADER_RE) plus the

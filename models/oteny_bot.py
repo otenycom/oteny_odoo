@@ -12,7 +12,7 @@ from datetime import timedelta
 import mistune
 from psycopg2 import IntegrityError
 
-from odoo import _, Command, api, fields, models
+from odoo import SUPERUSER_ID, _, Command, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import html_sanitize
 
@@ -657,7 +657,13 @@ class OtenyBot(models.Model):
                 res_model=work["res_model"], res_id=work["res_id"], token=work["token"])
             tail = WORK_TOKEN_TRAILER.format(token=work["token"])
         body = f"{head} {(prompt or '').strip()}{tail}".strip()
-        msg = channel.sudo().message_post(
+        # OdooBot signs the dispatch, whichever user's transaction fires it. A drain fires
+        # INSIDE the bot's own uplink call (the escalate that freed the slot), and ``sudo()``
+        # keeps that user as the author. The bot's gateway drops a message its own partner
+        # authored (the echo guard in hh-discuss ``select_inbound``), so a dispatch signed by
+        # the bot is never consumed and sits until the 3-min belt re-posts it as OdooBot
+        # (test1 session 51, 2026-09-05). ``with_user(SUPERUSER_ID)`` is the cron's own path.
+        msg = channel.with_user(SUPERUSER_ID).message_post(
             body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
         return {"ok": True, "message_id": msg.id, "channel_id": channel.id}
 
