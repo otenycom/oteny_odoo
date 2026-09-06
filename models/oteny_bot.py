@@ -56,10 +56,25 @@ WORK_TOKEN_TRAILER = (
 )
 
 # How long a started attended-login DANCE latches the bot's dispatch path before it expires by
-# itself. 15 min mirrors the Oteny broker's own handoff window (browser_handoff_minutes) — a
-# dance that outlives the browser session it minted is over regardless of what the human does.
-# The TTL is what makes the latch LIVENESS-SAFE: no OK, no cancel, a closed laptop, a crashed
-# browser — the bot resumes dispatching on wall clock alone, with no cron and no operator.
+# itself. The TTL is what makes the latch LIVENESS-SAFE: no OK, no cancel, a closed laptop, a
+# crashed browser — the bot resumes dispatching on wall clock alone, with no cron and no
+# operator.
+#
+# This is a FLOOR, not a mirror. It used to say that 15 minutes mirrored the broker's own
+# handoff window (`browser_handoff_minutes`), and that a dance outliving the window it minted
+# is over whatever the human does. Neither half survives. The login-handoff mint stopped using
+# `browser_handoff_minutes` and uses an INACTIVITY clock instead
+# (`LOGIN_HANDOFF_INACTIVITY_S`, 600 s at the time of writing), which is a different number and
+# a different KIND of number: an idle window dies inside 10 minutes, while a window a human
+# keeps working in is refreshed and can outlive any fixed latch. So the two clocks drifted
+# apart in both directions at once, and neither was wrong about its own job.
+#
+# The relationship that actually has to hold is one-way: the latch must cover the window, never
+# the reverse. A latch that ends first is the dangerous end — the bot resumes dispatching while
+# a human is still typing, and the run's browser is swept out from under them. So the latch
+# takes the greater of this floor and what the broker itself reports for the window it just
+# minted (`login_dance_extend`, called from the attach), and it never shrinks. A latch that
+# outlives a dead window costs nothing: re-open finds nothing and says so.
 LOGIN_DANCE_MINUTES = 15
 
 
@@ -265,6 +280,30 @@ class OtenyBot(models.Model):
             "until": bot.login_dance_until,
             "session_id": bot.login_dance_session_id or False,
         }
+
+    def login_dance_extend(self, token, minutes=None):
+        """Push THIS dance's expiry out — a COMPARE-and-extend on the epoch token.
+
+        Never shortens. The latch's only job is to cover the sign-in that is actually
+        happening, so moving it in is a way to hand a human's browser to the bot mid-2FA,
+        and there is no caller that wants that. A stale token from a superseded screen
+        extends nothing, the same fence ``login_dance_stop`` carries.
+
+        Call it with the window's own remaining life when the broker reports one, and on
+        a human's real interaction otherwise. Returns True when it moved the latch."""
+        self.ensure_one()
+        if not token:
+            return False
+        self.login_dance_hold()
+        bot = self.sudo()
+        if token != bot.login_dance_token:
+            return False
+        until = fields.Datetime.now() + timedelta(
+            minutes=minutes or LOGIN_DANCE_MINUTES)
+        if bot.login_dance_until and bot.login_dance_until >= until:
+            return False
+        bot.login_dance_until = until
+        return True
 
     @api.depends("login_dance_until")
     def _compute_login_dance_is_active(self):
