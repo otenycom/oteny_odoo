@@ -115,6 +115,14 @@ class OtenyBot(models.Model):
         "that release it are per-user and per-record, so 'stop the dance' must mean 'stop MY "
         "dance' — without the epoch, anyone's Cancel would release whoever's dance was live and "
         "re-open the run/login overlap the latch exists to close. Same fence as bot_claim_token.")
+    login_dance_session_id = fields.Char(
+        "Login Dance Session", copy=False,
+        help="The cloud-browser session THIS dance minted. The screen that minted it holds the "
+        "same id, but a screen is per-tab and per-record, so a closed tab or a reopened wizard "
+        "loses it. Keeping the id on the BOT is what lets the person who started the sign-in "
+        "re-open that same browser window instead of minting a second one — a second mint "
+        "supersedes the first, which throws away the half-finished sign-in and spends one of the "
+        "portal's few daily sign-ins.")
     login_dance_is_active = fields.Boolean(
         compute="_compute_login_dance_is_active",
         help="True while a login dance latch is in the future. The form uses this "
@@ -213,6 +221,51 @@ class OtenyBot(models.Model):
         })
         return token
 
+    def login_dance_attach_session(self, token, session_id):
+        """Record the browser session THIS dance minted — a COMPARE-and-set on the epoch token.
+
+        Same fence as ``login_dance_stop`` and for the same reason: a screen whose dance was
+        superseded still holds the old token, and it must not overwrite the newcomer's session
+        id. Returns True when it wrote."""
+        self.ensure_one()
+        if not token or not session_id:
+            return False
+        self.login_dance_hold()
+        if token != self.sudo().login_dance_token:
+            return False
+        self.sudo().login_dance_session_id = session_id
+        return True
+
+    def login_dance_stance(self):
+        """Who holds the attended sign-in for this bot right now, read from committed truth.
+
+        Returns ``{"state", "holder", "until", "session_id"}``. ``state`` is ``free`` when no
+        dance holds the latch — an EXPIRED dance reads free, because the TTL comparison IS the
+        expiry — ``mine`` when the current user started it, and ``theirs`` when somebody else did.
+
+        Ownership is per ODOO USER, deliberately, and not per screen. A popup blocker that eats
+        the login tab, a tab closed by accident and a wizard opened again all destroy per-screen
+        state, and those are exactly the cases a person has to recover from. The user written on
+        the bot record survives all three. The cost is that two people sharing one login are one
+        person here, so a team that shares one login gets the recovery answer for both of them.
+
+        CALL THIS WITHOUT ``sudo``. It sudoes internally for the field reads, because an HR user
+        may not read the bot record, but the ``mine`` test compares against ``self.env.uid`` — and
+        a sudoed caller carries the superuser id, which would read every dance as somebody else's.
+
+        No lock is taken. This is paint, so a stale read costs at worst a refused click that says
+        why, never a wrong write. Every write path still re-checks under ``login_dance_hold``."""
+        self.ensure_one()
+        bot = self.sudo()
+        if not bot.login_dance_active():
+            return {"state": "free", "holder": False, "until": False, "session_id": False}
+        return {
+            "state": "mine" if bot.login_dance_user_id.id == self.env.uid else "theirs",
+            "holder": bot.login_dance_user_id.name or _("another user"),
+            "until": bot.login_dance_until,
+            "session_id": bot.login_dance_session_id or False,
+        }
+
     @api.depends("login_dance_until")
     def _compute_login_dance_is_active(self):
         now = fields.Datetime.now()
@@ -238,6 +291,7 @@ class OtenyBot(models.Model):
             "login_dance_until": False,
             "login_dance_user_id": False,
             "login_dance_token": False,
+            "login_dance_session_id": False,
         })
 
     def action_login_dance_force_clear(self):
@@ -267,6 +321,7 @@ class OtenyBot(models.Model):
             return False
         self.sudo().write({
             "login_dance_until": False, "login_dance_user_id": False, "login_dance_token": False,
+            "login_dance_session_id": False,
         })
         return True
 

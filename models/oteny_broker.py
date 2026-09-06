@@ -112,6 +112,25 @@ class OtenyBrokerClient(models.AbstractModel):
                             "Could not open the portal sign-in page — "
                             "click Open login browser again."
                         )
+                    elif body.get("error") == "superseded":
+                        # A newer sign-in took the bot's one login window. The broker
+                        # supersedes rather than queues, so this screen is simply not the
+                        # live one any more. Say that, instead of an HTTP status.
+                        detail = _(
+                            "Somebody opened a newer login browser for this bot, so this "
+                            "window is no longer the live one. Start the sign-in again from "
+                            "the record's button."
+                        )
+                    elif body.get("error") == "no_open_login_session":
+                        # Re-open found nothing to re-open. The browser window times out on
+                        # its own after a period with no activity, and a tab a pop-up blocker
+                        # swallowed generates none — so this is the ordinary late-recovery
+                        # case, not a fault.
+                        detail = _(
+                            "The login browser window is gone — it closes by itself after a "
+                            "while with nobody using it. Open a new login browser and sign "
+                            "in again."
+                        )
                 if not detail and (resp.text or "").strip():
                     detail = (resp.text or "").strip()[:200]
                 raise UserError(_(
