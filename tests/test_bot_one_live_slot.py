@@ -156,6 +156,51 @@ class TestBotOneLiveSlotDrain(TransactionCase):
             )
         self.assertEqual(resumed, [park.id])
 
+    def test_drain_concurrency_error_reaches_odoo_retry(self):
+        # A serialization failure, a deadlock or a lock timeout is Odoo's own retryable class:
+        # the HTTP layer rolls the whole request back and replays it. The savepoint used to
+        # swallow it and leave the peer for the belt's next tick (test1, 2026-09-06 14:50:24:
+        # the drain's channel post collided with the bot's own narration post).
+        from psycopg2 import errors as pg_errors
+        occupant = self._make("RunRace", self.state_run)
+        self._make("QueuedRace", self.state_queue)
+
+        def _race(svc):
+            raise pg_errors.SerializationFailure("could not serialize access due to concurrent update")
+
+        with patch.object(type(self.Service), "_bot_dispatch_one", _race):
+            with self.assertRaises(pg_errors.SerializationFailure):
+                occupant.with_context(bot_no_inline_dispatch=False).state_id = (
+                    self.state_done
+                )
+
+    def test_drain_other_error_still_never_breaks_the_exit(self):
+        occupant = self._make("RunBoom", self.state_run)
+        queued = self._make("QueuedBoom", self.state_queue)
+
+        def _boom(svc):
+            raise RuntimeError("dispatch transport down")
+
+        with patch.object(type(self.Service), "_bot_dispatch_one", _boom):
+            occupant.with_context(bot_no_inline_dispatch=False).state_id = self.state_done
+        self.assertEqual(occupant.state_id, self.state_done)
+        self.assertEqual(queued.state_id, self.state_queue)      # left for the belt
+
+    def test_login_park_resume_concurrency_error_reaches_odoo_retry(self):
+        from psycopg2 import errors as pg_errors
+        hold = self._park_state("Parked Login Race")
+        occupant = self._make("RunParkRace", self.state_run)
+        self._make("ParkRace", hold)
+
+        def _race(svc):
+            raise pg_errors.DeadlockDetected("deadlock detected")
+
+        with patch.object(type(self.Service), "_bot_resume_login_park", _race):
+            with self.assertRaises(pg_errors.DeadlockDetected):
+                occupant.with_context(bot_no_inline_dispatch=False).state_id = (
+                    self.state_done
+                )
+
     def test_queue_peer_wins_over_login_park(self):
         hold = self._park_state("Parked Behind Queue")
         occupant = self._make("RunQ", self.state_run)

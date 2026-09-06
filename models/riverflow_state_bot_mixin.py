@@ -52,6 +52,7 @@ from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 _logger = logging.getLogger(__name__)
 
@@ -170,6 +171,13 @@ class RiverflowStateBotMixin(models.AbstractModel):
             try:
                 with self.env.cr.savepoint():
                     record.sudo()._bot_dispatch_one()
+            except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+                # A serialization failure, a deadlock or a lock timeout is Odoo's own retryable
+                # class: the HTTP layer rolls the whole request back and replays it, up to five
+                # times. Swallowing it here turned a millisecond race into the belt's three-minute
+                # delay (test1, 2026-09-06: the drain's post into the filing channel collided with
+                # the bot's own narration post, which bumps the same channel row).
+                raise
             except Exception:  # noqa: BLE001 — never break the hand-off; the cron belt retries
                 _logger.exception(
                     "inline bot dispatch failed for %s(%s) — record stays queued for the "
@@ -516,6 +524,8 @@ class RiverflowStateBotMixin(models.AbstractModel):
         try:
             with self.env.cr.savepoint():
                 park.sudo()._bot_resume_login_park()
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise  # Odoo's retryable class: let the HTTP layer replay the request
         except Exception:  # noqa: BLE001
             _logger.exception(
                 "login-park resume failed for %s(%s) after %s(%s) freed the slot",
