@@ -861,6 +861,18 @@ class OtenyBotSession(models.Model):
     # consuming module's models; the workflow/app layer sets these + renders an embedded view.
     origin_model = fields.Char("Origin Model", index=True, readonly=True)
     origin_res_id = fields.Integer("Origin Res ID", index=True, readonly=True)
+    has_origin = fields.Boolean(
+        compute="_compute_origin_display",
+        help="True when this activity stored an origin model and id. The row may since be gone.")
+    origin_model_label = fields.Char(
+        "Related model",
+        compute="_compute_origin_display",
+        help="Translated ir.model name for origin_model (Service, not riverflow.service).")
+    origin_ref = fields.Reference(
+        string="Related record",
+        selection="_selection_origin_models",
+        compute="_compute_origin_display",
+        help="Clickable display name of the origin row. Empty when the row is gone.")
     started_at = fields.Datetime(default=fields.Datetime.now, index=True, readonly=True)
     duration_s = fields.Float("Duration (s)", readonly=True)
     # Opaque broker browser session ids this run used (never live-view URLs — R3).
@@ -927,6 +939,66 @@ class OtenyBotSession(models.Model):
         if not text:
             return False
         return html_sanitize(_MARKDOWN(text))
+
+    @api.model
+    def _selection_origin_models(self):
+        return [(m.model, m.name) for m in self.env["ir.model"].sudo().search([])]
+
+    @api.depends("origin_model", "origin_res_id")
+    def _compute_origin_display(self):
+        wanted = {s.origin_model for s in self if s.origin_model}
+        labels = {}
+        if wanted:
+            for rec in self.env["ir.model"].sudo().search([("model", "in", list(wanted))]):
+                labels[rec.model] = rec.name
+        existing = {}
+        by_model = {}
+        for s in self:
+            if s.origin_model and s.origin_res_id and s.origin_model in self.env:
+                by_model.setdefault(s.origin_model, set()).add(s.origin_res_id)
+        for model, ids in by_model.items():
+            for rec in self.env[model].browse(list(ids)).exists():
+                existing[(model, rec.id)] = rec
+        for s in self:
+            s.has_origin = bool(s.origin_model and s.origin_res_id)
+            s.origin_model_label = labels.get(s.origin_model) or s.origin_model or False
+            rec = existing.get((s.origin_model, s.origin_res_id))
+            s.origin_ref = "%s,%s" % (s.origin_model, rec.id) if rec else False
+
+    def _origin_record(self):
+        """The origin row the current user can browse, or an empty recordset."""
+        self.ensure_one()
+        if not self.origin_model or not self.origin_res_id:
+            return self.browse()
+        if self.origin_model not in self.env:
+            return self.browse()
+        return self.env[self.origin_model].browse(self.origin_res_id).exists()
+
+    def action_open_origin(self):
+        """Open the origin record's form. Used from the Bot Activity header."""
+        self.ensure_one()
+        if not self.origin_model or not self.origin_res_id:
+            raise UserError(_("This activity is not linked to a record."))
+        if self.origin_model not in self.env:
+            raise UserError(_(
+                "The related model %(model)s is not installed on this database.",
+                model=self.origin_model,
+            ))
+        record = self._origin_record()
+        if not record:
+            raise UserError(_(
+                "The related %(model)s record is no longer available.",
+                model=self.origin_model_label or self.origin_model,
+            ))
+        return {
+            "type": "ir.actions.act_window",
+            "name": record.display_name,
+            "res_model": self.origin_model,
+            "res_id": record.id,
+            "view_mode": "form",
+            "views": [(False, "form")],
+            "target": "current",
+        }
 
     @api.model
     def search_latest_for_origin(self, origin_model, origin_res_id):

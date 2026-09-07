@@ -697,6 +697,66 @@ class TestOtenyBot(TransactionCase):
         arch = self.env.ref("oteny_bot.oteny_bot_session_view_form").arch_db
         self.assertIn('name="summary"', arch)
         self.assertIn('name="technical"', arch)
+        self.assertIn('name="action_open_origin"', arch)
+        self.assertIn('name="origin_ref"', arch)
+        self.assertIn('name="origin_model_label"', arch)
+
+    def test_origin_ref_uses_display_name_and_opens_form(self):
+        partner = self.env["res.partner"].create({"name": "Origin Partner"})
+        bot = self.env["oteny.bot"].create({"name": "OrigLink", "uplink_ref": "hhORIGLINK"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+            "origin_model": "res.partner", "origin_res_id": partner.id,
+        })
+        partner_label = self.env["ir.model"]._get("res.partner").name
+        self.assertTrue(session.has_origin)
+        self.assertEqual(session.origin_model_label, partner_label)
+        self.assertEqual(session.origin_ref, partner)
+        action = session.action_open_origin()
+        self.assertEqual(action["type"], "ir.actions.act_window")
+        self.assertEqual(action["res_model"], "res.partner")
+        self.assertEqual(action["res_id"], partner.id)
+        self.assertEqual(action["view_mode"], "form")
+        self.assertEqual(action["name"], partner.display_name)
+
+    def test_origin_ref_empty_when_row_is_gone(self):
+        bot = self.env["oteny.bot"].create({"name": "OrigGone", "uplink_ref": "hhORIGGONE"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+            "origin_model": "res.partner", "origin_res_id": 999999999,
+        })
+        self.assertTrue(session.has_origin)
+        self.assertEqual(
+            session.origin_model_label, self.env["ir.model"]._get("res.partner").name)
+        self.assertFalse(session.origin_ref)
+        with self.assertRaises(UserError) as err:
+            session.action_open_origin()
+        self.assertIn("no longer available", str(err.exception))
+
+    def test_action_open_origin_requires_a_linked_record(self):
+        bot = self.env["oteny.bot"].create({"name": "OrigNone", "uplink_ref": "hhORIGNONE"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+        })
+        self.assertFalse(session.has_origin)
+        self.assertFalse(session.origin_ref)
+        self.assertFalse(session.origin_model_label)
+        with self.assertRaises(UserError) as err:
+            session.action_open_origin()
+        self.assertIn("not linked", str(err.exception))
+
+    def test_action_open_origin_unknown_model(self):
+        bot = self.env["oteny.bot"].create({"name": "OrigMiss", "uplink_ref": "hhORIGMISS"})
+        session = self.env["oteny.bot.session"].create({
+            "bot_id": bot.id, "name": "run", "outcome": "ok",
+            "origin_model": "no.such.model", "origin_res_id": 1,
+        })
+        self.assertTrue(session.has_origin)
+        self.assertEqual(session.origin_model_label, "no.such.model")
+        self.assertFalse(session.origin_ref)
+        with self.assertRaises(UserError) as err:
+            session.action_open_origin()
+        self.assertIn("not installed", str(err.exception))
 
     def test_session_form_request_response_are_full_width(self):
         from lxml import etree
