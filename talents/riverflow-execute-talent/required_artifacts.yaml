@@ -1,0 +1,14 @@
+# Host Talent readiness. The project binds the Odoo uplink. This
+# bundle only needs the RPC tool mounted.
+bot: riverflow-execute-talent
+base_language: en
+
+artifacts:
+  - kind: tools
+    required:
+      - odoo_client
+    stubbed: []
+
+  - kind: cron
+    jobs_path: ~/.hermes/cron/jobs.json
+    jobs: []

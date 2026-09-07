@@ -1,5 +1,7 @@
 from odoo import _, fields, models, api
 from odoo.addons.riverflow.models.riverflow_transition_mixin import RiverflowTransitionMixin  # type: ignore
+from datetime import timedelta
+import ast
 import json
 
 
@@ -152,15 +154,75 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
 
             record.state_json = state_json
 
-    @api.depends("state_json")
+    def _user_sees_bot_work_transitions(self):
+        """True only for the bound bot user. HR never sees claim / work."""
+        if "oteny.bot" not in self.env:
+            return False
+        return bool(
+            self.env["oteny.bot"].sudo().search(
+                [("bot_user_id", "=", self.env.uid)], limit=1
+            )
+        )
+
+    def _format_bot_working_clock(self, when):
+        """Naive UTC Datetime as the viewing user's wall clock.
+
+        Form widgets already convert via ``env.tz``. The working-note banner
+        interpolates the same instants as text, so it must convert too.
+        """
+        if not when:
+            return ""
+        local = fields.Datetime.context_timestamp(self, when)
+        return fields.Datetime.to_string(local) or ""
+
+    def _bot_working_note(self):
+        """Generic strip when a live claim hides every button."""
+        self.ensure_one()
+        started = self.bot_work_started_at
+        sla = self.state_id.bot_timeout_minutes
+        deadline = started + timedelta(minutes=sla) if started and sla else False
+        return _(
+            "The bot is working. Started %(started)s. It is handed back at "
+            "%(deadline)s if it does not finish.",
+            started=self._format_bot_working_clock(started),
+            deadline=self._format_bot_working_clock(deadline),
+        )
+
+    @api.depends(
+        "state_json",
+        "from_transition_ids",
+        "bot_work_started_at",
+        "bot_run_started_at",
+        "state_id.bot_stage",
+        "state_id.bot_timeout_minutes",
+        "state_id.is_owned_by_bot",
+    )
     def _compute_transition_buttons_json(self):
         # for rendering the transition buttons below the state name
         for record in self:
-            transition_buttons = record.state_json
+            transition_buttons = dict(record.state_json or {})
+            transition_buttons["buttons"] = []
+            sees_bot_work = record._user_sees_bot_work_transitions()
+            if (
+                hasattr(record, "_bot_claim_is_live")
+                and record._bot_claim_is_live()
+                and not sees_bot_work
+            ):
+                transition_buttons["working_note"] = record._bot_working_note()
+                record.transition_buttons_json = transition_buttons
+                continue
             transition_ids = record.from_transition_ids
+            hide_bot_work = not sees_bot_work
+            no_primary = bool(
+                record.state_id
+                and record.state_id.is_owned_by_bot
+                and record.state_id.bot_stage in ("queue", "in_progress")
+            )
             if transition_ids:
                 index = 0
                 for transition in transition_ids:
+                    if hide_bot_work and transition.bot_role in ("claim", "work"):
+                        continue
                     # workaround, sometimes transition is a clone? in lookup tables or so
                     transition_id = (
                         transition.id.origin if isinstance(record.id, api.NewId) else int(transition.id)
@@ -173,18 +235,20 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                         if transition.from_state_id.id == False and transition.name == "Not Started":
                             continue
 
-                    transition_buttons["buttons"].append(
-                        {
-                            "index": index,
-                            "caption": transition.name,
-                            "help": transition.description,
-                            "action": "action_button_click",
-                            # context is posted back to the server side action method
-                            "context": {
-                                "transition_id": transition_id,
-                            },
-                        }
-                    )
+                    primary = (not no_primary) and index == 0
+                    button = {
+                        "index": index,
+                        "caption": transition.name,
+                        "help": transition.description,
+                        "action": "action_button_click",
+                        "primary": primary,
+                        # context is posted back to the server side action method
+                        "context": {
+                            "transition_id": transition_id,
+                        },
+                    }
+                    button.update(record._transition_button_extras(transition))
+                    transition_buttons["buttons"].append(button)
                     index += 1
 
             record.transition_buttons_json = transition_buttons
@@ -244,6 +308,36 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 )
 
             record.state_id_statusbar_json = json
+
+    def _transition_button_extras(self, transition):
+        """Keys the form widget ignores. A bot reads them from the same JSON."""
+        keys = self._transition_action_context_keys(transition)
+        parsed = {key: True for key in keys}
+        default = self.env.ref(
+            "riverflow.transition_action_default", raise_if_not_found=False
+        )
+        if default and transition.action_id == default:
+            visible = bool(
+                parsed.get("followup_in_days") or parsed.get("snooze_deadline_days")
+            )
+        else:
+            visible = True
+        return {
+            "has_visible_fields": visible,
+            "action_context_keys": keys,
+        }
+
+    def _transition_action_context_keys(self, transition):
+        raw = transition.action_context
+        if not raw:
+            return []
+        try:
+            parsed = ast.literal_eval(raw) or {}
+        except (ValueError, SyntaxError):
+            return []
+        if not isinstance(parsed, dict):
+            return []
+        return list(parsed.keys())
 
     def action_button_click(self):
 

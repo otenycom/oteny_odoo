@@ -30,6 +30,10 @@
                             <field name="show_state_in_crew_planning" />
                             <field name="auto_progress_on_children_done" />
                             <field name="auto_done_children_on_enter" />
+                            <field name="is_owned_by_bot" />
+                            <field name="bot_stage" />
+                            <field name="bot_timeout_minutes" />
+                            <field name="bot_login_hold" />
                         </group>
                     </group>
                     <notebook>

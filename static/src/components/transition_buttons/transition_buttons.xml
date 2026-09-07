@@ -93,11 +93,14 @@
             </div>
         </t>
         <t t-elif="this.useFormHeaderLayout()">
+            <t t-if="this.fieldValueState.working_note">
+                <div class="text-muted me-2" t-esc="this.fieldValueState.working_note"/>
+            </t>
             <div class="button-separator-group">
                 <t t-foreach="this.buttonDefs()" t-as="button" t-key="button.index">
                     <button
                         t-att-name="button.action"
-                        t-attf-class="btn #{button.index === 0 ? 'btn-primary' : 'btn-secondary'}"
+                        t-attf-class="btn #{button.primary ? 'btn-primary' : 'btn-secondary'}"
                         t-on-click.stop="() => this.executeTransition(button)"
                         type="object">
                         <span t-esc="button.caption" t-att-title="button.caption" />

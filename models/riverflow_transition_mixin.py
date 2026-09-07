@@ -7,6 +7,32 @@ class RiverflowTransitionMixin(models.AbstractModel):
     _name = "riverflow.transition.mixin"
     _description = "Base class with function to create an action to open a transition action wizard"
 
+    def prepare_transition_action(self):
+        """Public /json/2/ door. Underscore methods are private on that pipe."""
+        return self._prepare_transition_action()
+
+    def _check_wizard_carries_this_model(self, transition, res_model):
+        """Refuse a wizard that cannot carry this record.
+
+        A transition wizard resolves its records through ``_workflow_model``. A
+        wizard for another model sees no records, builds an empty in-memory
+        record, and then fails the state check with the misleading "Another
+        user just updated this record". Name the real cause at the button.
+        A wizard that starts a transition (``self._transient``) has no record.
+        """
+        if self._transient:
+            return
+        wizard_model = getattr(self.env[res_model], "_workflow_model", None)
+        if not wizard_model or wizard_model == "definedInDerivedClass":
+            return
+        if wizard_model != self._name:
+            raise UserError(_(
+                "Transition %(transition)s opens a %(wizard)s wizard, but this "
+                "record is a %(record)s. Give the transition an action whose "
+                "wizard applies to %(record)s.",
+                transition=transition.name, wizard=wizard_model, record=self._name,
+            ))
+
     def _prepare_transition_action(self):
         transition_id = self.env.context.get("transition_id")
         transition = self.env["riverflow.transition"].browse(transition_id)
@@ -21,8 +47,18 @@ class RiverflowTransitionMixin(models.AbstractModel):
             if expected_state and current_state != expected_state:
                 raise UserError(_("Another user just updated this record. Please refresh and try again."))
 
+            # Refuse at the BUTTON, not after the user has filled the wizard in, when a bot is
+            # mid-run on this record (the wizard's own action_save re-checks — a run can start
+            # while the screen is open). hasattr: this mixin also serves models that predate the
+            # bot layer.
+            if len(self.ids) == 1 and hasattr(self, "_bot_assert_human_transition_allowed"):
+                self._bot_assert_human_transition_allowed(transition)
+
         action_context = self._prepare_action_context(transition)
         action_context["transition_id"] = transition.id
+        effects = list(action_context.keys())
+        if self.env.context.get("riverflow_bot_caller"):
+            action_context["riverflow_bot_caller"] = True
 
         # Resolve the wizard model before building defaults, so we can
         # filter to only fields the wizard declares.
@@ -31,6 +67,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
             odoo_view = f"riverflow.{odoo_view}"
         view = self.sudo().env.ref(odoo_view)
         res_model = view.model
+        self._check_wizard_carries_this_model(transition, res_model)
 
         defaults_context = {}
         if isWizard:
@@ -39,6 +76,9 @@ class RiverflowTransitionMixin(models.AbstractModel):
                 if key.startswith("default_"):
                     defaults_context[key] = value
         elif len(self.ids) == 1:
+            action_context["active_model"] = self._name
+            action_context["active_id"] = self.id
+            action_context["active_ids"] = self.ids
             # Pre-populate the wizard with current entity field values.
             # Access ALL entity fields (getattr triggers stored computes that
             # must fire for state_record tracker consistency), but only include
@@ -47,10 +87,13 @@ class RiverflowTransitionMixin(models.AbstractModel):
             # etc.) must not leak into context where they pollute create() calls
             # on unrelated models during action_save.
             wizard_fields = set(self.env[res_model]._fields.keys())
-            for field_name in self._fields:
-                field = self._fields[field_name]
-                value = getattr(self, field_name)
-                converted_value = field.convert_to_cache(value, self)
+            # A seam login often cannot read catalog rows (ir.model).
+            # Read defaults as sudo. Later verbs still run as the user.
+            source = self.sudo()
+            for field_name in source._fields:
+                field = source._fields[field_name]
+                value = getattr(source, field_name)
+                converted_value = field.convert_to_cache(value, source)
                 if field_name in wizard_fields:
                     defaults_context["default_" + field_name] = converted_value
 
@@ -65,6 +108,7 @@ class RiverflowTransitionMixin(models.AbstractModel):
             "views": [(view.id, "form")],
             "target": "new",
             "context": action_context,
+            "effects": [key for key in effects if key != "transition_id"],
         }
 
         return action

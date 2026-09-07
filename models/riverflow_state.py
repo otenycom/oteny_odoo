@@ -16,6 +16,41 @@ class RiverflowWorkflowState(models.Model):
     sequence = fields.Integer(default=10)
     hide_in_statusbar = fields.Boolean("Hide in Statusbar", default=False)
     is_end_state = fields.Boolean("Is End State", default=False)
+    is_owned_by_bot = fields.Boolean(
+        "Owned by Bot",
+        default=False,
+        help="If true, a service in this state is owned/worked by an automated agent "
+        "(e.g. Barney), not a human. Ownership lives in the STATE — a hand-off transition "
+        "moves the service between a human-owned and a bot-owned state, so the per-state "
+        "transition buttons stay meaningful. Drives the bot's work poll and lets a human "
+        "review filter exclude the bot's in-flight queue (is_owned_by_bot = False).",
+    )
+    bot_stage = fields.Selection(
+        [("queue", "Queue — the bot should act"),
+         ("in_progress", "In progress — claimed, the bot is working"),
+         ("watch", "Watch — the bot monitors, no action")],
+        string="Bot Stage",
+        help="The generic role of a bot-owned state in the transition harness (D173): a service in "
+        "a `queue` state is picked up (claimed → the `in_progress` state → an isolated agent run); "
+        "`watch` states the bot monitors without firing. Read by the generic bot_work_queue so an "
+        "app sets these on its workflow instead of hard-coding transition xml-ids.",
+    )
+    bot_timeout_minutes = fields.Integer(
+        "Bot Timeout (minutes)",
+        default=0,
+        help="SLA for a bot `in_progress` state: a record that has sat here longer than this is "
+        "escalated by the timeout reaper (ir.cron → _bot_reap_timeouts) through the state's "
+        "is_bot_timeout transition. 0 disables the reaper for this state (the backstop for a dead "
+        "harness that never reported back — set it comfortably above the harness's own poll window).",
+    )
+    bot_login_hold = fields.Boolean(
+        "Bot Login Hold",
+        default=False,
+        help="A record in this state holds its bot's one live slot for a human sign-in. "
+        "Fresh bot work on the same workflow waits. The record's own login resume is "
+        "admitted (exclude-self). Set this on login-park and login-resume states in the "
+        "workflow XML. There is no occupancy record and no extra clock.",
+    )
 
     """
     SERVICE STATE COLORS

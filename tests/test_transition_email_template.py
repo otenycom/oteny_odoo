@@ -522,3 +522,63 @@ class TestEmailSenderSnooze(TransactionCase):
             vals.get("project_deadline"),
             fields.Date.today() + timedelta(days=3),
         )
+
+
+@tagged("post_install", "-at_install", "riverflow", "test_email_sender_snooze")
+class TestSetDeadlineRelative(TransactionCase):
+    """set_deadline_relative writes the two relative fields only.
+
+    It drops the email sender's today + 1 write. It does not write
+    project_deadline. It does not touch weekend_deadline_rule.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        _create_email_test_data(cls)
+        Transition = cls.env["riverflow.transition"]
+        cls.trans_relative = Transition.create({
+            "name": "Send Relative",
+            "from_state_id": cls.state_a.id,
+            "to_state_id": cls.state_b.id,
+            "action_id": cls.email_action.id,
+            "mail_template_id": cls.template_alpha.id,
+            "action_context": (
+                "{'keep_service_name': True, "
+                "'set_deadline_relative': {'from': 'creation', 'days': 3}}"
+            ),
+            "sequence": 60,
+        })
+        cls.recipient = cls.env["res.partner"].create({
+            "name": "Relative Recipient",
+            "email": "relative@example.com",
+        })
+
+    def test_set_deadline_relative_writes_from_and_days(self):
+        service = self.env["riverflow.service"].create({
+            "name": "Relative Service",
+            "state_id": self.state_a.id,
+            "company_id": self.env.company.id,
+        })
+        import ast
+        extra_ctx = ast.literal_eval(self.trans_relative.action_context)
+        ctx = {
+            "transition_id": self.trans_relative.id,
+            "active_model": "riverflow.service",
+            "active_ids": service.ids,
+            **extra_ctx,
+        }
+        Wizard = self.env["riverflow.service.email.sender.wizard"].with_context(**ctx)
+        defaults = Wizard.default_get(Wizard._fields.keys())
+        defaults["recipient_partner_ids"] = [(6, 0, [self.recipient.id])]
+        defaults["subject_updatable"] = "Relative subject"
+        defaults["body_updatable"] = "<p>Relative body</p>"
+        wizard = Wizard.create(defaults)
+        wizard.action_save()
+        self.assertEqual(service.state_id, self.state_b)
+        self.assertEqual(service.use_project_deadline_from, "creation")
+        self.assertEqual(service.days_relative_to_project, 3)
+        self.assertNotEqual(
+            service.project_deadline,
+            fields.Date.today() + timedelta(days=1),
+        )

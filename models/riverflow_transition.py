@@ -20,6 +20,56 @@ class RiverflowTransition(models.Model):
         help="Combination of Icon and name",
     )
     active = fields.Boolean("Active", default=True)
+    bot_role = fields.Selection(
+        [("claim", "Claim — queue → in-progress (the harness claim)"),
+         ("work", "Work — the agent's success advance out of in-progress"),
+         ("escalate", "Escalate — in-progress → a human state on failure")],
+        string="Bot Role",
+        help="The generic role of a transition in the bot transition harness (D173). The generic "
+        "bot_work_queue resolves the claim/work/escalate transitions from these roles + the state "
+        "bot_stage, so an app configures its workflow declaratively instead of the harness "
+        "hard-coding xml-ids.",
+    )
+    is_bot_timeout = fields.Boolean(
+        "Bot Timeout Exit",
+        default=False,
+        help="When set, the timeout reaper (_bot_reap_timeouts) follows this transition out of a "
+        "bot in-progress state whose bot_timeout_minutes SLA has been exceeded. Distinct from "
+        "bot_role='escalate' (the agent's own failure hand-back); this is the external 'you took "
+        "too long' exit, though a workflow may point both at the same human state.",
+    )
+    bot_skill = fields.Char(
+        "Bot Skill",
+        help="The Talent skill the isolated bot run loads for the work this transition claims "
+        "(set on the bot_role='claim' transition, e.g. 'postedworkers-filing'). _bot_work_item "
+        "reads it so the WORKFLOW declares the skill instead of an app model hard-coding it; "
+        "empty falls back to the app's _bot_task_spec() hook. A multi-task bot preloads the "
+        "union of its transitions' bot skills.",
+    )
+    bot_prompt = fields.Text(
+        "Bot Prompt",
+        help="The anchored instruction for the isolated bot run this transition claims — the "
+        "per-transition task/persona override passed to the run alongside the skill and the "
+        "bot-safe DTO. Set on the bot_role='claim' transition; empty falls back to the app's "
+        "_bot_task_spec() prompt.",
+    )
+    bot_max_tool_turns = fields.Integer(
+        "Bot Max Tool Turns",
+        default=0,
+        help="The tool-turn (iteration) budget the isolated bot run this transition claims needs "
+        "(set on the bot_role='claim' transition, e.g. 200 for the field-by-field MFNL browser "
+        "filing). Rides the work item as max_tool_turns; the platform sizes the bot's agent "
+        "budget to the max over its transitions' declared budgets. 0 = undeclared (the "
+        "platform default applies).",
+    )
+    bot_verbose = fields.Boolean(
+        "Bot Verbose Trace",
+        default=False,
+        help="When set on the bot_role='claim' transition, the isolated bot run this transition "
+        "claims streams a per-tool-call narration line into the bot's channel (the [oteny:verbose] "
+        "flag on the dispatch). A debugging aid for a run that otherwise answers silently — leave "
+        "off in normal operation (it is chatty and costs channel writes).",
+    )
     from_state_id = fields.Many2one(
         "riverflow.state",
         "From",
