@@ -126,6 +126,43 @@ class TestAutoDoneChildrenOnEnter(TransactionCase):
             "sequence": 10,
         })
 
+        # -- Cancel variant: the same flag on a state that is ALSO a cancelled
+        # state, which flips the cascade from "complete the children" to
+        # "cancel the whole subtree". --
+        cls.parent_cancelled_cascading = State.create({
+            "workflow_id": cls.parent_workflow.id,
+            "name": "Cancelled (cascading)",
+            "sequence": 60,
+            "is_end_state": True,
+            "is_cancelled_state": True,
+            "auto_done_children_on_enter": True,
+        })
+        cls.trans_parent_to_cancelled_cascading = Transition.create({
+            "name": "Cancel (cascading)",
+            "from_state_id": cls.parent_not_started.id,
+            "to_state_id": cls.parent_cancelled_cascading.id,
+            "action_id": default_action.id,
+            "sequence": 40,
+        })
+
+        # -- A child workflow WITHOUT a cancelled state, to prove the fallback:
+        # closing the task in its normal end state beats leaving it open. --
+        cls.plain_workflow = Workflow.create({
+            "model_id": service_model.id,
+            "name": "Test Cascade Plain Child WF",
+        })
+        cls.plain_not_started = State.create({
+            "workflow_id": cls.plain_workflow.id,
+            "name": "Not Started",
+            "sequence": 10,
+        })
+        cls.plain_done = State.create({
+            "workflow_id": cls.plain_workflow.id,
+            "name": "Done",
+            "sequence": 20,
+            "is_end_state": True,
+        })
+
     def _transition_service(self, service, transition):
         """Simulate a transition via the service wizard."""
         wizard = (
@@ -238,3 +275,82 @@ class TestAutoDoneChildrenOnEnter(TransactionCase):
         # Manually invoke the cascade as the wizard would
         parent._cascade_done_to_children()
         self.assertEqual(children[0].state_id, self.child_done)
+
+    # --- cancel cascade (flag on a cancelled state) -----------------------
+
+    def test_cancel_cascade_cancels_children_instead_of_completing_them(self):
+        """The flag on a cancelled state picks the child's Cancelled state.
+
+        Closing work that was called off as "Done" would read as work
+        completed, so the cancelled end state is picked over the Done one.
+        """
+        parent, children = self._create_parent_with_children(2)
+
+        self._transition_service(parent, self.trans_parent_to_cancelled_cascading)
+
+        self.assertEqual(parent.state_id, self.parent_cancelled_cascading)
+        for child in children:
+            self.assertEqual(
+                child.state_id,
+                self.child_cancelled,
+                "A cancelled parent must cancel its children, not complete them",
+            )
+
+    def test_cancel_cascade_walks_through_an_already_finished_child(self):
+        """The whole subtree is cancelled, not just the direct children.
+
+        The real shape this exists for: a work permit root over an "AB
+        Appointment" marker that is already Done, with taxis still open
+        underneath it. Stopping at the finished marker would leave exactly the
+        bookings that have to be dropped untouched.
+        """
+        parent, children = self._create_parent_with_children(1)
+        marker = children[0]
+        marker.state_id = self.child_done
+        booking = self.env["riverflow.service"].create({
+            "name": "Taxi under the finished marker",
+            "parent_id": marker.id,
+            "workflow_id": self.child_workflow.id,
+            "state_id": self.child_not_started.id,
+        })
+
+        self._transition_service(parent, self.trans_parent_to_cancelled_cascading)
+
+        self.assertEqual(
+            marker.state_id,
+            self.child_done,
+            "A child already in an end state keeps it — the walk only descends through it",
+        )
+        self.assertEqual(
+            booking.state_id,
+            self.child_cancelled,
+            "The grandchild booking under the finished marker must be cancelled",
+        )
+
+    def test_cancel_cascade_falls_back_to_the_normal_end_state(self):
+        """A child workflow with no cancelled state still gets closed."""
+        parent, _children = self._create_parent_with_children(0)
+        plain_child = self.env["riverflow.service"].create({
+            "name": "Child without a cancelled state",
+            "parent_id": parent.id,
+            "workflow_id": self.plain_workflow.id,
+            "state_id": self.plain_not_started.id,
+        })
+
+        self._transition_service(parent, self.trans_parent_to_cancelled_cascading)
+
+        self.assertEqual(
+            plain_child.state_id,
+            self.plain_done,
+            "Without a cancelled state, closing the task beats leaving it open",
+        )
+
+    def test_cancel_cascade_skips_archived_children(self):
+        """Archived children stay out of the cancel cascade too."""
+        parent, children = self._create_parent_with_children(2)
+        children[0].active = False
+
+        self._transition_service(parent, self.trans_parent_to_cancelled_cascading)
+
+        self.assertEqual(children[0].state_id, self.child_not_started)
+        self.assertEqual(children[1].state_id, self.child_cancelled)

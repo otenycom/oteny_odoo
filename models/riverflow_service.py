@@ -1615,9 +1615,17 @@ class Service(models.Model):
 
         Idempotent: children already in any end state (Cancelled or Done)
         are left untouched.
+
+        When the state entered is itself a CANCELLED state, the cascade flips
+        to ``_cascade_cancel_to_subtree`` instead: children are cancelled
+        rather than completed, and the whole subtree is walked. See there for
+        why the difference matters.
         """
         for service in self:
             if not service.state_id.auto_done_children_on_enter:
+                continue
+            if service.state_id.is_cancelled_state:
+                service._cascade_cancel_to_subtree()
                 continue
             active_children = service.child_ids.filtered(lambda c: c.active and not c.state_id.is_end_state)
             for child in active_children:
@@ -1632,6 +1640,56 @@ class Service(models.Model):
                 )
                 if done_state:
                     child.state_id = done_state
+
+    def _cascade_cancel_to_subtree(self):
+        """Cancel every active, still-open service below this one.
+
+        Two differences with the Done cascade above, both driven by what
+        cancelling a parent actually means for the work underneath it:
+
+        - The child lands in its own workflow's CANCELLED end state, not the
+          Done one. Closing a taxi that was never taken as "Done" would read
+          as work completed and would count as such in reporting.
+        - The FULL subtree is walked, not just the direct children. A cancelled
+          parent typically sits above a marker child that is already Done while
+          the bookings under *that* marker are still open — e.g. an Arrange
+          Work Permit root at AB Booked over a Done "AB Appointment" marker
+          whose taxis and train tickets are still Registered. Those bookings
+          are exactly what has to be dropped, so an already-finished node is
+          descended through instead of stopping the walk.
+
+        Workflows without a cancelled state fall back to their first normal end
+        state — closing the task is still better than leaving it open. Services
+        already in an end state are left untouched (idempotent).
+        """
+        self.ensure_one()
+        for child in self.child_ids.filtered("active"):
+            if not child.state_id.is_end_state:
+                cancel_state = child._cancel_end_state()
+                if cancel_state:
+                    child.state_id = cancel_state
+            child._cascade_cancel_to_subtree()
+
+    def _cancel_end_state(self):
+        """The end state to park a cancelled service in.
+
+        The workflow's cancelled state when it has one. Otherwise the LAST end
+        state by sequence rather than the first: workflows here are sequenced
+        "work finished" before "no work happened" (Done 30 → Not Needed 40 →
+        Cancelled 50), so the last one is the closest thing to a cancel the
+        workflow offers. A workflow with only a Done state (the generic Task)
+        lands there — closing the task still beats leaving it open.
+        """
+        self.ensure_one()
+        State = self.env["riverflow.state"]
+        end_states = [
+            ("workflow_id", "=", self.state_id.workflow_id.id),
+            ("active", "=", True),
+            ("is_end_state", "=", True),
+        ]
+        return State.search(
+            end_states + [("is_cancelled_state", "=", True)], order="sequence", limit=1
+        ) or State.search(end_states, order="sequence desc", limit=1)
 
     def _auto_progress_to_next_state(self):
         """Progress to the next visible workflow state by sequence.

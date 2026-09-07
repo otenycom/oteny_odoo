@@ -139,7 +139,10 @@ class RiverflowWorkflowState(models.Model):
         "workflow (by sequence). Mirror of auto_progress_on_children_done in "
         "the opposite direction. Used on parent terminal states whose "
         "semantics imply child tasks are also complete (e.g. AUV Done means "
-        "the OPS Review-AUV child task is moot).",
+        "the OPS Review-AUV child task is moot). On a state that is also a "
+        "cancelled state, the children are CANCELLED instead of completed and "
+        "the whole subtree is walked (e.g. cancelling a work permit case drops "
+        "the taxis booked under its AB appointment).",
         default=False,
     )
 
