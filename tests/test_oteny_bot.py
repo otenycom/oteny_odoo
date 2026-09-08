@@ -14,6 +14,7 @@ from odoo.addons.oteny_bot.models.oteny_bot import (
 )
 from odoo.exceptions import UserError
 from odoo.tests import TransactionCase, tagged
+from odoo.tools import mute_logger
 
 
 @tagged("oteny_bot", "post_install", "-at_install")
@@ -72,8 +73,11 @@ class TestOtenyBot(TransactionCase):
         res = self.env["oteny.bot"].ensure_bot("hh00777")
         self.assertEqual(self.env["oteny.bot"].browse(res["bot_id"]).name, "hh00777")
 
+    @mute_logger("odoo.sql_db")
     def test_uplink_ref_is_unique(self):
-        # the DB constraint is what actually stops two bots forking one tenant's activity log
+        # the DB constraint is what actually stops two bots forking one tenant's activity log.
+        # The deliberate IntegrityError logs a "bad query" ERROR that reaches ir_logging and
+        # turns the Odoo.sh build red, hence the mute_logger.
         self.env["oteny.bot"].create({"name": "A", "uplink_ref": "dup"})
         with self.assertRaises(IntegrityError), self.env.cr.savepoint():
             self.env["oteny.bot"].create({"name": "B", "uplink_ref": "dup"}).flush_recordset()
@@ -264,7 +268,10 @@ class TestOtenyBot(TransactionCase):
         self.assertEqual(
             bot.dispatch_isolated_turn("hi", role="unbound")["channel_id"], home.id)
 
+    @mute_logger("odoo.sql_db")
     def test_a_role_can_only_be_bound_once_per_bot(self):
+        # Same as test_uplink_ref_is_unique: the IntegrityError is the point of the test, and
+        # its "bad query" ERROR would otherwise turn the Odoo.sh build red.
         a = self.env["discuss.channel"].create({"name": "A"})
         b = self.env["discuss.channel"].create({"name": "B"})
         bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hhUNIQ"})
