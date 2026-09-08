@@ -6,6 +6,7 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
+from odoo.tools import mute_logger
 
 
 @tagged("post_install", "-at_install", "riverflow", "test_bot_one_live_slot")
@@ -174,7 +175,13 @@ class TestBotOneLiveSlotDrain(TransactionCase):
                     self.state_done
                 )
 
+    @mute_logger("odoo.addons.riverflow.models.riverflow_state_bot_mixin")
     def test_drain_other_error_still_never_breaks_the_exit(self):
+        """The swallow logs the failure with a traceback, which is exactly what a
+        production operator needs. Inside a test that traceback reaches ir_logging at
+        ERROR and turns the Odoo.sh build red for a fault the test is asserting on
+        purpose, so the mixin's logger is muted for this method only (same reason as
+        test_partial_unique_index_blocks_second_open in crewradar_cuneus_sign)."""
         occupant = self._make("RunBoom", self.state_run)
         queued = self._make("QueuedBoom", self.state_queue)
 
