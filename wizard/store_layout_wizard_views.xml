@@ -8,6 +8,13 @@
             <form string="Store Layout">
                 <group>
                     <field name="filter_id" />
+                    <field name="has_period" invisible="1" />
+                    <!-- A captured custom period can be stored as the fixed
+                         dates, or relative to today in whole months so the
+                         shortcut moves with the calendar -->
+                    <field name="period_mode" widget="radio" invisible="not has_period" />
+                    <field name="start_month_offset" invisible="not has_period or period_mode != 'relative'" />
+                    <field name="length_months" invisible="not has_period or period_mode != 'relative'" />
                     <field name="layout_summary" nolabel="1" colspan="2" />
                     <field name="layout_json" invisible="1" />
                 </group>
