@@ -12,6 +12,7 @@ import importlib.util
 import pathlib
 
 from odoo.tests import TransactionCase, tagged
+from odoo.tools import mute_logger
 
 _MIGRATION = (
     pathlib.Path(__file__).resolve().parents[1] / "migrations" / "19.0.1.519" / "pre-migrate.py"
@@ -64,7 +65,14 @@ class TestAuditLogOrphanRepairMigration(TransactionCase):
         self.env.cr.execute("SELECT 1 FROM oteny_audit_log_ref WHERE id = %s", (ref_id,))
         return bool(self.env.cr.fetchone())
 
+    @mute_logger("oteny_audit_repair_19_0_1_519")
     def test_an_orphan_ref_is_deleted(self):
+        # The migration narrates this branch at WARNING, which is what an
+        # operator needs during a real upgrade. Here the branch IS the test,
+        # and on Odoo.sh --log-db copies every WARNING into ir_logging, where
+        # any row turns the build red. The test loads the migration under this
+        # module name, so that name is also its logger.
+
         """The foreign key is created ON DELETE cascade, so this row cannot exist while the
         constraint does. It exists only because the parent went while the key was absent."""
         log = self._make_log()
@@ -89,7 +97,14 @@ class TestAuditLogOrphanRepairMigration(TransactionCase):
 
         self.assertTrue(self._exists(ref.id))
 
+    @mute_logger("oteny_audit_repair_19_0_1_519")
     def test_the_foreign_key_can_be_added_again_after_the_repair(self):
+        # The migration narrates this branch at WARNING, which is what an
+        # operator needs during a real upgrade. Here the branch IS the test,
+        # and on Odoo.sh --log-db copies every WARNING into ir_logging, where
+        # any row turns the build red. The test loads the migration under this
+        # module name, so that name is also its logger.
+
         """The point of the whole exercise: without this, every later upgrade fails."""
         log = self._make_log()
         self._make_ref(log.id)
