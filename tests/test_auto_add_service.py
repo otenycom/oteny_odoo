@@ -158,3 +158,91 @@ class TestAutoAddServiceDedup(TransactionCase):
             "Deactivated old rule must not create a service even when "
             "active_test=False is in context and a newer active rule exists",
         )
+
+    def _make_workflow_rule(self, name):
+        """A rule on its own two-state workflow (Open -> Done), so a service can
+        be closed and the dedup observed against a closed one."""
+        service_model = self.env["ir.model"]._get("riverflow.service").id
+        workflow = self.env["riverflow.workflow"].create(
+            {"name": name, "model_id": service_model}
+        )
+        open_state = self.env["riverflow.state"].create(
+            {"name": "Open", "workflow_id": workflow.id, "sequence": 10}
+        )
+        self.env["riverflow.state"].create(
+            {
+                "name": "Done",
+                "workflow_id": workflow.id,
+                "sequence": 20,
+                "is_end_state": True,
+            }
+        )
+        template = self.env["riverflow.service"].create(
+            {
+                "name": name + " template",
+                "is_this_a_template": True,
+                "workflow_id": workflow.id,
+                "state_id": open_state.id,
+            }
+        )
+        rule = self.env["riverflow.auto.add.service"].create(
+            {"domain_id": self.auto_add_domain.id, "service_template_id": template.id}
+        )
+        return workflow, rule
+
+    def _services_of_rule(self, rule):
+        return self.env["riverflow.service"].with_context(active_test=False).search(
+            [
+                ("res_id", "=", self.subject_partner.id),
+                ("res_model", "=", "res.partner"),
+                ("created_by_auto_add_service_id", "=", rule.id),
+            ]
+        )
+
+    def test_closed_service_blocks_only_without_single_open(self):
+        """A closed service and the occasion dedup.
+
+        Without single-open the old rule stands: a Done service for the same
+        key is "already handled" and nothing is re-created (the hand-in
+        services keyed on one card rely on this when a lifecycle state is
+        re-entered). With single-open, the presence side of the invariant
+        wins: a closed service never blocks, only an open one does — an
+        in-scope subject always holds exactly one open service. Incident
+        10-Sep-2026: a Renew Passport task closed by a re-upload of the
+        passport already on file left the employee with no task at all.
+        """
+        AutoAdd = self.env["riverflow.auto.add.service"]
+        # The shared fixture rule also matches this subject; leave it be and
+        # count only this test's rule.
+        self.auto_add_rule.active = False
+        workflow, rule = self._make_workflow_rule("Dedup vs closed")
+        done = workflow.state_ids.filtered("is_end_state")
+
+        AutoAdd.auto_add_services(self.subject_partner)
+        first = self._services_of_rule(rule)
+        self.assertEqual(len(first), 1)
+        first.state_id = done
+        self.assertFalse(first.is_open)
+
+        AutoAdd.auto_add_services(self.subject_partner)
+        self.assertEqual(
+            len(self._services_of_rule(rule)), 1,
+            "without single-open a closed service still counts as handled",
+        )
+
+        workflow.enforce_single_open = True
+        AutoAdd.auto_add_services(self.subject_partner)
+        services = self._services_of_rule(rule)
+        self.assertEqual(
+            len(services), 2,
+            "with single-open a closed service never blocks: the subject gets "
+            "its open service back",
+        )
+        self.assertEqual(len(services.filtered("is_open")), 1)
+
+        AutoAdd.auto_add_services(self.subject_partner)
+        self.assertEqual(
+            len(self._services_of_rule(rule)), 2,
+            "the open service blocks; nothing stacks on it",
+        )
+

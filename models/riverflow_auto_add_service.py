@@ -167,6 +167,17 @@ class AutoAddService(models.Model):
         for ns in new_services:
             candidate_ids_by_model.setdefault(ns["res_model"], set()).add(ns["res_id"])
 
+        # On a workflow that enforces single-open, a CLOSED service (end state,
+        # or archived) never counts as "already handled": the presence side of
+        # that invariant says an in-scope subject always holds one open
+        # service, so a Done task for the current occasion must not block a
+        # fresh monitoring task. Without this, filing the passport already on
+        # file through the Renew Passport task closed it and left the employee
+        # with no task at all (10-Sep-2026). Only open services block here, and
+        # _filter_single_open below already dedups on open-ness. Workflows
+        # without single-open keep the full dedup: a hand-in service keyed on
+        # a specific card must not return when its lifecycle state is
+        # re-entered.
         Service = self.with_context(active_test=False).env["riverflow.service"]
         current_service_keys = set()
         for candidate_model, candidate_ids in candidate_ids_by_model.items():
@@ -177,6 +188,8 @@ class AutoAddService(models.Model):
                     ("created_by_auto_add_service_id", "!=", False),
                 ]
             ):
+                if s.workflow_id.enforce_single_open and not s.is_open:
+                    continue
                 current_service_keys.add(
                     (
                         s.created_by_auto_add_service_id.id,
