@@ -21,11 +21,16 @@ BASE_PARAM = "oteny.broker_base_url"
 TOKEN_PARAM = "oteny.broker_token"
 TOKEN_LIVE_WATCH_PARAM = "oteny.broker_token_live_watch"
 TOKEN_REPLAY_VIEW_PARAM = "oteny.broker_token_replay_view"
+# Stop-and-reset needs its own slot for the same reason live-watch and replay-view do:
+# `_broker_token` refuses to lend one purpose's credential to another, so a purpose with
+# no slot of its own answers 401 while the button still looks available.
+TOKEN_JAR_CLEAR_PARAM = "oteny.broker_token_jar_clear"
 
 _PURPOSE_TOKEN_PARAMS = {
     "login-gate": TOKEN_PARAM,
     "live-watch": TOKEN_LIVE_WATCH_PARAM,
     "replay-view": TOKEN_REPLAY_VIEW_PARAM,
+    "jar-clear": TOKEN_JAR_CLEAR_PARAM,
 }
 
 

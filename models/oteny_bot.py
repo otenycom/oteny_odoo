@@ -123,6 +123,11 @@ class OtenyBot(models.Model):
         "res.users", string="Login Dance By", copy=False,
         help="Who started the login dance currently holding the latch — so a second person is "
         "told WHO is signing in rather than just 'busy'.")
+    jar_clear_available = fields.Boolean(
+        compute="_compute_jar_clear_available",
+        help="Whether this Oteny account has a stop-and-reset credential wired. "
+             "Gates the button so it is hidden rather than broken.")
+
     login_dance_token = fields.Char(
         "Login Dance Token", copy=False,
         help="The epoch of ONE dance: minted on every login_dance_start and required by "
@@ -336,6 +341,50 @@ class OtenyBot(models.Model):
     def action_login_dance_force_clear(self):
         self.login_dance_force_clear()
         return True
+
+    @api.depends_context("uid")
+    def _compute_jar_clear_available(self):
+        """Hide the button rather than break it. `_broker_token` refuses to lend one
+        purpose's credential to another, so an unconfigured stop-and-reset would answer
+        401 while the button still looked available."""
+        ok = self.env["oteny.broker.client"]._broker_purpose_configured("jar-clear")
+        for rec in self:
+            rec.jar_clear_available = ok
+
+    def action_stop_and_reset_browser(self):
+        """Close this bot's live cloud browser and forget any saved sign-in.
+
+        The button an operator presses when a run is stuck inside the portal. It stops
+        the window FIRST, because that is what ends the stuck run, and forgets the saved
+        sign-in SECOND, so the next run cannot restore whatever wedged this one.
+
+        It stops a window even when a turn is using it. That is the point: a run stuck in
+        a portal dialog is exactly what this is for. The record that turn was working
+        parks itself back to not-started the way it does for any lost browser, so nothing
+        is left half-filed.
+
+        Anyone who can open this form may press it. The blast radius is one bot's browser,
+        and waiting for the right person is worse than an interrupted run.
+        """
+        self.ensure_one()
+        res = self.env["oteny.broker.client"]._broker_post(
+            "/v1/browser/reset", {}, purpose="jar-clear") or {}
+        closed = int(res.get("sessions_closed") or 0)
+        forgot = bool(res.get("jar_forgotten"))
+        if closed and forgot:
+            msg = _("Browser stopped (%s window(s)) and the saved sign-in was cleared.", closed)
+        elif closed:
+            msg = _("Browser stopped (%s window(s)). There was no saved sign-in to clear.", closed)
+        elif forgot:
+            msg = _("The saved sign-in was cleared. No browser window was open.")
+        else:
+            msg = _("Nothing to stop: no browser window was open and no sign-in was saved.")
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {"title": _("Stop and Reset browser"), "message": msg,
+                       "type": "success", "sticky": False},
+        }
 
     def login_dance_stop(self, token):
         """COMPARE-and-clear: release the latch ONLY if ``token`` is the CURRENT dance's epoch.

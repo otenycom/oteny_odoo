@@ -22,6 +22,8 @@
             <form>
                 <header>
                     <field name="login_dance_is_active" invisible="1"/>
+                    <!-- Read by the Clear login dance button's own visibility, so the
+                         button is offered only while a dance actually holds the latch. -->
                     <button name="action_open_discuss_channel" type="object"
                             string="Open Discuss"
                             invisible="not discuss_channel_id"
@@ -30,6 +32,15 @@
                             string="Clear login dance"
                             invisible="not login_dance_is_active"
                             groups="oteny_bot.group_oteny_bot_manager"/>
+                    <field name="jar_clear_available" invisible="1"/>
+                    <!-- Read by the Stop and Reset browser button's own visibility. The
+                         button is hidden rather than broken when this Oteny account has
+                         no stop-and-reset credential wired, because the call would
+                         otherwise answer 401 while the button still looked available. -->
+                    <button name="action_stop_and_reset_browser" type="object"
+                            string="Stop and Reset browser"
+                            invisible="not jar_clear_available"
+                            confirm="Stop this bot's cloud browser and clear its saved sign-in? A run using that window right now will stop."/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
