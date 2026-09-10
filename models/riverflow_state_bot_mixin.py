@@ -38,12 +38,17 @@ records at random times, so this layer also owns two symmetric fences, both keye
   Deferred, never failed: the record keeps its place and the dispatch cron re-drives it.
 * ``_bot_assert_human_transition_allowed`` — refuses a HUMAN transition out from under a live run,
   so a person cannot cancel a job in the seconds between the irreversible act and the record
-  catching up with it.
+  catching up with it. ONE transition is exempt: the state's ``is_bot_timeout`` hand-back
+  (``riverflow.state.bot_timeout_transition``), which is the reaper's own exit. A person taking
+  that door early makes the same judgement the clock makes on an abandoned run, and lands the
+  record in the same state, so it is one hand-back with two triggers rather than a second meaning.
+  Every other exit — *Cancel* above all — stays refused while a run is live.
 
 Both are bounded by wall clock BY CONSTRUCTION: a claim stops being live the moment its state's
 ``bot_timeout_minutes`` SLA passes (the reaper then owns it), and a state with NO SLA is never
 treated as live at all — an unbounded block would park a human forever, and liveness outranks the
-fence.
+fence. The hand-back exemption bounds it a second way, on demand: a person who can see the run is
+dead does not have to sit out the SLA to say so.
 """
 
 import logging
@@ -566,27 +571,66 @@ class RiverflowStateBotMixin(models.AbstractModel):
         The window this closes is small and real: an isolated run's irreversible act (a portal
         submit) and the record catching up with it (write the proof, advance the state) are seconds
         apart, and a person clicking *Cancel* in between leaves a real, filed side effect behind a
-        record that says cancelled. There is no way to un-submit, so the only correct answer is to
-        make the human wait for the run — a few minutes, never open-ended.
+        record that says cancelled. There is no way to un-submit, so the only correct answer for
+        that transition is to make the human wait for the run.
+
+        ONE transition is exempt: the state's ``is_bot_timeout`` exit (``bot_timeout_transition``).
+        That is the hand-back door, and the reaper already takes it on this very record once the
+        SLA passes. A person taking the same door early is making the same judgement the clock
+        makes — "this run is not coming back" — so it carries the same meaning and the same
+        landing state, never a second one. It is exempt for three reasons.
+
+        First, the record needs a human abort at all: a run whose gateway died keeps the record
+        in-progress, and the SLA is the only exit, which parks a person for up to
+        ``bot_timeout_minutes`` in front of a bot that will never answer.
+
+        Second, the hand-back is honest about an in-flight side effect in a way *Cancel* is not.
+        It lands in the workflow's own owner-return state ("this is not done, look at it"), where
+        *Cancel* asserts the work is over. So a submit that did land leaves a record that still
+        reads as unfinished work, which is the truthful record either way.
+
+        Third, the submit race is fenced one step closer to the act than this method can reach.
+        The agent's own skill re-checks its epoch (``bot_token_check``) immediately before the
+        irreversible call and stops on a lost claim, and the hand-back clears
+        ``bot_claim_token`` in the same transaction as the state change — so an abort that
+        commits before that check turns the submit into a no-op. What stays possible is a submit
+        already in flight, and that residual is identical for the reaper's hand-back and the
+        agent's own escalate, which this fence has never guarded.
 
         Called from the transition-execution choke points (the button and the wizard
         OK). A person is refused. ``bot_claim`` and a flagged bot open/OK pass
         ``riverflow_bot_caller`` so the claiming bot's own wizard still runs. The
-        bound is the run finishing or the SLA reaper handing the record back; the
-        message says so, because a refusal whose end the user cannot see is
-        indistinguishable from a hang."""
+        bound is the run finishing, the person taking the hand-back, or the SLA reaper
+        handing the record back; the message names all three, because a refusal whose
+        end the user cannot see is indistinguishable from a hang."""
         self.ensure_one()
         if self.env.context.get("riverflow_bot_caller"):
             return
         if not self._bot_claim_is_live():
             return
+        abort = self.state_id.bot_timeout_transition()
+        if abort and transition == abort:
+            return
+        waited = int((fields.Datetime.now() - self.bot_work_started_at).total_seconds() // 60)
+        if abort:
+            raise UserError(_(
+                "%(bot_state)s is working on this right now — it started %(minutes)s minute(s) "
+                "ago and usually takes a few minutes. Wait for it to finish and try again. If it "
+                "never finishes, it is handed back automatically within %(sla)s minutes — you do "
+                "not need to do anything. To take it back straight away, use "
+                "%(abort)s instead.",
+                bot_state=self.state_id.name,
+                minutes=waited,
+                sla=self.state_id.bot_timeout_minutes,
+                abort=abort.name,
+            ))
         raise UserError(_(
             "%(bot_state)s is working on this right now — it started %(minutes)s minute(s) ago and "
             "usually takes a few minutes. Wait for it to finish and try again. If it never "
             "finishes, it is handed back automatically within %(sla)s minutes — you do not need to "
             "do anything.",
             bot_state=self.state_id.name,
-            minutes=int((fields.Datetime.now() - self.bot_work_started_at).total_seconds() // 60),
+            minutes=waited,
             sla=self.state_id.bot_timeout_minutes,
         ))
 
@@ -756,8 +800,10 @@ class RiverflowStateBotMixin(models.AbstractModel):
         an ir.cron on each concrete workflow-bearing model. For every ``in_progress`` or
         timeout-enabled ``queue`` state with a positive ``bot_timeout_minutes``, any record
         whose ``bot_work_started_at`` is older than the SLA is advanced through that state's
-        ``is_bot_timeout`` transition (the reaper's exit, distinct from the agent's own
-        escalate). The reaper passes the token it READS as its ``work_token``: ``bot_claim``
+        ``is_bot_timeout`` transition (``bot_timeout_transition`` — the reaper's exit, distinct
+        from the agent's own escalate, and the SAME door
+        ``_bot_assert_human_transition_allowed`` lets a person take early on an abandoned run).
+        The reaper passes the token it READS as its ``work_token``: ``bot_claim``
         re-checks it under the row lock, so a record whose run completed (or whose token
         rotated) between the read and the lock is a clean no-op — the reaper can never
         revert a just-completed record. A queue state has no claim token, so the fence
@@ -770,7 +816,7 @@ class RiverflowStateBotMixin(models.AbstractModel):
         ])
         reaped = 0
         for state in states:
-            timeout_transition = state.from_transition_ids.filtered("is_bot_timeout")[:1]
+            timeout_transition = state.bot_timeout_transition()
             if not timeout_transition:
                 continue
             deadline = now - timedelta(minutes=state.bot_timeout_minutes)

@@ -188,6 +188,28 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
             deadline=self._format_bot_working_clock(deadline),
         )
 
+    def _transition_button(self, transition, index, primary):
+        """One button row for ``transition_buttons_json``. Extracted so the live-claim branch
+        below can render the abort with exactly the shape every other button has — a second
+        copy of this dict would drift the moment a key is added."""
+        self.ensure_one()
+        transition_id = (
+            transition.id.origin if isinstance(self.id, api.NewId) else int(transition.id)
+        )
+        button = {
+            "index": index,
+            "caption": transition.name,
+            "help": transition.description,
+            "action": "action_button_click",
+            "primary": primary,
+            # context is posted back to the server side action method
+            "context": {
+                "transition_id": transition_id,
+            },
+        }
+        button.update(self._transition_button_extras(transition))
+        return button
+
     @api.depends(
         "state_json",
         "from_transition_ids",
@@ -209,6 +231,16 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 and not sees_bot_work
             ):
                 transition_buttons["working_note"] = record._bot_working_note()
+                # Every other exit stays hidden while the run is live — the fence in
+                # _bot_assert_human_transition_allowed would refuse it anyway, and a button
+                # that always errors is worse than no button. The state's own timeout exit is
+                # the exception: it is the hand-back the reaper takes on the clock, and the
+                # note beside it names the hour that will happen. A person who can see the run
+                # is dead needs that door NOW, on the panel that told them to wait.
+                abort = record.state_id.bot_timeout_transition()
+                if abort:
+                    transition_buttons["buttons"] = [
+                        record._transition_button(abort, 0, False)]
                 record.transition_buttons_json = transition_buttons
                 continue
             transition_ids = record.from_transition_ids
@@ -223,11 +255,6 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                 for transition in transition_ids:
                     if hide_bot_work and transition.bot_role in ("claim", "work"):
                         continue
-                    # workaround, sometimes transition is a clone? in lookup tables or so
-                    transition_id = (
-                        transition.id.origin if isinstance(record.id, api.NewId) else int(transition.id)
-                    )
-
                     if not record.state_id:
                         # The start transition to the first state can be skipped, as that is a no-op
                         # its typically named "Not Started" and used in the Start-new wizard to create a new record in the first state
@@ -236,19 +263,8 @@ class RiverflowWorkflowStateMixin(RiverflowTransitionMixin):
                             continue
 
                     primary = (not no_primary) and index == 0
-                    button = {
-                        "index": index,
-                        "caption": transition.name,
-                        "help": transition.description,
-                        "action": "action_button_click",
-                        "primary": primary,
-                        # context is posted back to the server side action method
-                        "context": {
-                            "transition_id": transition_id,
-                        },
-                    }
-                    button.update(record._transition_button_extras(transition))
-                    transition_buttons["buttons"].append(button)
+                    transition_buttons["buttons"].append(
+                        record._transition_button(transition, index, primary))
                     index += 1
 
             record.transition_buttons_json = transition_buttons

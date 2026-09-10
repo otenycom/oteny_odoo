@@ -98,9 +98,30 @@ class TestTransitionButtonsBotHide(TransactionCase):
             not b["primary"] for b in rec.transition_buttons_json["buttons"]
         ))
 
-    def test_live_claim_shows_note_and_no_buttons(self):
+    def test_live_claim_shows_the_note_and_only_the_abort(self):
+        """A live run hides every exit but one. The note says the bot is working and names
+        the hour it is handed back, and the state's own timeout exit sits under it — the
+        same door the reaper takes on the clock, offered to whoever can see the run is dead.
+        Any other exit would only raise from the fence, so a button for it is worse than
+        none."""
         rec = self._make("Live", self.state_run)
         rec.bot_run_started_at = fields.Datetime.now()
+        rec.invalidate_recordset(["transition_buttons_json"])
+        payload = rec.transition_buttons_json
+        self.assertEqual([b["caption"] for b in payload["buttons"]],
+                         [self.trans_run_stop.name])
+        self.assertEqual(payload["buttons"][0]["context"]["transition_id"],
+                         self.trans_run_stop.id)
+        self.assertFalse(payload["buttons"][0]["primary"], "an abort is never the default")
+        self.assertIn("working", (payload.get("working_note") or "").lower())
+
+    def test_a_live_claim_with_no_declared_timeout_exit_shows_no_buttons(self):
+        """The abort is driven by the workflow's own declaration, not by a hard-coded name.
+        A state that declares no timeout exit has no hand-back to offer, and the panel is
+        back to the note alone."""
+        rec = self._make("LiveNoExit", self.state_run)
+        rec.bot_run_started_at = fields.Datetime.now()
+        self.trans_run_stop.is_bot_timeout = False
         rec.invalidate_recordset(["transition_buttons_json"])
         payload = rec.transition_buttons_json
         self.assertEqual(payload["buttons"], [])

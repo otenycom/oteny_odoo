@@ -188,6 +188,20 @@ class RiverflowWorkflowState(models.Model):
         help="Transitions from this state",
     )
 
+    def bot_timeout_transition(self):
+        """This state's ``is_bot_timeout`` exit — the one hand-back door out of a stalled bot
+        run, and an empty recordset when the state has none.
+
+        TWO callers share this lookup on purpose. ``_bot_reap_timeouts`` takes the door on the
+        CLOCK, once the state's ``bot_timeout_minutes`` SLA passes.
+        ``_bot_assert_human_transition_allowed`` lets a person take the SAME door ON DEMAND,
+        before the SLA, when a run looks abandoned. One lookup keeps those two from drifting
+        into two meanings: a workflow that declares one timeout exit gets one hand-back, however
+        it is triggered. ``[:1]`` because a state with two flagged exits has an ambiguous
+        hand-back, and the first by sequence is the declared one."""
+        self.ensure_one()
+        return self.from_transition_ids.filtered("is_bot_timeout")[:1]
+
     display_name = fields.Char("Display Name", compute="_compute_display_name", store=True, index="trigram")
 
     @api.depends("name", "workflow_id.name")
