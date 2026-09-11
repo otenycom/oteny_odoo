@@ -956,12 +956,18 @@ class RiverflowStateBotMixin(models.AbstractModel):
         Discuss dispatch."""
         self.ensure_one()
         # B-PROMPT1: name the ONE first uplink read by id — the channel never carries the DTO.
+        # A bot whose Talent declares `record_pin` already has the record in its system
+        # prompt, read by the platform at dispatch (the SOURCE RECORD SNAPSHOT frame); that
+        # snapshot is what it files, so it must not fetch a second copy. Every other bot
+        # still makes the one read.
         thin = (
             f"Run the '{item.get('skill') or ''}' task for {item.get('state')} record "
-            f"#{self.id} (riverflow.service). Load the skill. First uplink call: ONE "
-            f"search_read with domain [['id', '=', {self.id}]] for this record's fields — "
-            f"there is no record payload in this message. Fetch over your uplink, complete "
-            f"the work, and advance the record. Act only on this one record."
+            f"#{self.id} (riverflow.service). Load the skill. If your system prompt carries "
+            f"a SOURCE RECORD SNAPSHOT of this record, that snapshot is this record's data: "
+            f"do not fetch it again. Otherwise your first uplink call is ONE search_read "
+            f"with domain [['id', '=', {self.id}]] for this record's fields — there is no "
+            f"record payload in this message. Complete the work, and advance the record. "
+            f"Act only on this one record."
         )
         declared = (item.get("prompt") or "").strip()
         return f"{thin}\n{declared}" if declared else thin
