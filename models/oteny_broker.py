@@ -66,10 +66,14 @@ class OtenyBrokerClient(models.AbstractModel):
         """True when a mint for ``purpose`` has a usable bearer (honest UI gate)."""
         return bool(self._broker_token(purpose))
 
-    def _broker_post(self, path, payload=None, *, purpose=None):
+    def _broker_post(self, path, payload=None, *, purpose=None, tolerate=()):
         """POST to the Oteny cloud-browser broker. Fenced on base URL + token
         (unset → a clear error, so nothing calls out off-prod). The token is used
-        in the header only — never logged; broker errors carry no bearer URL."""
+        in the header only — never logged; broker errors carry no bearer URL.
+
+        ``tolerate`` lists broker error codes the caller handles itself. Their JSON
+        body is returned instead of raised, so the caller can tell "nothing to do"
+        from a refusal without parsing a sentence."""
         if requests is None:
             raise UserError(_("The requests library is not available in this Odoo."))
         icp = self.env["ir.config_parameter"].sudo()
@@ -101,6 +105,8 @@ class OtenyBrokerClient(models.AbstractModel):
                     body = resp.json()
                 except ValueError:
                     body = {}
+                if isinstance(body, dict) and body.get("error") in tolerate:
+                    return body
                 if isinstance(body, dict):
                     detail = (
                         body.get("message")
