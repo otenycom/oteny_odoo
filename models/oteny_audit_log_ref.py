@@ -1,5 +1,7 @@
 # oteny_audit/models/oteny_audit_log_ref.py
 from odoo import fields, models, api
+
+from .oteny_audit_fields import BigInteger
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -23,7 +25,8 @@ class OtenyAuditLogRef(models.Model):
     parent_display_name = fields.Char(string="Parent Record Name")
     is_direct = fields.Boolean(default=True, string="Is Direct Reference")
     create_date = fields.Datetime(string="Create Date", readonly=True)
-    transaction_id = fields.Integer(string="Transaction ID")
+    # Copied from the log row; 64-bit for the same reason (see oteny_audit_fields).
+    transaction_id = BigInteger(string="Transaction ID")
 
     @api.model
     def init(self):

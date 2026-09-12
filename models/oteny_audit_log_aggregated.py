@@ -1,4 +1,6 @@
 from odoo import api, fields, models, tools
+
+from .oteny_audit_fields import BigInteger
 import markupsafe
 import logging
 from datetime import datetime
@@ -29,7 +31,8 @@ class OtenyAuditLogAggregated(models.Model):
     parent_record_display_name = fields.Char(string="Parent Record", readonly=True)
 
     # --- Fields from oteny.audit.log ---
-    transaction_id = fields.Integer(readonly=True, string="Transaction ID")
+    # 64-bit like the underlying log column (see oteny_audit_fields).
+    transaction_id = BigInteger(readonly=True, string="Transaction ID")
     model_name = fields.Char(readonly=True, string="Parent Model Name")
     model_display_name = fields.Char(
         string="Parent Model",

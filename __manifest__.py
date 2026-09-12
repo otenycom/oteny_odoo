@@ -3,7 +3,8 @@
     # 19.0.1.519: redact credentials in audit values + skip messages in an audit-ignored container (migration scrubs stored secrets)
     # 19.0.1.474: perf: split aggregated audit view into UNION ALL (push value-search into log scan; 36s->~100ms)
     # 19.0.1.473: perf: partial snapshot GIN + (field_name, create_date) base index
-    "version": "19.0.1.597",
+    # 19.0.1.598: transaction_id becomes a 64-bit column (BigInteger, int8) on the log, the ref and the aggregated view; txid_current() passed 2^31 on production on 2026-09-12 and every write failed with "integer out of range" (white screen). migrations/19.0.1.598/pre-migrate.py converts the columns; the field type keeps fresh installs correct.
+    "version": "19.0.1.598",
     "depends": ["base", "mail"],
     "author": "Oteny.com",
     "category": "Extra Tools",

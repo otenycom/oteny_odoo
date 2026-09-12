@@ -4,6 +4,8 @@ import logging
 
 from odoo import Command, api, fields, models
 
+from .oteny_audit_fields import BigInteger
+
 _logger = logging.getLogger(__name__)
 
 _AUDIT_ACTION_XML_MODULE = "oteny_audit"
@@ -29,7 +31,8 @@ class OtenyAuditLog(models.Model):
         "res.partner": "parent_id",
     }
 
-    transaction_id = fields.Integer(required=False, string="Transaction ID")
+    # PostgreSQL transaction number (txid_current), a 64-bit counter: see oteny_audit_fields.
+    transaction_id = BigInteger(required=False, string="Transaction ID")
     model_name = fields.Char(required=True)
     record_id = fields.Integer(required=True, string="Record ID")
     record_ref = fields.Reference(

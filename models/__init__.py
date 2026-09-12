@@ -1,3 +1,4 @@
+from . import oteny_audit_fields
 from . import oteny_audit_log
 from . import oteny_audit_log_ref
 from . import oteny_audit_log_aggregated
