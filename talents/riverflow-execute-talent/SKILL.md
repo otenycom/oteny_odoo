@@ -24,8 +24,9 @@ does not copy this recipe.
 
 Load this skill before you press a riverflow button. Call
 `odoo_client` with the Odoo connection the project already bound.
-Pass `connection=<name>` on every call. Do not request `terminal`
-or `execute_code`.
+Pass `connection=<name>` on every call. You reach this Odoo as an
+employee does: through your own login and its rights. Do not write to
+its database or run its server commands.
 
 ## Why one strip
 
@@ -161,8 +162,8 @@ dict.
 
 ## Hard rules
 
-- Use `odoo_client` only. Do not request `terminal` or
-  `execute_code`.
+- Work this Odoo through `odoo_client` and your own login only. Never
+  its database, never its server commands.
 - Do not `search_read` `riverflow.transition` by name.
 - Do not write `state_id` raw. `bot_claim` is open-and-save.
 - Do not copy deadline keys onto `bot_claim`.
