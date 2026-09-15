@@ -15,15 +15,13 @@
                             shortcuts="x2manyShortcuts"
                             activeId="shortcutState.activeId"
                             onClick.bind="onX2ManyShortcutClick"
-                            onSetup.bind="onX2ManyShortcutSetup"
                             inToolbar="true"/>
                     </t>
                 </t>
                 <X2ManyShortcutsRow t-else=""
                     shortcuts="x2manyShortcuts"
                     activeId="shortcutState.activeId"
-                    onClick.bind="onX2ManyShortcutClick"
-                    onSetup.bind="onX2ManyShortcutSetup"/>
+                    onClick.bind="onX2ManyShortcutClick"/>
             </t>
         </xpath>
     </t>

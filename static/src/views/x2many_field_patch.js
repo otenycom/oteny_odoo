@@ -8,7 +8,6 @@ import { patch } from "@web/core/utils/patch";
 import { X2ManyField } from "@web/views/fields/x2many/x2many_field";
 import { X2ManyShortcutsRow } from "@oteny_shortcut/components/x2many_shortcuts_row/x2many_shortcuts_row";
 import { isShortcutShown, showWhenContext } from "@oteny_shortcut/views/show_when";
-import { openShortcutSetup } from "@oteny_shortcut/views/shortcut_setup";
 
 // Why this exists:
 // A person looking at a list inside a form (the services of an employee, the
@@ -42,10 +41,10 @@ import { openShortcutSetup } from "@oteny_shortcut/views/shortcut_setup";
 // rendered into it with a portal; without such a toolbar the row stays on its
 // own line above the list.
 //
-// A gear next to the active button opens the Set Up Shortcut wizard
-// (Python, wizard/shortcut_setup_wizard.py) for that filter, with this form's
-// model as the "Only in the form of ..." choice; on close the row reloads its
-// shortcuts instead of reloading the page, so unsaved edits in the form stay.
+// The settings of a shortcut are fields on the favorite's own form; a user
+// edits the filter to change them. The row carries no door to that form, and
+// an edit shows after the page is reloaded (the shortcuts are cached per
+// model for the page load).
 
 // Shortcuts per model for this page load; which of them show above a given
 // list is decided per form (see x2manyShortcuts). An admin who changes the
@@ -114,7 +113,6 @@ patch(X2ManyField.prototype, {
             return;
         }
         this._shortcutOrm = useService("orm");
-        this._shortcutAction = useService("action");
         this._shortcutOriginalLimit = null;
         this._shortcutPending = null;
         this._shortcutRootRef = useRef("x2manyShortcutRoot");
@@ -178,35 +176,6 @@ patch(X2ManyField.prototype, {
             return this._deactivateShortcut();
         }
         return this._activateShortcut(shortcut);
-    },
-
-    /**
-     * The gear: set up the active shortcut in the wizard. On close the row
-     * reads the shortcuts again (the page is not reloaded, so the form keeps
-     * its unsaved edits) and keeps the same filter active if it still shows.
-     */
-    async onX2ManyShortcutSetup(shortcut) {
-        return openShortcutSetup(this._shortcutAction, {
-            filterId: shortcut.id,
-            subjectModel: this.props.record.resModel,
-            noReload: true,
-            onClose: async () => {
-                clearFormShortcutsCache();
-                this.shortcutState.shortcuts = await loadFormShortcuts(
-                    this._shortcutOrm,
-                    this.list.resModel
-                );
-                const active = this.x2manyShortcuts.find(
-                    (s) => s.id === this.shortcutState.activeId
-                );
-                if (active) {
-                    this._shortcutPending = null;
-                    await this._refreshShortcutMatches();
-                } else {
-                    await this._deactivateShortcut();
-                }
-            },
-        });
     },
 
     async _activateShortcut(shortcut) {

@@ -95,7 +95,7 @@ test("the default Forms shortcut is active at open and hides the rows it does no
     });
     await mountView({ type: "form", resModel: "parent", resId: 1, arch: ARCH });
 
-    expect(queryAllTexts(".o_x2many_shortcuts button:not(.o_shortcut_setup)")).toEqual(["Todo", "Done"]);
+    expect(queryAllTexts(".o_x2many_shortcuts button")).toEqual(["Todo", "Done"]);
     expect(".o_x2many_shortcuts button.btn-primary").toHaveText("Todo");
     expect(".o_x2many_shortcuts button .fa-check").toHaveCount(1);
     expect(visibleRowNames()).toEqual(["Open A", "Open C"]);

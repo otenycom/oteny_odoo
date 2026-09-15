@@ -3,7 +3,6 @@
 import { Component, onWillStart } from "@odoo/owl";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
-import { openShortcutSetup } from "@oteny_shortcut/views/shortcut_setup";
 
 /**
  * The shortcut banner: the saved Favorites promoted to buttons, shown above
@@ -19,11 +18,9 @@ import { openShortcutSetup } from "@oteny_shortcut/views/shortcut_setup";
  * A click is simply toggling that favorite, so the banner and the Favorites
  * menu always agree on what is active.
  *
- * The gear: when exactly one favorite is active in the search, shortcut or
- * not, a gear opens the Set Up Shortcut wizard for it (Thijs, 2026-09-15).
- * That is the door for a user to promote a favorite to a button, or to change
- * where a button shows, without the technical filter form. The banner then
- * renders even when the model has no shortcut buttons yet.
+ * The settings of a shortcut (button on or off, where it shows, icon) are
+ * fields on the favorite's own form; a user edits the filter to change them
+ * (Thijs, 2026-09-15). The banner itself carries no door to that form.
  *
  * A view that has a layout worth storing (list columns, calendar scale, the
  * timeline period) exposes it through env.shortcutLayout, an object with
@@ -92,32 +89,6 @@ export class ViewShortcutsBanner extends Component {
         return active.length === 1 ? active[0] : null;
     }
 
-    /**
-     * The single active favorite of the search, shortcut or not; null when
-     * none or several are active. The gear works on it.
-     */
-    get activeFavorite() {
-        if (!this.isEnabled) {
-            return null;
-        }
-        const active = this.env.searchModel.getSearchItems(
-            (item) => item.type === "favorite" && item.isActive
-        );
-        return active.length === 1 ? active[0] : null;
-    }
-
-    /**
-     * Open the Set Up Shortcut wizard for the active favorite. The wizard
-     * reloads the page on confirm, so the favorites and the buttons are
-     * read again.
-     */
-    onSetupShortcut() {
-        const favorite = this.activeFavorite;
-        if (!favorite) {
-            return;
-        }
-        return openShortcutSetup(this.actionService, { filterId: favorite.serverSideId });
-    }
 
     /**
      * True when exactly one shortcut is active and the view exposes a layout,

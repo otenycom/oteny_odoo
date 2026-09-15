@@ -8,34 +8,63 @@
         <field name="inherit_id" ref="base.ir_filters_view_form" />
         <field name="arch" type="xml">
             <xpath expr="//group/group[last()]" position="after">
-                <group string="Shortcut Banner">
-                    <field name="shortcut_sequence" />
+                <!-- The shortcut settings of a favorite, for every user (Thijs,
+                     2026-09-15): a switch, a choice in Odoo's own words and a picker.
+                     They read and write shortcut_sequence and shortcut_show_when, so
+                     nobody needs the expression or the order number; those stay for
+                     administrators in debug mode. The gear next to a selected filter
+                     opens this form. -->
+                <group string="Shortcut">
+                    <div colspan="2" class="text-muted small mb-2">
+                        <p class="mb-0">
+                            A shortcut is a favorite shown as a button: above the views of
+                            these records (list, kanban, calendar) and above the lists of
+                            these records inside forms. Switch it on and choose where it shows.
+                        </p>
+                    </div>
+                    <field name="is_shortcut" widget="boolean_toggle" />
+                    <field name="shortcut_show_preset" widget="radio" invisible="not is_shortcut" />
+                    <div colspan="2" class="text-muted small mb-2" invisible="not is_shortcut">
+                        <ul class="mb-0">
+                            <li><b>Everywhere</b>: in the views and inside the forms.</li>
+                            <li><b>Views only</b>: the list, kanban and calendar views you open from a menu.</li>
+                            <li><b>Forms only</b>: the lists inside forms, for example the Services tab of an employee.</li>
+                            <li><b>One form only</b>: pick the form below.</li>
+                            <li><b>Custom rule</b>: an expression of your own, for administrators (debug mode).</li>
+                        </ul>
+                    </div>
+                    <field name="shortcut_subject_model_ids" invisible="1" />
+                    <field name="shortcut_subject_model_id"
+                           invisible="not is_shortcut or shortcut_show_preset != 'subject'"
+                           required="is_shortcut and shortcut_show_preset == 'subject'"
+                           domain="[('id', 'in', shortcut_subject_model_ids)]"
+                           options="{'no_create': True, 'no_open': True}" />
+                    <field name="shortcut_icon" widget="fa_icon" invisible="not is_shortcut" />
                     <field name="shortcut_view_type_whitelist" invisible="1" />
                     <field name="shortcut_view_type" widget="filterable_selection"
-                           options="{'whitelist_fname': 'shortcut_view_type_whitelist'}" />
-                    <field name="shortcut_icon" widget="fa_icon" />
-                    <field name="shortcut_layout" readonly="1" />
+                           options="{'whitelist_fname': 'shortcut_view_type_whitelist'}"
+                           invisible="not is_shortcut" />
+                    <field name="shortcut_layout" readonly="1" invisible="not is_shortcut" groups="base.group_no_one" />
+                    <!-- The position is not shown to users: a new button goes last. -->
+                    <field name="shortcut_sequence" groups="base.group_no_one" />
                 </group>
-                <!-- Where the shortcut button shows: the explanation of the names the
-                     expression can use, then the expression itself in a code box
-                     (Thijs, 2026-09-15). The expression is evaluated in the browser,
-                     see oteny_shortcut/static/src/views/show_when.js. -->
-                <group string="Show When">
+                <!-- The expression the choice above writes, and the names a custom rule
+                     can use; administrators only. It is evaluated in the browser, see
+                     oteny_shortcut/static/src/views/show_when.js. -->
+                <group string="Show When" groups="base.group_no_one" invisible="not is_shortcut">
                     <div colspan="2" class="text-muted small mb-2">
                         <p class="mb-1">
                             A Python expression that says where the shortcut button shows.
-                            Empty: everywhere, on the screens of this model (its lists and
-                            calendars) and on every tab that lists this model inside another
-                            record. The <b>Default Filter</b> of a shortcut applies only where
-                            the expression is true. Most users set this through the gear next
-                            to a selected filter; the choices there write this expression.
+                            Empty: everywhere. The choice above writes it; Custom rule leaves it
+                            to you. The <b>Default Filter</b> of a shortcut applies only where
+                            the expression is true.
                         </p>
                         <p class="mb-1">Names you can use:</p>
                         <ul class="mb-1">
-                            <li><span class="font-monospace">subject</span>: on a tab, the model of the record the tab belongs to, e.g. <span class="font-monospace">'hr.employee'</span>; <span class="font-monospace">False</span> on a screen</li>
+                            <li><span class="font-monospace">subject</span>: inside a form, the model of the record the list belongs to, e.g. <span class="font-monospace">'hr.employee'</span>; <span class="font-monospace">False</span> in a view</li>
                             <li><span class="font-monospace">subject_id</span>: the id of that record; <span class="font-monospace">False</span> on a new record</li>
-                            <li><span class="font-monospace">field</span>: on a tab, the field name of its list, e.g. <span class="font-monospace">'service_ids'</span></li>
-                            <li><span class="font-monospace">view</span>: <span class="font-monospace">'form'</span> on a tab, else the screen's view type: <span class="font-monospace">'list'</span>, <span class="font-monospace">'kanban'</span>, <span class="font-monospace">'calendar'</span>, ...</li>
+                            <li><span class="font-monospace">field</span>: inside a form, the field name of the list, e.g. <span class="font-monospace">'service_ids'</span></li>
+                            <li><span class="font-monospace">view</span>: <span class="font-monospace">'form'</span> inside a form, else the view type: <span class="font-monospace">'list'</span>, <span class="font-monospace">'kanban'</span>, <span class="font-monospace">'calendar'</span>, ...</li>
                             <li><span class="font-monospace">uid</span>, <span class="font-monospace">context</span>: the current user and their context</li>
                         </ul>
                         <p class="mb-0">

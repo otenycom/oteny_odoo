@@ -1,3 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_shortcut_store_layout_wizard,shortcut.store.layout.wizard,model_shortcut_store_layout_wizard,base.group_user,1,1,1,1
-access_shortcut_setup_wizard,shortcut.setup.wizard,model_shortcut_setup_wizard,base.group_user,1,1,1,1

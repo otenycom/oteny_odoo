@@ -12,13 +12,6 @@
                     <t t-esc="shortcut.name"/>
                 </button>
             </t>
-            <button t-if="activeShortcut"
-                    type="button"
-                    class="btn btn-sm btn-link text-muted o_shortcut_setup"
-                    t-attf-title="Set up the shortcut of #{activeShortcut.name}"
-                    t-on-click.stop.prevent="() => props.onSetup(activeShortcut)">
-                <i class="fa fa-cog"/>
-            </button>
         </div>
     </t>
 

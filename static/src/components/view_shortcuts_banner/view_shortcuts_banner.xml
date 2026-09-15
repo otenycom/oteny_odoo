@@ -3,8 +3,7 @@
 
     <t t-name="oteny_shortcut.ViewShortcutsBanner">
         <t t-set="items" t-value="shortcuts"/>
-        <t t-set="favorite" t-value="activeFavorite"/>
-        <div t-if="items.length or favorite" class="view-shortcuts-banner mx-3 mt-2 mb-1 d-flex gap-2 flex-wrap align-items-center">
+        <div t-if="items.length" class="view-shortcuts-banner mx-3 mt-2 mb-1 d-flex gap-2 flex-wrap align-items-center">
             <t t-foreach="items" t-as="shortcut" t-key="shortcut.id">
                 <button
                     type="button"
@@ -15,22 +14,13 @@
                     <t t-esc="shortcut.description"/>
                 </button>
             </t>
-            <div class="ms-auto d-flex gap-2 align-items-center">
-                <button t-if="canStoreLayout"
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary"
-                        title="Store current view layout into the active shortcut"
-                        t-on-click="onStoreLayout">
-                    <i class="fa fa-save"/><span class="d-none d-md-inline ms-1">Store Layout</span>
-                </button>
-                <button t-if="favorite"
-                        type="button"
-                        class="btn btn-sm btn-link text-muted o_shortcut_setup"
-                        t-attf-title="Set up the shortcut of #{favorite.description}"
-                        t-on-click="onSetupShortcut">
-                    <i class="fa fa-cog"/>
-                </button>
-            </div>
+            <button t-if="canStoreLayout"
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary ms-auto"
+                    title="Store current view layout into the active shortcut"
+                    t-on-click="onStoreLayout">
+                <i class="fa fa-save"/><span class="d-none d-md-inline ms-1">Store Layout</span>
+            </button>
         </div>
     </t>
 

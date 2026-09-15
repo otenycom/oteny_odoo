@@ -1,6 +1,54 @@
+import re
+
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 from odoo.tools.safe_eval import test_python_expr
+
+# The choices a user gets for "Show in" instead of writing the Show When
+# expression by hand (Thijs, 2026-09-15: the expression is too technical for
+# most users). Odoo's own words, explained on the form: a view is a list,
+# kanban or calendar opened from a menu; a form is the record's own screen,
+# where the lists inside it (the tabs) show these records. Each choice is one
+# expression; "custom" keeps whatever the filter holds and is the only one
+# that needs the expression itself. The keys are fixed.
+SHOW_PRESETS = [
+    ("everywhere", "Everywhere"),
+    ("views", "Views only"),
+    ("forms", "Forms only"),
+    ("subject", "One form only"),
+    ("custom", "Custom rule"),
+]
+
+PRESET_EXPRESSIONS = {
+    "everywhere": "",
+    "views": "not subject",
+    "forms": "view == 'form'",
+}
+
+# `subject == 'hr.employee'`, with either quote style and any spacing.
+SUBJECT_EXPRESSION = re.compile(r"^subject\s*==\s*['\"]([\w.]+)['\"]$")
+
+
+def expression_for_preset(preset, subject_model=None):
+    """The Show When expression a preset stands for."""
+    if preset == "subject":
+        return f"subject == '{subject_model}'" if subject_model else ""
+    return PRESET_EXPRESSIONS.get(preset, "")
+
+
+def preset_for_expression(expression):
+    """(preset, subject model) for a stored expression: the reverse mapping,
+    so the form opens on the choice the filter already holds. Anything the
+    presets do not cover is "custom".
+    """
+    expression = (expression or "").strip()
+    for preset, preset_expression in PRESET_EXPRESSIONS.items():
+        if expression == preset_expression:
+            return preset, None
+    match = SUBJECT_EXPRESSION.match(expression)
+    if match:
+        return "subject", match.group(1)
+    return "custom", None
 
 # The shortcut fields the client reads. get_filters() carries them on every
 # favorite a view loads, so the banner needs no request of its own, and
@@ -24,6 +72,42 @@ class IrFilters(models.Model):
         help="When greater than 0, this filter appears as a shortcut button: in "
         "the banner above the model's views, and above every list of the model "
         "inside a form. Show When narrows where. Lower values appear first.",
+    )
+    # The user-facing settings (Thijs, 2026-09-15): on the filter's own form,
+    # a switch, a choice and a picker that read and write the stored
+    # shortcut_sequence and shortcut_show_when, so nobody needs the expression
+    # or the order number. A new button goes last; an administrator reorders
+    # in debug mode.
+    is_shortcut = fields.Boolean(
+        string="Show as a button",
+        compute="_compute_is_shortcut",
+        inverse="_inverse_is_shortcut",
+        help="On: a button above the views and lists of these records. Off: "
+        "the favorite stays in the Favorites menu only.",
+    )
+    shortcut_show_preset = fields.Selection(
+        SHOW_PRESETS,
+        string="Show in",
+        compute="_compute_shortcut_show_preset",
+        inverse="_inverse_shortcut_show_settings",
+        help="Everywhere: in the views of these records and inside the forms "
+        "that list them. Views only: the list, kanban and calendar views you "
+        "open from a menu. Forms only: the lists inside forms, for example the "
+        "Services tab of an employee. One form only: pick the form below. "
+        "Custom rule: an expression of your own, for administrators.",
+    )
+    shortcut_subject_model_id = fields.Many2one(
+        "ir.model",
+        string="Form",
+        compute="_compute_shortcut_show_preset",
+        inverse="_inverse_shortcut_show_settings",
+        help="For One form only: the form whose list shows these records, "
+        "for example Employee for the services of an employee.",
+    )
+    # The forms the picker offers: see _shortcut_subject_models.
+    shortcut_subject_model_ids = fields.Many2many(
+        "ir.model",
+        compute="_compute_shortcut_subject_model_ids",
     )
     # Where a shortcut button shows (Thijs, 2026-09-14). A shortcut shows
     # everywhere by default: the banner above every multi-record view of the
@@ -109,6 +193,111 @@ class IrFilters(models.Model):
                 model_types = set(View.search([("model", "=", flt.model_id)]).mapped("type"))
                 available = sorted(model_types & switchable)
             flt.shortcut_view_type_whitelist = available
+
+    @api.depends("shortcut_sequence")
+    def _compute_is_shortcut(self):
+        for record in self:
+            record.is_shortcut = record.shortcut_sequence > 0
+
+    def _inverse_is_shortcut(self):
+        """Switching the button on gives it the last position; switching it
+        off clears the position, so the favorite is no shortcut any more.
+        """
+        for record in self:
+            if record.is_shortcut and record.shortcut_sequence <= 0:
+                record.shortcut_sequence = record._next_shortcut_sequence()
+            elif not record.is_shortcut and record.shortcut_sequence > 0:
+                record.shortcut_sequence = 0
+
+    def _next_shortcut_sequence(self):
+        """After the highest position among the model's buttons."""
+        last = self.search(
+            [("model_id", "=", self.model_id), ("shortcut_sequence", ">", 0)],
+            order="shortcut_sequence desc",
+            limit=1,
+        )
+        return (last.shortcut_sequence or 0) + 10
+
+    @api.depends("shortcut_show_when")
+    def _compute_shortcut_show_preset(self):
+        """The choice and the form the stored expression stands for."""
+        for record in self:
+            preset, subject_model = preset_for_expression(record.shortcut_show_when)
+            record.shortcut_show_preset = preset
+            record.shortcut_subject_model_id = (
+                self.env["ir.model"]._get(subject_model) if subject_model else False
+            )
+
+    def _inverse_shortcut_show_settings(self):
+        """The choice writes the expression; Custom rule leaves it as it is,
+        for an administrator to edit in debug mode. A choice other than One
+        form only also drops the picked form, so the cache and the expression
+        agree without waiting for a recompute.
+        """
+        for record in self:
+            preset = record.shortcut_show_preset
+            if preset == "custom":
+                continue
+            if preset != "subject" and record.shortcut_subject_model_id:
+                record.shortcut_subject_model_id = False
+            record.shortcut_show_when = expression_for_preset(
+                preset, record.shortcut_subject_model_id.model
+            )
+
+    @api.depends("model_id")
+    def _compute_shortcut_subject_model_ids(self):
+        for record in self:
+            record.shortcut_subject_model_ids = self._shortcut_subject_models(record.model_id)
+
+    @api.model
+    def _shortcut_subject_models(self, res_model):
+        """The models whose form shows a list of ``res_model``: the relation
+        fields that point at it, kept when a form view of their model places
+        that field. Without the form check the list names every model that
+        merely relates to these records (for services: plan slots, a wizard
+        base), which is noise to a user. Among those, the models a user opens
+        from a menu are preferred (for services: Employee, Logbook Entry,
+        Service, Ship); the others are kept only when no model has a menu.
+        """
+        if not res_model:
+            return self.env["ir.model"]
+        View = self.env["ir.ui.view"]
+        relation_fields = self.env["ir.model.fields"].search(
+            [("relation", "=", res_model), ("ttype", "in", ("one2many", "many2many"))]
+        )
+        models_with_list = self.env["ir.model"]
+        for field in relation_fields:
+            model = field.model_id
+            if model.transient or model in models_with_list:
+                continue
+            in_a_form = View.search_count(
+                [
+                    ("model", "=", model.model),
+                    ("type", "=", "form"),
+                    ("arch_db", "ilike", f'name="{field.name}"'),
+                ]
+            )
+            if in_a_form:
+                models_with_list |= model
+        return self._prefer_models_with_a_menu(models_with_list).sorted("name")
+
+    @api.model
+    def _prefer_models_with_a_menu(self, models):
+        """The models among ``models`` that a menu item opens, or all of them
+        when none has a menu."""
+        if not models:
+            return models
+        actions = self.env["ir.actions.act_window"].search(
+            [("res_model", "in", models.mapped("model"))]
+        )
+        menus = self.env["ir.ui.menu"].search(
+            [("action", "in", [f"ir.actions.act_window,{action.id}" for action in actions])]
+        )
+        models_with_menu = {
+            action.res_model for action in actions if any(m.action == action for m in menus)
+        }
+        preferred = models.filtered(lambda m: m.model in models_with_menu)
+        return preferred or models
 
     @api.constrains("shortcut_show_when")
     def _check_shortcut_show_when(self):
