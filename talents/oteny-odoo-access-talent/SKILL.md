@@ -21,8 +21,9 @@ does not copy this recipe.
 
 Load this skill before you browse a list or fill a form. Call
 `odoo_client` with the Odoo connection the project already bound.
-Pass `connection=<name>` on every call. Do not request `terminal` or
-`execute_code`.
+Pass `connection=<name>` on every call. You reach this Odoo as an
+employee does: through your own login and its rights. Do not write to
+its database or run its server commands; that is not your machine.
 
 ## Why the host holds the tab
 
@@ -136,8 +137,9 @@ Edit-save still sends changed fields only.
 
 ## Hard rules
 
-- Use `odoo_client` only. Do not request `terminal` or
-  `execute_code`.
+- Work this Odoo through `odoo_client` and your own login only. Never
+  its database, never its server commands, even when they are reachable
+  from your machine.
 - Do not invent a second write path.
 - Do not `set` a field the photo does not list as amendable.
 - Do not read view arch or `view_state`.

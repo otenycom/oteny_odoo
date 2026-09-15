@@ -35,7 +35,8 @@ routing:
     form, load oteny-odoo-access-talent (skill_view
     name='oteny-odoo-access-talent') and follow its checklist. Call
     odoo_client with the Odoo connection the project already bound.
-    Do not request terminal or execute_code. Do not invent a second
+    Reach that Odoo through your own login only, never its database or
+    its server commands. Do not invent a second
     write path.
   signature: "oteny-odoo-access-talent"
 
