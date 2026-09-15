@@ -2,22 +2,35 @@
 <templates xml:space="preserve">
 
     <t t-name="oteny_shortcut.ViewShortcutsBanner">
-        <div t-if="state.loaded and state.shortcuts.length" class="view-shortcuts-banner mx-3 mt-2 mb-1 d-flex gap-2 flex-wrap align-items-center">
-            <t t-foreach="state.shortcuts" t-as="shortcut" t-key="shortcut.id">
+        <t t-set="items" t-value="shortcuts"/>
+        <t t-set="favorite" t-value="activeFavorite"/>
+        <div t-if="items.length or favorite" class="view-shortcuts-banner mx-3 mt-2 mb-1 d-flex gap-2 flex-wrap align-items-center">
+            <t t-foreach="items" t-as="shortcut" t-key="shortcut.id">
                 <button
-                    t-attf-class="btn btn-sm #{this.isActive(shortcut) ? 'btn-primary' : 'btn-outline-secondary'}"
+                    type="button"
+                    t-attf-class="btn btn-sm #{shortcut.isActive ? 'btn-primary' : 'btn-outline-secondary'}"
                     t-on-click="() => this.onShortcutClick(shortcut)">
-                    <i t-if="shortcut.shortcut_icon" t-attf-class="fa #{shortcut.shortcut_icon} me-1"/>
+                    <i t-if="shortcut.shortcutIcon" t-attf-class="fa #{shortcut.shortcutIcon} me-1"/>
                     <i t-if="viewTypeIcon(shortcut)" t-attf-class="#{viewTypeIcon(shortcut)} me-1 opacity-50"/>
-                    <t t-esc="shortcut.name"/>
+                    <t t-esc="shortcut.description"/>
                 </button>
             </t>
-            <button t-if="canStoreLayout"
-                    class="btn btn-sm btn-outline-secondary ms-auto"
-                    title="Store current view layout into the active shortcut"
-                    t-on-click="onStoreLayout">
-                <i class="fa fa-save"/><span class="d-none d-md-inline ms-1">Store Layout</span>
-            </button>
+            <div class="ms-auto d-flex gap-2 align-items-center">
+                <button t-if="canStoreLayout"
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        title="Store current view layout into the active shortcut"
+                        t-on-click="onStoreLayout">
+                    <i class="fa fa-save"/><span class="d-none d-md-inline ms-1">Store Layout</span>
+                </button>
+                <button t-if="favorite"
+                        type="button"
+                        class="btn btn-sm btn-link text-muted o_shortcut_setup"
+                        t-attf-title="Set up the shortcut of #{favorite.description}"
+                        t-on-click="onSetupShortcut">
+                    <i class="fa fa-cog"/>
+                </button>
+            </div>
         </div>
     </t>
 

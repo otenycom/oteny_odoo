@@ -1,17 +1,18 @@
 /** @odoo-module **/
 
-import { ListController } from "@web/views/list/list_controller";
-import { ViewShortcutsBanner } from "@oteny_shortcut/components/view_shortcuts_banner/view_shortcuts_banner";
-import { useEffect } from "@odoo/owl";
+import { useEffect, useSubEnv } from "@odoo/owl";
 import { browser } from "@web/core/browser/browser";
+import { patch } from "@web/core/utils/patch";
+import { ListController } from "@web/views/list/list_controller";
 
-export class ShortcutListController extends ListController {
-    static template = "oteny_shortcut.ShortcutListView";
-    static components = {
-        ...ListController.components,
-        ViewShortcutsBanner,
-    };
-
+// Why this exists:
+// The shortcut banner (rendered by Layout on every list view) can store and
+// restore a list layout: the optional columns and the column width ratios.
+// The list controller owns that layout, so it exposes getViewLayout and
+// applyViewLayout to the banner through env.shortcutLayout. This used to be
+// the ShortcutListController behind js_class="shortcut_list"; since the
+// banner shows everywhere, every list controller carries it.
+patch(ListController.prototype, {
     setup() {
         super.setup();
         // Stored column width ratios to apply after each render, keyed by field name.
@@ -27,7 +28,14 @@ export class ShortcutListController extends ListController {
                 });
             }
         });
-    }
+
+        useSubEnv({
+            shortcutLayout: {
+                getViewLayout: () => this.getViewLayout(),
+                applyViewLayout: (layout) => this.applyViewLayout(layout),
+            },
+        });
+    },
 
     /**
      * Build the same localStorage key the ListRenderer uses for optional fields,
@@ -38,7 +46,7 @@ export class ShortcutListController extends ListController {
         const parts = [this.model.root.resModel, "list", this.env.config.viewId];
         parts.push(...fieldNames);
         return `optional_fields,${parts.join(",")}`;
-    }
+    },
 
     /**
      * Capture the current list view layout: active optional columns and
@@ -74,7 +82,7 @@ export class ShortcutListController extends ListController {
         }
 
         return layout;
-    }
+    },
 
     /**
      * Restore a stored list layout: write optional columns to localStorage
@@ -101,7 +109,7 @@ export class ShortcutListController extends ListController {
         } else {
             this._storedColumnWidths = null;
         }
-    }
+    },
 
     /**
      * Apply stored width ratios to the table's <th> elements.
@@ -139,5 +147,5 @@ export class ShortcutListController extends ListController {
                 th.style.width = `${Math.floor(ratio * totalDataWidth)}px`;
             }
         }
-    }
-}
+    },
+});

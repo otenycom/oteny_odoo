@@ -1,0 +1,26 @@
+// The panel of the icon chooser shows the icons as a wrapping grid instead of
+// one per row, so that several hundred of them stay browsable. Layout only:
+// the icons take the colour of the dropdown, in light and in dark mode alike.
+.o_fa_icon_field_menu {
+    // Room for a row of icons whatever the width of the field, and a height
+    // that does not change while the person types (SelectMenu caps the panel
+    // at 300px, so this fixes it there).
+    min-width: 320px;
+    min-height: 300px;
+
+    .o_select_menu_item {
+        // Beats the display: block of Bootstrap's .dropdown-item.
+        display: inline-block !important;
+        width: auto;
+        padding: 0.4em;
+        line-height: 1;
+    }
+
+    .o_fa_icon_field_choice {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+    }
+}

@@ -1,164 +1,183 @@
 /** @odoo-module **/
 
-import { Component, onWillStart, useState } from "@odoo/owl";
+import { Component, onWillStart } from "@odoo/owl";
 import { useBus, useService } from "@web/core/utils/hooks";
 import { session } from "@web/session";
+import { openShortcutSetup } from "@oteny_shortcut/views/shortcut_setup";
 
+/**
+ * The shortcut banner: the saved Favorites promoted to buttons, shown above
+ * every multi-record view (list, kanban, calendar, pivot, graph, gantt and
+ * custom views). It is rendered by Odoo's Layout component (see
+ * views/layout_patch.xml), so no view has to opt in with a js_class any more
+ * (Thijs, 2026-09-14). Form views and dialogs get no banner.
+ *
+ * The buttons come from the favorites the view's SearchModel already holds:
+ * ir.filters.get_filters carries the shortcut fields and the SearchModel
+ * patch (views/search_model_patch.js) keeps them on each favorite and marks
+ * the ones whose Show When expression is true for this view (shortcutVisible).
+ * A click is simply toggling that favorite, so the banner and the Favorites
+ * menu always agree on what is active.
+ *
+ * The gear: when exactly one favorite is active in the search, shortcut or
+ * not, a gear opens the Set Up Shortcut wizard for it (Thijs, 2026-09-15).
+ * That is the door for a user to promote a favorite to a button, or to change
+ * where a button shows, without the technical filter form. The banner then
+ * renders even when the model has no shortcut buttons yet.
+ *
+ * A view that has a layout worth storing (list columns, calendar scale, the
+ * timeline period) exposes it through env.shortcutLayout, an object with
+ * getViewLayout() and applyViewLayout(layout), set with useSubEnv by its
+ * controller (views/list_controller_patch.js, views/calendar_controller_patch.js,
+ * rivercreds' timeline controller). Without it the Store Layout button stays
+ * hidden and stored layouts are ignored.
+ */
 export class ViewShortcutsBanner extends Component {
     static template = "oteny_shortcut.ViewShortcutsBanner";
-    static props = {
-        getViewLayout: { type: Function, optional: true },
-        applyViewLayout: { type: Function, optional: true },
-    };
+    static props = {};
 
     setup() {
-        this.orm = useService("orm");
         this.actionService = useService("action");
-        this.state = useState({
-            loaded: false,
-            shortcuts: [],
-            activeIds: new Set(),
-        });
-        // Maps ir.filters record id -> searchModel searchItem id
-        this._serverIdToSearchItemId = {};
         // Tracks which shortcut's layout was last applied, so we only
         // re-apply when the active shortcut actually changes (not on
         // every SearchModel update like sort or pagination).
         this._lastAppliedLayoutId = null;
 
-        onWillStart(async () => {
-            const resModel = this.env.searchModel.resModel;
-            const actionId = this.env.config.actionId || null;
-            const shortcuts = await this.orm.call(
-                "ir.filters",
-                "get_shortcuts",
-                [resModel, actionId]
+        if (this.isEnabled) {
+            // Covers the initial page load where a favorite is already active
+            // from the URL or a default filter.
+            onWillStart(() => this._applyActiveShortcutLayout());
+            // Re-derive active state whenever the SearchModel changes (user
+            // toggles filters via the search bar, favorites dropdown, etc.).
+            useBus(this.env.searchModel, "update", () => {
+                this._applyActiveShortcutLayout();
+                this.render();
+            });
+        }
+    }
+
+    /**
+     * Only a multi-record view with a search model shows the banner. Form
+     * views have a search model too (for the record pager), and dialogs
+     * (Search More...) have their own; neither wants shortcut buttons.
+     */
+    get isEnabled() {
+        const { searchModel, inDialog, config } = this.env;
+        return Boolean(searchModel) && !inDialog && config?.viewType !== "form";
+    }
+
+    /**
+     * The favorites promoted to shortcut buttons, in banner order. Each item
+     * is an enriched SearchModel favorite: `id` is the search item id,
+     * `serverSideId` the ir.filters id, `isActive` whether it is in the query.
+     */
+    get shortcuts() {
+        if (!this.isEnabled) {
+            return [];
+        }
+        return this.env.searchModel
+            .getSearchItems((item) => item.type === "favorite" && item.shortcutVisible)
+            .sort(
+                (a, b) =>
+                    a.shortcutSequence - b.shortcutSequence ||
+                    a.description.localeCompare(b.description)
             );
-            Object.assign(this.state, { loaded: true, shortcuts });
-            this._buildServerIdMap();
-            this._syncActiveState();
-        });
-
-        // Re-derive active state whenever the SearchModel changes
-        // (user toggles filters via the search bar, favorites dropdown, etc.)
-        useBus(this.env.searchModel, "update", () => this._syncActiveState());
     }
 
     /**
-     * Build a lookup from ir.filters server-side id to the SearchModel's
-     * internal searchItem id, so we can quickly check active state.
+     * Return the single active shortcut, or null if none/multiple.
      */
-    _buildServerIdMap() {
-        this._serverIdToSearchItemId = {};
-        const searchItems = this.env.searchModel.searchItems;
-        for (const [id, item] of Object.entries(searchItems)) {
-            if (item.type === "favorite" && item.serverSideId) {
-                this._serverIdToSearchItemId[item.serverSideId] = Number(id);
-            }
+    get activeShortcut() {
+        const active = this.shortcuts.filter((shortcut) => shortcut.isActive);
+        return active.length === 1 ? active[0] : null;
+    }
+
+    /**
+     * The single active favorite of the search, shortcut or not; null when
+     * none or several are active. The gear works on it.
+     */
+    get activeFavorite() {
+        if (!this.isEnabled) {
+            return null;
         }
-    }
-
-    /**
-     * Check the SearchModel query to determine which shortcuts correspond
-     * to an active favorite, and update the highlighted button state.
-     * Also auto-applies stored layout when the active shortcut changes
-     * (including on initial page load).
-     */
-    _syncActiveState() {
-        const activeSearchItemIds = new Set(
-            this.env.searchModel.query.map((q) => q.searchItemId)
+        const active = this.env.searchModel.getSearchItems(
+            (item) => item.type === "favorite" && item.isActive
         );
-        const activeIds = new Set();
-        for (const shortcut of this.state.shortcuts) {
-            const searchItemId = this._serverIdToSearchItemId[shortcut.id];
-            if (searchItemId !== undefined && activeSearchItemIds.has(searchItemId)) {
-                activeIds.add(shortcut.id);
-            }
-        }
-        this.state.activeIds = activeIds;
+        return active.length === 1 ? active[0] : null;
+    }
 
-        this._applyActiveShortcutLayout();
+    /**
+     * Open the Set Up Shortcut wizard for the active favorite. The wizard
+     * reloads the page on confirm, so the favorites and the buttons are
+     * read again.
+     */
+    onSetupShortcut() {
+        const favorite = this.activeFavorite;
+        if (!favorite) {
+            return;
+        }
+        return openShortcutSetup(this.actionService, { filterId: favorite.serverSideId });
+    }
+
+    /**
+     * True when exactly one shortcut is active and the view exposes a layout,
+     * so the Store Layout button has an unambiguous target filter.
+     */
+    get canStoreLayout() {
+        return Boolean(this.activeShortcut) && Boolean(this.env.shortcutLayout?.getViewLayout);
     }
 
     /**
      * If exactly one shortcut with a stored layout is now active, and it
-     * differs from the last one we applied, push its layout to the
-     * controller. This covers both explicit clicks AND the initial page
-     * load where a favorite is already active from the URL/default.
+     * differs from the last one we applied, push its layout to the view.
      */
     _applyActiveShortcutLayout() {
-        if (!this.props.applyViewLayout) {
+        const applyViewLayout = this.env.shortcutLayout?.applyViewLayout;
+        if (!applyViewLayout) {
             return;
         }
-
-        const shortcut = this._getActiveShortcut();
-        const layoutId = shortcut?.shortcut_layout ? shortcut.id : null;
-
+        const shortcut = this.activeShortcut;
+        const layoutId = shortcut?.shortcutLayout ? shortcut.serverSideId : null;
         if (layoutId === this._lastAppliedLayoutId) {
             return;
         }
         this._lastAppliedLayoutId = layoutId;
 
-        if (shortcut?.shortcut_layout) {
+        if (shortcut?.shortcutLayout) {
             try {
-                const layout = JSON.parse(shortcut.shortcut_layout);
-                this.props.applyViewLayout(layout);
+                applyViewLayout(JSON.parse(shortcut.shortcutLayout));
             } catch {
                 // Ignore invalid JSON
             }
         } else {
             // Active shortcut changed to one without layout, or no shortcut
             // is active -- clear any previously applied layout state.
-            this.props.applyViewLayout(null);
+            applyViewLayout(null);
         }
-    }
-
-    isActive(shortcut) {
-        return this.state.activeIds.has(shortcut.id);
     }
 
     /**
      * Icon class for the shortcut's target view type, read from the same
      * server-provided per-view-type icon map Odoo's own view switcher uses
-     * (session.view_info, populated from ir.ui.view._get_view_info). This
-     * covers list and calendar as well as any custom view type (e.g. the
-     * credential planning timeline) without a hardcoded mapping here.
-     * Returns "" when the shortcut targets no view type or the type is
-     * unknown, so the template can skip rendering the icon.
+     * (session.view_info, populated from ir.ui.view._get_view_info). Returns
+     * "" when the shortcut targets no view type or the type is unknown, so
+     * the template can skip rendering the icon.
      */
     viewTypeIcon(shortcut) {
-        const viewType = shortcut.shortcut_view_type;
+        const viewType = shortcut.shortcutViewType;
         return (viewType && session.view_info?.[viewType]?.icon) || "";
-    }
-
-    /**
-     * True when exactly one shortcut is active, so the Store Layout button
-     * has an unambiguous target filter.
-     */
-    get canStoreLayout() {
-        return this.state.activeIds.size === 1 && !!this.props.getViewLayout;
-    }
-
-    /**
-     * Return the single active shortcut, or null if none/multiple.
-     */
-    _getActiveShortcut() {
-        if (this.state.activeIds.size !== 1) {
-            return null;
-        }
-        const activeId = [...this.state.activeIds][0];
-        return this.state.shortcuts.find((s) => s.id === activeId) || null;
     }
 
     /**
      * Capture the current view layout and open the confirmation wizard.
      */
     async onStoreLayout() {
-        const shortcut = this._getActiveShortcut();
-        if (!shortcut || !this.props.getViewLayout) {
+        const shortcut = this.activeShortcut;
+        const getViewLayout = this.env.shortcutLayout?.getViewLayout;
+        if (!shortcut || !getViewLayout) {
             return;
         }
-        const layout = this.props.getViewLayout();
+        const layout = getViewLayout();
         if (!layout) {
             return;
         }
@@ -168,27 +187,24 @@ export class ViewShortcutsBanner extends Component {
             views: [[false, "form"]],
             target: "new",
             context: {
-                default_filter_id: shortcut.id,
+                default_filter_id: shortcut.serverSideId,
                 default_layout_json: JSON.stringify(layout),
             },
         });
     }
 
     /**
-     * Activate the favorite matching this shortcut in the SearchModel,
-     * then switch view if the shortcut specifies a different view type.
+     * Toggle the favorite behind this shortcut in the SearchModel (toggling a
+     * favorite clears the other active facets), then switch view if the
+     * shortcut specifies a different view type.
      *
-     * Layout restoration is handled automatically by _syncActiveState()
-     * which fires on the SearchModel "update" event triggered by
-     * toggleSearchItem().
+     * Layout restoration follows automatically: toggleSearchItem() fires the
+     * SearchModel "update" event that _applyActiveShortcutLayout() listens to.
      */
     async onShortcutClick(shortcut) {
-        const searchItemId = this._serverIdToSearchItemId[shortcut.id];
-        if (searchItemId !== undefined) {
-            this.env.searchModel.toggleSearchItem(searchItemId);
-        }
+        this.env.searchModel.toggleSearchItem(shortcut.id);
 
-        const targetView = shortcut.shortcut_view_type;
+        const targetView = shortcut.shortcutViewType;
         if (
             targetView &&
             targetView !== this.env.config.viewType &&

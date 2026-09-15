@@ -13,8 +13,40 @@
                     <field name="shortcut_view_type_whitelist" invisible="1" />
                     <field name="shortcut_view_type" widget="filterable_selection"
                            options="{'whitelist_fname': 'shortcut_view_type_whitelist'}" />
-                    <field name="shortcut_icon" placeholder="e.g. fa-clock-o" />
+                    <field name="shortcut_icon" widget="fa_icon" />
                     <field name="shortcut_layout" readonly="1" />
+                </group>
+                <!-- Where the shortcut button shows: the explanation of the names the
+                     expression can use, then the expression itself in a code box
+                     (Thijs, 2026-09-15). The expression is evaluated in the browser,
+                     see oteny_shortcut/static/src/views/show_when.js. -->
+                <group string="Show When">
+                    <div colspan="2" class="text-muted small mb-2">
+                        <p class="mb-1">
+                            A Python expression that says where the shortcut button shows.
+                            Empty: everywhere, on the screens of this model (its lists and
+                            calendars) and on every tab that lists this model inside another
+                            record. The <b>Default Filter</b> of a shortcut applies only where
+                            the expression is true. Most users set this through the gear next
+                            to a selected filter; the choices there write this expression.
+                        </p>
+                        <p class="mb-1">Names you can use:</p>
+                        <ul class="mb-1">
+                            <li><span class="font-monospace">subject</span>: on a tab, the model of the record the tab belongs to, e.g. <span class="font-monospace">'hr.employee'</span>; <span class="font-monospace">False</span> on a screen</li>
+                            <li><span class="font-monospace">subject_id</span>: the id of that record; <span class="font-monospace">False</span> on a new record</li>
+                            <li><span class="font-monospace">field</span>: on a tab, the field name of its list, e.g. <span class="font-monospace">'service_ids'</span></li>
+                            <li><span class="font-monospace">view</span>: <span class="font-monospace">'form'</span> on a tab, else the screen's view type: <span class="font-monospace">'list'</span>, <span class="font-monospace">'kanban'</span>, <span class="font-monospace">'calendar'</span>, ...</li>
+                            <li><span class="font-monospace">uid</span>, <span class="font-monospace">context</span>: the current user and their context</li>
+                        </ul>
+                        <p class="mb-0">
+                            Examples: <span class="font-monospace">subject == 'crewradar.log.entry'</span>,
+                            <span class="font-monospace">subject in ('hr.employee', 'crewradar.site')</span>,
+                            <span class="font-monospace">view == 'calendar'</span>,
+                            <span class="font-monospace">not subject</span>.
+                        </p>
+                    </div>
+                    <field name="shortcut_show_when" nolabel="1" colspan="2"
+                           widget="code" options="{'mode': 'python'}" />
                 </group>
             </xpath>
         </field>
@@ -28,6 +60,7 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='is_default']" position="after">
                 <field name="shortcut_sequence" optional="show" string="Shortcut Seq." />
+                <field name="shortcut_show_when" optional="hide" string="Show When" />
                 <field name="shortcut_view_type" optional="show" string="Shortcut View" />
             </xpath>
         </field>

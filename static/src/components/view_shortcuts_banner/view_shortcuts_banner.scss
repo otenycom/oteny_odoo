@@ -1,4 +1,7 @@
-.view-shortcuts-banner {
+// Shared sizing for the two shortcut button rows: the banner above a
+// multi-record view and the row above an in-form list.
+.view-shortcuts-banner,
+.o_x2many_shortcuts {
     .btn {
         font-size: 0.8125rem;
         line-height: 1.4;

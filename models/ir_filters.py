@@ -1,4 +1,17 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
+from odoo.tools.safe_eval import test_python_expr
+
+# The shortcut fields the client reads. get_filters() carries them on every
+# favorite a view loads, so the banner needs no request of its own, and
+# get_shortcuts() reads the same list for the in-form row.
+SHORTCUT_FIELDS = [
+    "shortcut_sequence",
+    "shortcut_view_type",
+    "shortcut_icon",
+    "shortcut_layout",
+    "shortcut_show_when",
+]
 
 
 class IrFilters(models.Model):
@@ -8,9 +21,36 @@ class IrFilters(models.Model):
     # in the view shortcuts banner. Set shortcut_sequence > 0 to enable.
     shortcut_sequence = fields.Integer(
         default=0,
-        help="When greater than 0, this filter appears as a shortcut button "
-        "above list/calendar views that use the shortcut js_class. "
-        "Lower values appear first.",
+        help="When greater than 0, this filter appears as a shortcut button: in "
+        "the banner above the model's views, and above every list of the model "
+        "inside a form. Show When narrows where. Lower values appear first.",
+    )
+    # Where a shortcut button shows (Thijs, 2026-09-14). A shortcut shows
+    # everywhere by default: the banner above every multi-record view of the
+    # model, and the button row above every list of the model inside a form
+    # (an x2many field in list mode). This Python expression, evaluated in the
+    # browser at each of those places, narrows it: the services filters under
+    # an employee differ from those under a log entry, so a filter needs a rule
+    # for where it shows. The names it can use: subject (model of the record
+    # the list belongs to, False on a top-level view), subject_id, field (the
+    # x2many field name), view ('form' inside a form, else the view type),
+    # uid and context. Empty = show everywhere. It governs the buttons only;
+    # the favorite itself stays in the Favorites menu. A shortcut's Default
+    # Filter applies only where the expression is true, so a form-only default
+    # does not narrow the model's top-level views at open.
+    # Text, not Char: the form shows it in a code box (the ace editor, which
+    # takes text and html fields only) with the list of names beside it.
+    shortcut_show_when = fields.Text(
+        string="Show When",
+        help="Python expression that says where the shortcut button shows. Empty: "
+        "everywhere (the banner above the model's views and above every list "
+        "of the model inside a form). Names: subject (model of the record the "
+        "list belongs to, e.g. 'hr.employee'; False on a top-level view), "
+        "subject_id, field (the list's field name), view ('form' inside a form, "
+        "else 'list', 'kanban', 'calendar', ...), uid, context. Examples: "
+        "subject == 'crewradar.log.entry'; subject in ('hr.employee', "
+        "'crewradar.site'); view == 'calendar'; not subject. A shortcut's "
+        "Default Filter applies only where the expression is true.",
     )
     shortcut_view_type = fields.Selection(
         selection="_shortcut_view_type_selection",
@@ -70,27 +110,68 @@ class IrFilters(models.Model):
                 available = sorted(model_types & switchable)
             flt.shortcut_view_type_whitelist = available
 
+    @api.constrains("shortcut_show_when")
+    def _check_shortcut_show_when(self):
+        """Refuse an expression that does not parse, so a typo cannot hide a
+        shortcut everywhere. The browser evaluates the expression; a name it
+        does not know at runtime hides the button and logs a warning there.
+        """
+        for record in self:
+            expression = (record.shortcut_show_when or "").strip()
+            if not expression:
+                continue
+            message = test_python_expr(expression, mode="eval")
+            if message:
+                raise ValidationError(
+                    _(
+                        'The Show When expression of filter "%(name)s" is not valid Python: %(error)s',
+                        name=record.name,
+                        error=message,
+                    )
+                )
+
     @api.model
-    def get_shortcuts(self, res_model, action_id=None):
-        """Return filters configured as shortcut buttons for the current user.
+    def get_filters(self, model, action_id=None, embedded_action_id=None, embedded_parent_res_id=None):
+        """The favorites a view loads, with the shortcut fields on each.
+
+        The shortcut banner reads its buttons from these favorites, so a
+        view open costs no extra request for shortcuts (Thijs, 2026-09-14).
+        The browser decides per favorite whether its button shows here
+        (shortcut_show_when) and whether its Default Filter applies here.
+        """
+        filters = super().get_filters(
+            model, action_id, embedded_action_id, embedded_parent_res_id
+        )
+        if not filters:
+            return filters
+        by_id = {
+            values["id"]: values
+            for values in self.browse([f["id"] for f in filters]).read(SHORTCUT_FIELDS)
+        }
+        for values in filters:
+            shortcut_values = by_id[values["id"]]
+            values.update({name: shortcut_values[name] for name in SHORTCUT_FIELDS})
+        return filters
+
+    @api.model
+    def get_shortcuts(self, res_model):
+        """Every shortcut of a model the current user may see, for the button
+        row above a list of that model inside a form.
 
         Reuses the built-in ir.filters visibility rules: a filter is visible
         when user_ids is empty (shared with everyone) or contains the
-        current user.
+        current user. Inside a form there is no action, so the action a
+        filter was saved from does not count: a shortcut applies at model
+        level and its Show When expression, evaluated in the browser with
+        the form's record as subject, says whether its button shows.
         """
-        action_domain = self._get_action_domain(action_id)
-        domain = action_domain + [
+        domain = [
+            ("embedded_action_id", "=", False),
+            ("embedded_parent_res_id", "in", [0, False]),
             ("model_id", "=", res_model),
             ("shortcut_sequence", ">", 0),
             ("user_ids", "in", [self.env.uid, False]),
         ]
-        return (
-            self.search(domain, order="shortcut_sequence, name")
-            .read([
-                "name",
-                "shortcut_sequence",
-                "shortcut_view_type",
-                "shortcut_icon",
-                "shortcut_layout",
-            ])
+        return self.search(domain, order="shortcut_sequence, name").read(
+            ["name", "domain", "is_default"] + SHORTCUT_FIELDS
         )

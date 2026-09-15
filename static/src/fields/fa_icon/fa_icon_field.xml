@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- The icon chooser. In edit it is Odoo's SelectMenu: the button shows the
+         chosen icon and its class, and the panel shows the icons as a grid with
+         a search box above them (the grid is the stylesheet, see
+         fa_icon_field.scss). An icon whose class the page cannot render shows
+         as its class instead of as an empty square. -->
+    <t t-name="oteny_shortcut.FaIconField">
+        <span t-if="props.readonly" class="o_fa_icon_field d-inline-flex align-items-center gap-2">
+            <i t-if="iconClass" t-attf-class="fa #{iconClass}"/>
+            <span class="text-muted" t-esc="iconClass"/>
+        </span>
+        <SelectMenu t-else=""
+            menuClass="'o_fa_icon_field_menu'"
+            searchPlaceholder.translate="Search an icon"
+            autoSort="false"
+            required="false"
+            value="iconClass"
+            choices="choices"
+            onSelect.bind="onSelect">
+            <span t-if="iconClass" class="o_fa_icon_field d-inline-flex align-items-center gap-2">
+                <i t-attf-class="fa #{iconClass}"/>
+                <span t-esc="iconClass"/>
+            </span>
+            <span t-else="" class="text-muted">Choose an icon</span>
+            <t t-set-slot="choice" t-slot-scope="choice">
+                <i t-if="isKnown(choice.data.value)"
+                    t-attf-class="o_fa_icon_field_choice fa #{choice.data.value}"
+                    t-att-title="choice.data.value"/>
+                <span t-else="" class="text-muted" t-esc="choice.data.value"/>
+            </t>
+        </SelectMenu>
+    </t>
+
+</templates>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- The banner sits between the control panel and the view content, as a
+         row of the action's flex column, so a search panel inside the content
+         is not affected. -->
+    <t t-name="oteny_shortcut.Layout" t-inherit="web.Layout" t-inherit-mode="extension">
+        <xpath expr="//main" position="before">
+            <ViewShortcutsBanner/>
+        </xpath>
+    </t>
+
+</templates>
