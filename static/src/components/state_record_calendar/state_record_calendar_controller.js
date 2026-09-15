@@ -1,10 +1,12 @@
 /** @odoo-module **/
 
-import { ShortcutCalendarController } from "@oteny_shortcut/views/shortcut_calendar/shortcut_calendar_controller";
+import { CalendarController } from "@web/views/calendar/calendar_controller";
 import { FormViewDialog } from "@web/views/view_dialogs/form_view_dialog";
 import { useService } from "@web/core/utils/hooks";
 
-export class StateRecordCalendarController extends ShortcutCalendarController {
+// The shortcut banner needs no special parent any more: oteny_shortcut renders
+// it from Odoo's Layout on every view and patches CalendarController itself.
+export class StateRecordCalendarController extends CalendarController {
     setup() {
         super.setup();
         this.actionService = useService("action");
