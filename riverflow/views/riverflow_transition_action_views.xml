@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="transition_action_view_form" model="ir.ui.view">
+        <field name="name">riverflow.transition.action.form</field>
+        <field name="model">riverflow.transition.action</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="active" invisible="True" />
+                            <field name="name" class="w-100" on_change="1" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="model_id" />
+                            <field name="description" />
+                            <field name="icon" on_change="1" />
+                            <field name="icon_name_html" readonly="1" />
+                            <field name="odoo_view" />
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="transition_action_view_list" model="ir.ui.view">
+        <field name="name">riverflow.transition.action.list</field>
+        <field name="model">riverflow.transition.action</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="active" column_invisible="True" />
+                <field name="model" />
+                <field name="icon_name_html" />
+                <field name="name" optional="hide" />
+                <field name="description" />
+            </list>
+        </field>
+    </record>
+
+    <record id="transition_action_action" model="ir.actions.act_window">
+        <field name="name">Transition Actions</field>
+        <field name="path">transition-actions</field>
+        <field name="res_model">riverflow.transition.action</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new workflow transition action!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="riverflow.services_menu_configuration_transition_actions"
+        parent="riverflow.services_configuration_menu" sequence="50"
+        action="riverflow.transition_action_action" />
+
+</odoo>

@@ -1,0 +1,4 @@
+// Needed because our list is regarded as readonly by odoo that somehow hides the drag handle icon
+.o_row_handle {
+    display: inline-block !important;
+}

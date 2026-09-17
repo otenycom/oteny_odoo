@@ -1,0 +1,11 @@
+// Dark mode overrides for the shared timeline scale selector.
+// Loaded via web.assets_web_dark only (see __manifest__.py).
+
+.o_timeline_scale_picker {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.05);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}

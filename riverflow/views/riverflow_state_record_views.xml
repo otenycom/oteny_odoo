@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="state_record_view_form" model="ir.ui.view">
+        <field name="name">riverflow.state.record.form</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form create="false">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="active" invisible="True" />
+                            <field name="name" class="w-100" />
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="deadline" readonly="1" />
+                        <field name="master_record_reference" invisible="1" />
+                        <field name="service_id" invisible="not service_id" />
+                        <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
+                        <field name="state_name" invisible="not state_name" string="State" />
+                        <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                        <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+                        <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="state_record_view_list" model="ir.ui.view">
+        <field name="name">riverflow.state.record.list</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <list
+                action="row_click" type="object"
+                create="0" edit="0" delete="0"
+                decoration-info="is_subject and not is_end_state"
+                decoration-success="is_subject and is_end_state"
+                decoration-bf="is_subject"
+            >
+                <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" />
+                <field name="active" column_invisible="True" />
+                <field name="display_order" column_invisible="True" />
+                <field name="root_id" column_invisible="True" />
+                <field name="root_name" column_invisible="True" />
+                <field name="is_subject" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
+                <field name="res_model" optional="hide" />
+                <field name="res_name" optional="show" />
+
+                <field name="master_model" optional="hide" />
+                <field name="name" optional="hide" />
+                <field name="display_name" optional="hide" />
+                <field name="indented_name" optional="show" />
+                <field name="company_id" optional="hide" width="120px" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
+                <field name="deadline" widget="timing_widget" optional="show" />
+                <field name="timing_json" column_invisible="1" />
+                <!-- <field name="deadline" optional="hide"
+                    decoration-danger="(deadline &lt; context_today().strftime('%Y-%m-%d')) and not is_end_state"
+                    decoration-warning="(deadline == context_today().strftime('%Y-%m-%d')) and not is_end_state"
+                    decoration-muted="is_end_state" /> -->
+                <field name="state_json" widget="transition_buttons" optional="show" width="140px" />
+                <field name="state_id" optional="hide" decoration-success="is_end_state" />
+                <field name="responsible_team_id" optional="show" string="Responsible" />
+                <field name="write_uid" string="Updated By" optional="hide" />
+                <field name="write_date" string="Updated On" optional="hide" />
+                <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" />
+                <field name='internal_notes_summary' width="180px" optional="show" />
+                <field name="external_messages_summary" width="180px" optional="show" />
+                <field name="unreviewed_message_count" optional="show" />
+            </list>
+        </field>
+    </record>
+
+    <record id="state_record_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.state.record.calendar</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <!-- edit="1" allows drag & resize of calendar events, but the renderer
+                 (state_record_calendar_renderer.js) restricts this per event: only
+                 events backed by a service may be dragged, which reschedules the
+                 service deadline. Rows without a service (log entry sign-on/sign-off
+                 milestones, employee/ship subject rows) derive their date from the
+                 master record and cannot be dragged - those planning dates must be
+                 changed on the log entry form itself. -->
+            <calendar string="State Records"
+                js_class="state_record_calendar"
+                date_start="deadline"
+                date_stop="end_date"
+                color="color_int"
+                create="1" edit="1" delete="0"
+                mode="month"
+                scales="day,week,month,quarter,year"
+                hide_time="true"
+                event_limit="35">
+                <!-- Fields needed for sorting: res_date asc,res_model,res_sortable_name,res_id,is_subject desc,root_name,root_id,display_order,deadline -->
+                <field name="res_date" invisible="1" /> <!-- obsolete: not used for sorting -->
+                <field name="res_model" invisible="1" />
+                <field name="res_sortable_name" invisible="1" />
+                <field name="res_id" invisible="1" />
+                <field name="is_subject" invisible="1" />
+                <field name="root_name" invisible="1" />
+                <field name="root_id" invisible="1" />
+                <field name="display_order" invisible="1" />
+                <field name="deadline" invisible="1" />
+
+                <!-- normal fields for the popup window -->
+                <field name="service_id" invisible="not service_id" />
+                <field name="current_workflow_name" invisible="not current_workflow_name" string="Workflow" />
+                <field name="state_name" invisible="not state_name" string="State" />
+                <field name="tag_ids" widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}" invisible="not tag_ids" />
+                <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
+                <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+                <field name="check_result_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="not check_result_ids" />
+            </calendar>
+        </field>
+    </record>
+
+    <record id="state_record_view_search" model="ir.ui.view">
+        <field name="name">riverflow.state.record.search</field>
+        <field name="model">riverflow.state.record</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Name"
+                    filter_domain="['|', ('res_name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="master_model" />
+                <field name="res_model" />
+                <field name="res_name" />
+                <field name="root_name" />
+                <field name="workflow_id" />
+                <field name="state_id" />
+                <field name="tag_ids" />
+                <field name="deadline" />
+                <field name="is_end_state" />
+                <field name="internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" string="External Messages" />
+                <field name="responsible_team_id" />
+                <field name="company_id" />
+                <separator />
+                <filter string="Log entries" name="log_entries" domain="[('master_model', '=', 'crewradar.log.entry')]" />
+                <filter string="Services" name="services" domain="[('master_model', '=', 'riverflow.service')]" />
+                <separator />
+                <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <separator />
+                <filter string="Deadline" name="deadline" date="deadline" />
+                <separator />
+                <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
+                <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
+                <!-- Show items with a deadline today or within the last 7 days -->
+                <filter string="7 Days Ago and Later" name="last_seven_days_and_later"
+                    domain="[('deadline', '&gt;=', (context_today() - relativedelta(days=7)).strftime('%Y-%m-%d'))]" />
+                <separator />
+                <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Issues" name="has_issues" domain="[('check_result_ids.severity', '!=', False)]" />
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
+                <group>
+                    <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'deadline'}" />
+                    <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />
+                    <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="radar_action" model="ir.actions.act_window">
+        <field name="name">Radar</field>
+        <field name="path">radar</field>
+        <field name="res_model">riverflow.state.record</field>
+        <field name="view_mode">list,form,calendar</field>
+        <field name="search_view_id" ref="riverflow.state_record_view_search" />
+        <!-- todo: override ListRenderer so that the default click action opens the master record
+                then, we can make the list properly read-only
+           -->
+        <field name="context">{'edit': true}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                This is a dashboard for the tracking services.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_recompute_company_id" model="ir.actions.server">
+        <field name="name">Recompute Company</field>
+        <field name="model_id" ref="model_riverflow_state_record" />
+        <field name="binding_model_id" ref="model_riverflow_state_record" />
+        <field name="state">code</field>
+        <field name="code">action = model.action_recompute_company_id()</field>
+        <field name="binding_view_types">list</field>
+    </record>
+
+    <!-- Server action to bulk update service deadlines from radar view -->
+    <record id="action_bulk_update_deadline_from_radar" model="ir.actions.server">
+        <field name="name">Update Deadline</field>
+        <field name="model_id" ref="model_riverflow_state_record" />
+        <field name="binding_model_id" ref="model_riverflow_state_record" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list</field>
+        <field name="code">
+            action = {
+            'name': 'Update Deadline',
+            'type': 'ir.actions.act_window',
+            'res_model': 'crewradar.service.deadline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+            'active_ids': records.ids,
+            'active_model': 'riverflow.state.record',
+            },
+            }
+        </field>
+    </record>
+
+    <menuitem id='riverflow.tracker_root'
+        web_icon='riverflow,static/description/radar.png' action="riverflow.radar_action" sequence="5">
+        <menuitem id="riverflow.radar_radar"
+            name="Radar"
+            action="riverflow.radar_action" sequence="10" />
+    </menuitem>
+
+    <!-- <menuitem id="menu_riverflow_maintenance"
+        name="Maintenance"
+        parent="riverflow.tracker_root"
+        sequence="100"
+        groups="base.group_no_one" />
+    <menuitem id="menu_recompute_company_id"
+        name="Recompute Companies"
+        action="action_recompute_company_id"
+        parent="menu_riverflow_maintenance"
+        sequence="10" /> -->
+
+</odoo>

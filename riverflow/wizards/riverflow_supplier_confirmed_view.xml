@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_supplier_confirmed_form" model="ir.ui.view">
+        <field name="name">riverflow.supplier.confirmed.wizard.form</field>
+        <field name="model">riverflow.supplier.confirmed.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Supplier Confirmed">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="unreviewed_message_count" invisible="not unreviewed_message_count" readonly="1" />
+                            <field name="mark_external_messages_as_reviewed" invisible="not unreviewed_message_count" widget="boolean_toggle" />
+                            <field name="new_note" required="0" invisible="new_note_invisible" widget="html" />
+                            <field name="new_note_invisible" invisible="1" />
+                        </group>
+                        <group>
+                            <field name="transition_id" invisible="1" />
+                            <field name="records_to_transition_ids" invisible="1" />
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirm" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo> 

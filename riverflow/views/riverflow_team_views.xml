@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="team_view_form" model="ir.ui.view">
+        <field name="name">riverflow.team.form</field>
+        <field name="model">riverflow.team</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h2>
+                            <field name="name" class="w-100" />
+                        </h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active" invisible="True" />
+                            <field name="email" widget="email" />
+                            <field name="phone" widget="phone" />
+                            <field name="discuss_channel_id" />
+                            <field name="company_id" groups="base.group_multi_company" />
+                            <field name="partner_id" groups="base.group_no_one"
+                                readonly="1"
+                                required="0"
+                                invisible="not id" />
+                        </group>
+                    </group>
+                </sheet>
+                <chatter />
+            </form>
+        </field>
+    </record>
+
+    <record id="team_view_list" model="ir.ui.view">
+        <field name="name">riverflow.team.list</field>
+        <field name="model">riverflow.team</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="active" column_invisible="True" />
+                <field name="name" />
+                <field name="email" />
+                <field name="phone" />
+                <field name="discuss_channel_id" />
+                <field name="company_id" groups="base.group_multi_company" />
+            </list>
+        </field>
+    </record>
+
+    <record id="team_action" model="ir.actions.act_window">
+        <field name="name">Teams</field>
+        <field name="path">workflow-teams</field>
+        <field name="res_model">riverflow.team</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new team!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="riverflow.services_menu_configuration_teams"
+        parent="riverflow.services_configuration_menu" sequence="100"
+        action="riverflow.team_action" />
+
+</odoo>

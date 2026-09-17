@@ -1,0 +1,727 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id='view_service_form' model='ir.ui.view'>
+        <field name="name">riverflow.service.form</field>
+        <field name="model">riverflow.service</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form string="Services" create="false">
+                <header>
+                    <!-- see compileHeader(el, params) for btn in class="btn": this moves the transitions buttons to the left
+                      in the slot where the normal Odoo buttons are -->
+                    <field name="transition_buttons_json" widget="transition_buttons" max_buttons="5" layout="form_header" />
+                    <!-- o_field_statusbar is needed because riverflow_statusbar inherits from o_field_statusbar, and its scss files only work inside o_field_statusbar -->
+                    <field name="state_id" widget="riverflow_statusbar" readonly="1" class="o_field_statusbar" />
+                    <field name="state_id_statusbar_json" invisible="1" />
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button type="object" name="action_view_parent_service"
+                            invisible="not parent_id" class="oe_stat_button" icon="fa-bell">
+                            <field name="parent_id" widget="statinfo" />
+                        </button>
+                        <!-- <button name="action_view_audit_log" type="object"
+                            class="oe_stat_button" icon="fa-book">
+                            Widget field must be char, cannot be date
+                            <field name="write_date" widget="statinfo" />
+                        </button> -->
+
+                    </div>
+                    <widget name="web_ribbon" title="Template" bg_color="text-bg-info"
+                        invisible="not is_root_a_template" />
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h2>
+                            <field name="name" class="w-100" on_change="1" />
+                        </h2>
+                    </div>
+                    <group>
+                        <group colspan="1">
+                            <field name="state_name" invisible="1" on_change="1" />
+                            <field name="state_id" on_change="1" invisible="1" />
+                            <field name="model" invisible="1" />
+                            <field name="workflow_id" on_change="1" invisible="transition_buttons_json" />
+                            <field name="company_id" groups="base.group_no_one" />
+                            <field name="responsible_team_id" />
+                            <field name="tag_ids" widget="many2many_tags"
+                                options="{'color_field': 'color', 'no_create_edit': True}" />
+                            <field name="supply_order_service_id" invisible="not supply_order_service_id" />
+                            <field name="internal_notes_summary" invisible="not internal_notes_summary" readonly="1" />
+                            <field name="external_messages_summary" invisible="not external_messages_summary" readonly="1" />
+                            <field name="unreviewed_message_count" string="Review Messages" invisible="not unreviewed_message_count" />
+                            <button name="action_mark_external_messages_reviewed" type="object" class="btn-primary"
+                                invisible="not unreviewed_message_count"
+                                string="Mark as Reviewed" icon="fa-check" help="Review the External Messages in the Chatter,
+                                    and once done and followup is complete, mark them as Reviewed" />
+                        </group>
+                        <group colspan="1">
+                            <field name="parent_id" on_change="1" can_create="False"
+                                can_write="True" invisible="1" />
+                            <field name="active" invisible="1" />
+                            <field name="is_days_relative_to_project_applicable" invisible="1" />
+                            <field name="use_project_deadline_from_options" invisible="1" />
+                            <field
+                                name="project_deadline"
+                                widget="daterange"
+                                options="{'end_date_field': 'end_date'}"
+                                string="Deadline"
+                                invisible="is_days_relative_to_project_applicable"
+                                on_change="1"
+                                decoration-muted="is_end_state"
+                                decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                            />
+                            <field name="end_date" invisible="1" />
+                            <!-- readonly: changing this resets use_project_deadline_from to 'self'.
+                            To change the deadline for relative mode, use the calendar or switch to self first. -->
+                            <field name="deadline" readonly="1" invisible="not is_days_relative_to_project_applicable"
+                                decoration-muted="is_end_state"
+                                decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                            />
+                            <field name="daily_prio" string="Priority"
+                                options="{'enable_formatting': false}" />
+                            <field name="use_project_deadline_from" widget="filterable_selection"
+                                options="{'whitelist_fname': 'use_project_deadline_from_options'}" required="1" on_change="1" />
+                            <field name="root_service_deadline" invisible="use_project_deadline_from != 'root'" />
+                            <field name="root_service_appointment_date" invisible="use_project_deadline_from != 'root_appointment'" />
+                            <field name="days_relative_to_project" invisible="not is_days_relative_to_project_applicable"
+                                on_change="1" />
+                            <field name="weekend_deadline_rule" invisible="not is_days_relative_to_project_applicable" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <!-- invisible by default: keep UI simple. The cog menu still allows creating child services -->
+                        <page string="Supply Order" name="supply_order" invisible="not is_supply_order">
+                            <group invisible="not has_supply_unit_price">
+                                <field name="supply_unit_price" widget="monetary" />
+                                <field name="supply_unit_price_currency_id" invisible="1" />
+                            </group>
+                            <group invisible="not has_supplier">
+                                <group colspan="2">
+                                    <field name="supplier_partner_id" />
+                                    <field name="supply_order_instructions" />
+                                </group>
+                            </group>
+                            <group>
+                                <field name="supply_date" />
+                                <field name="supply_actual_date" />
+                                <field name="supply_time_of_day" widget="float_time"
+                                    invisible="not has_supply_time" />
+                            </group>
+                            <group invisible="not has_legs">
+                                <field name="leg_ids" nolabel="1">
+                                    <list>
+                                        <field name="sequence" widget="handle" />
+                                        <field name="supply_from" />
+                                        <field name="supply_to" />
+                                        <field name="supply_instructions" optional="hide" />
+                                        <field name="supply_distance_km" sum="Total" optional="show" />
+                                        <field name="supply_cost_currency_id" column_invisible="1" />
+                                        <field name="supply_cost_amount" sum="Total Cost"
+                                            currency_field="supply_cost_currency_id" optional="show" />
+                                    </list>
+                                </field>
+                            </group>
+                        </page>
+                        <page string="Child Services" name="services" invisible="not descendant_ids">
+                            <div>
+                                <button name="add_child_service" type="object" data-hotkey="n"
+                                    icon="fa-plus">
+                                    Add Child Service</button>
+                            </div>
+                            <!-- Workaround: list view click opens a popup of the child service, instead of the form view.
+                                                         To ensure the form view opens for the child service, we use riverflow_one2many -->
+                            <field name="descendant_ids" widget="riverflow_one2many" invisible="not descendant_ids">
+                                <!-- Because there is a handle-field, we must set the default_order to prevent Odoo from taking the handle's field as the primary sort field -->
+                                <!-- All fields from default_order must be included in the list, added with column_invisible but do not change the existing column order (eg root_name must remain where it was), see state record view conventions -->
+                                <list create="0" delete="0" edit="0" default_order="res_sortable_name,res_model,res_id,root_name,root_id,display_order">
+                                    <field name="active" column_invisible="True" />
+                                    <field name="is_end_state" column_invisible="1" />
+                                    <field name='indented_name' optional="show" width="260px" />
+                                    <field name="display_name" optional="hide" />
+                                    <field name="root_name" optional="hide" />
+                                    <field name="res_sortable_name" column_invisible="True" />
+                                    <field name="res_model" column_invisible="True" />
+                                    <field name="res_id" column_invisible="True" />
+                                    <field name="root_id" column_invisible="True" />
+                                    <field name="display_order" column_invisible="True" />
+                                    <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
+                                    <field name="state_id" width="140px" optional="show" decoration-success="is_end_state" />
+                                    <field name="deadline" widget="timing_widget" optional="show" />
+                                    <field name="timing_json" column_invisible="1" />
+                                    <!-- <field name="deadline" optional="hide"
+                                        decoration-muted="is_end_state"
+                                        decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                        decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                                    /> -->
+                                    <field name="daily_prio" optional="hide" options="{'enable_formatting': false}" />
+
+                                    <field name="end_date" optional="hide" />
+                                    <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" />
+                                    <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
+                                    <field name="write_uid" string="Updated By" optional="hide" />
+                                    <field name="write_date" string="Updated On" optional="hide" />
+                                    <field name="front_office_workflow_id" optional="hide" />
+                                    <field name="supply_unit_price" optional="hide" />
+                                    <field name="supply_unit_price_currency_id" column_invisible="1" />
+                                    <field name="company_id" width="100px" optional="hide" />
+                                    <field name='internal_notes_summary' width="200px" optional="show" />
+                                    <field name="external_messages_summary" width="200px" optional="show" />
+                                    <field name="unreviewed_message_count" width="40px" optional="show" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Template Settings" name="template_settings" invisible="not is_root_a_template">
+                            <group>
+                                <group string="Email Settings">
+                                    <field name="mail_template_id" />
+                                    <field name="add_operator_as_recipient" />
+                                </group>
+                                <group string="Supply Order Settings">
+                                    <field name="is_supply_order" />
+                                </group>
+                                <group string="Subject Settings">
+                                    <field name="subject_from" />
+                                </group>
+                                <group string="Template Settings" groups="base.group_no_one">
+                                    <field name="is_root_a_template" />
+                                    <field name="is_this_a_template" />
+                                    <field name="only_add_children" />
+                                    <field name="create_on_state_id" />
+                                    <field name="can_be_root_service" />
+                                    <field name="can_be_child_service" />
+                                    <field name="allowed_subject_model_ids" widget="many2many_tags" />
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Unreviewed External Messages" name="unreviewed_messages" groups="base.group_no_one">
+                            <field name="unreviewed_message_ids" no_label="1" class="oe_inline">
+                                <list>
+                                    <field name="date" />
+                                    <field name="author_id" />
+                                    <field name="author_guest_id" optional="hide" />
+                                    <field name="email_from" />
+                                    <field name="subject" />
+                                    <field name="preview" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="External Messages" name="all_external_messages" invisible="1">
+                            <span>Messages visible to third parties (customers, vendors, etc.),
+                                or received from third party.</span>
+                            <group>
+                                <field name="external_messages_summary" />
+
+                                <field name="external_message_ids" />
+                            </group>
+                        </page>
+                        <page string="Internal Notes" name="internal_notes" invisible="1">
+                            <field name="internal_note_ids" />
+                        </page>
+                        <page string="Workflow Override" name="workflow" groups="base.group_no_one">
+                            <group>
+                                <field name="workflow_id" on_change="1" options="{'no_create': True}" />
+                                <field name="state_id" on_change="1" options="{'no_create': True}" />
+                            </group>
+                        </page>
+
+                        <!-- <page string="Audit" name="audit" groups="base.group_no_one">
+                            <field name="audit_log_ids">
+                                <list>
+                                    <field name="caption" />
+                                </list>
+                            </field>
+                        </page> -->
+
+                    </notebook>
+                </sheet>
+                <chatter reload_on_post="True" />
+            </form>
+        </field>
+    </record>
+
+    <!-- Add form view for service legs -->
+    <record id="view_service_leg_form" model="ir.ui.view">
+        <field name="name">riverflow.service.leg.form</field>
+        <field name="model">riverflow.service.leg</field>
+        <field name="arch" type="xml">
+            <form string="Supply Leg">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="supply_from" />
+                            <field name="supply_to" />
+                            <field name="supply_instructions" />
+                            <field name="supply_distance_km" />
+
+                            <field name="supply_cost_amount" string="Cost" />
+                            <field name="supply_cost_currency_id" invisible="1" />
+                            <field name="service_id" readonly="1" string="Supply Order" options="{'no_create': True, 'no_open': False}" />
+                        </group>
+                    </group>
+                    <group colspan="2">
+                        <field name="name" invisible="1" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+
+    <record id='service_view_list' model='ir.ui.view'>
+        <field name='name'>riverflow.service.list</field>
+        <field name='model'>riverflow.service</field>
+        <field name='arch' type='xml'>
+            <!-- Because there is a handle-field, we must set the default_order to prevent Odoo from taking the handle's field as the primary sort field -->
+            <list create="false" js_class="riverflow_service_list" default_order="res_sortable_name,res_model,res_id,root_name,root_id,display_order">
+                <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" />
+                <field name="active" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
+                <field name="res_name" optional="show" width="260px" />
+                <field name="root_name" optional="hide" width="260px" />
+                <field name='indented_name' optional="show" width="300px" />
+                <field name="display_name" optional="hide" width="300px" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" width="140px" />
+                <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
+                <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="show" />
+                <field name="state_id" optional="hide" decoration-success="is_end_state" width="140px" />
+                <field name="timing_json" widget="timing_widget" optional="hide" width="150px" />
+                <field name="deadline" optional="show"
+                    decoration-danger="deadline &lt; context_today().strftime('%Y-%m-%d') and not is_end_state"
+                    decoration-warning="deadline == context_today().strftime('%Y-%m-%d') and not is_end_state"
+                    decoration-muted="is_end_state" />
+                <field name="daily_prio" optional="hide" options="{'enable_formatting': false}" />
+                <field name="end_date" optional="hide" />
+                <field name="write_uid" string="Updated By" optional="hide" />
+                <field name="write_date" string="Updated On" optional="hide" />
+                <field name="front_office_workflow_id" optional="hide" />
+                <field name="supply_unit_price" optional="hide" />
+                <field name="supply_unit_price_currency_id" column_invisible="1" />
+                <field name="company_id" width="100px" optional="hide" />
+                <field name='internal_notes_summary' optional="show" />
+                <field name="external_messages_summary" optional="show" />
+                <field name="unreviewed_message_count" width="40px" optional="show" />
+            </list>
+        </field>
+    </record>
+
+    <record id="service_view_search" model="ir.ui.view">
+        <field name="name">riverflow.service.search</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <search string="Search Services">
+                <field name="name" string="Name"
+                    filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="res_name" string="Subject" />
+                <field name="supplier_partner_id" />
+                <field name="supplier_partner_id" />
+                <field name="workflow_id" />
+                <field name="state_id" />
+                <field name="tag_ids" />
+                <field name="project_deadline" />
+                <field name="internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" string="External Messages" />
+                <field name="responsible_team_id" />
+                <field name="company_id" />
+                <separator />
+                <filter string="Standalone Services" name="standalone_services" domain="[('res_model', '=', False)]" />
+                <filter string="Linked Services" name="linked_services" domain="[('res_model', '!=', False)]" />
+                <separator />
+                <filter string="Pending Supply Orders" name="pending_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '=', False)]" />
+                <filter string="Completed Supply Orders" name="completed_supply_orders" domain="[('is_supply_order', '=', True), ('supply_actual_date', '!=', False)]" />
+                <separator />
+                <filter string="Workflow Pending" name="pending" domain="[('is_end_state', '=', False)]" />
+                <filter string="Workflow Completed" name="completed" domain="[('is_end_state', '=', True)]" />
+                <filter string="Archived" name="archived" domain="[('active', '=', False)]" />
+                <separator />
+                <filter string="Deadline" name="deadline" date="deadline" />
+                <separator />
+                <filter string="Overdue" name="overdue" domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <filter string="Today" name="today" domain="[('deadline', '=', context_today().strftime('%Y-%m-%d')),('is_end_state', '=', False)]" />
+                <!-- Either deadline is not set, or deadline is in the future. Either way, the workflow must not be completed -->
+                <filter string="Upcoming" name="upcoming" domain="['|', ('deadline', '=', False), ('deadline', '&gt;', context_today().strftime('%Y-%m-%d')), ('is_end_state', '=', False)]" />
+                <!-- Due within one month from today (overdue and undated included). Purely
+                     date-based, unlike Overdue/Today/Upcoming above: combine with the
+                     "Workflow Pending" filter to also hide completed services. -->
+                <filter string="Upcoming (1 Month)" name="upcoming_month" domain="['|', ('deadline', '=', False), ('deadline', '&lt;=', (context_today() + relativedelta(months=1)).strftime('%Y-%m-%d'))]" />
+                <separator />
+                <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
+                <group>
+                    <!-- <filter string="Deadline" name="group_by_deadline" context="{'group_by': 'project_deadline'}" /> -->
+                    <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />
+                    <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'res_name'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+
+    <record id="service_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.service.calendar</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <calendar string="Services"
+                date_start="deadline"
+                date_stop="end_date_for_calendar"
+                color="color_int"
+                create="1" edit="1" delete="0"
+                mode="month"
+                scales="day,week,month,quarter,year"
+                hide_time="true"
+                event_limit="35"
+            >
+
+                <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
+                <field name="state_name" invisible="not state_name" string="State" />
+                <field name="tag_ids" widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}" invisible="not tag_ids" />
+                <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
+                <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+
+            </calendar>
+        </field>
+    </record>
+
+    <record id="service_action" model="ir.actions.act_window">
+        <field name="name">Services</field>
+        <field name="path">services</field>
+        <field name="res_model">riverflow.service</field>
+        <field name="view_mode">list,form,calendar</field>
+        <field name="search_view_id" ref="riverflow.service_view_search" />
+        <field name="domain">[('is_root_a_template', '=', False)]</field>
+        <field name="context">{'default_is_this_a_template': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new service!
+            </p>
+        </field>
+    </record>
+
+    <!-- Supply Orders Search View: uses supply_date instead of deadline -->
+    <record id="supply_order_view_search" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.search</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <search string="Search Supply Orders">
+                <field name="name" string="Name"
+                    filter_domain="['|', ('name', 'ilike', self), ('display_name', 'ilike', self)]" />
+                <field name="res_name" string="Subject" />
+                <field name="supplier_partner_id" />
+                <field name="workflow_id" />
+                <field name="state_id" />
+                <field name="tag_ids" />
+                <field name="supply_date" />
+                <field name="internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" string="External Messages" />
+                <field name="responsible_team_id" />
+                <field name="company_id" />
+                <separator />
+                <filter string="Pending" name="pending_supply_orders" domain="[('state_id.is_supply_order_delivered', '=', False), ('state_id.is_end_state', '=', False), ('state_id.is_cancelled_state', '=', False)]" />
+                <!-- 'Delivered' filter: includes services that are either marked as supply order delivered
+                     or are in an end state, but not cancelled.
+                     Logical: (is_supply_order_delivered OR is_end_state) AND NOT is_cancelled_state -->
+                <filter string="Delivered" name="completed_supply_orders"
+                    domain="['|', ('state_id.is_supply_order_delivered', '=', True), ('state_id.is_end_state', '=', True), ('state_id.is_cancelled_state', '=', False)]" />
+                <separator />
+                <filter string="Cancelled" name="cancelled" domain="[('state_id.is_cancelled_state', '=', True)]" />
+                <filter string="Non-cancelled" name="non_cancelled" domain="[('state_id.is_cancelled_state', '=', False)]" />
+                <separator />
+                <filter string="Supply Date" name="supply_date" date="supply_date" />
+                <separator />
+                <filter string="Past" name="past" domain="[('supply_date', '&lt;', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Today" name="today" domain="[('supply_date', '=', context_today().strftime('%Y-%m-%d'))]" />
+                <filter string="Upcoming" name="upcoming" domain="[('supply_date', '&gt;', context_today().strftime('%Y-%m-%d'))]" />
+                <separator />
+                <filter string="Needs Review" name="needs_review" domain="[('unreviewed_message_count', '&gt;', 0)]" />
+                <filter string="Has Internal Notes" name="has_internal_notes"
+                    domain="[('internal_notes_summary', '!=', False), ('internal_notes_summary', '!=', '')]" />
+                <filter string="Has External Messages" name="has_external_messages"
+                    domain="[('external_messages_summary', '!=', False), ('external_messages_summary', '!=', '')]" />
+                <group>
+                    <filter string="Supply Date" name="group_by_supply_date" context="{'group_by': 'supply_date'}" />
+                    <filter string="Supplier" name="group_by_supplier" context="{'group_by': 'supplier_partner_id'}" />
+                    <filter string="Responsible Team" name="group_by_responsible_team" context="{'group_by': 'responsible_team_id'}" />
+                    <filter string="Company" name="group_by_company" context="{'group_by': 'company_id'}" />
+                    <filter string="Workflow" name="group_by_workflow" context="{'group_by': 'workflow_id'}" />
+                    <filter string="State" name="group_by_state" context="{'group_by': 'state_id'}" />
+                    <filter string="Subject" name="group_by_subject" context="{'group_by': 'res_name'}" />
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Supply Orders List View: includes supply_date column -->
+    <record id="supply_order_view_list" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.list</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <list create="false" js_class="riverflow_service_list" default_order="supply_date asc,res_sortable_name">
+                <field name="highlight_row" column_invisible="1" />
+                <field name="highlight_row_type" column_invisible="1" />
+                <field name="active" column_invisible="True" />
+                <field name="is_end_state" column_invisible="1" />
+                <field name="supply_date" optional="show" />
+                <field name="supply_actual_date" optional="hide" />
+                <field name="res_name" optional="show" width="260px" />
+                <field name="parent_id" optional="hide" width="200px" />
+                <field name='indented_name' optional="show" width="300px" />
+                <field name="supplier_partner_id" optional="show" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" readonly="1" optional="show" width="140px" />
+                <field name="responsible_team_id" string="Responsible" width="120px" optional="show" />
+                <field name="transition_buttons_json" widget="transition_buttons" width="240px" optional="hide" />
+                <field name="state_id" optional="show" decoration-success="is_end_state" width="140px" />
+                <field name="supply_unit_price" optional="hide" />
+                <field name="supply_unit_price_currency_id" column_invisible="1" />
+                <field name="company_id" width="100px" optional="hide" />
+                <field name='internal_notes_summary' optional="show" />
+                <field name="external_messages_summary" optional="hide" />
+                <field name="unreviewed_message_count" width="40px" optional="show" />
+            </list>
+        </field>
+    </record>
+
+    <!-- Supply Orders Calendar View: uses supply_date instead of deadline -->
+    <record id="supply_order_view_calendar" model="ir.ui.view">
+        <field name="name">riverflow.service.supply.order.calendar</field>
+        <field name="model">riverflow.service</field>
+        <field name="arch" type="xml">
+            <calendar string="Supply Orders"
+                date_start="supply_date"
+                date_stop="supply_end_date_for_calendar"
+                color="color_int"
+                create="1" edit="1" delete="0"
+                mode="month"
+                scales="day,week,month,quarter,year"
+                hide_time="true"
+                event_limit="35"
+            >
+                <field name="workflow_name_html" invisible="not workflow_name_html" string="Workflow" />
+                <field name="state_name" invisible="not state_name" string="State" />
+                <field name="supplier_partner_id" invisible="not supplier_partner_id" string="Supplier" />
+                <field name="tag_ids" widget="many2many_tags"
+                    options="{'color_field': 'color', 'no_create_edit': True}" invisible="not tag_ids" />
+                <field name="responsible_team_id" string="Responsible" invisible="not responsible_team_id" options="{'no_open': True}" />
+                <field name="supply_unit_price" invisible="not supply_unit_price" string="Cost" />
+                <field name="internal_notes_summary" invisible="not internal_notes_summary" string="Internal Notes" />
+                <field name="external_messages_summary" invisible="not external_messages_summary" string="External Messages" />
+            </calendar>
+        </field>
+    </record>
+
+    <!-- Supply Orders Action: filters for is_supply_order services only -->
+    <record id="supply_order_action" model="ir.actions.act_window">
+        <field name="name">Supply Orders</field>
+        <field name="path">supply-orders</field>
+        <field name="res_model">riverflow.service</field>
+        <field name="view_mode">calendar,list,form</field>
+        <field name="search_view_id" ref="riverflow.supply_order_view_search" />
+        <field name="domain">[('is_supply_order', '=', True), ('is_root_a_template', '=', False)]</field>
+        <field name="context">{'default_is_this_a_template': False}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No supply orders yet!
+            </p>
+            <p>Supply orders are services linked to suppliers, such as taxi bookings, transport orders, etc.</p>
+        </field>
+    </record>
+
+    <!-- Associate the supply order list view with the supply order action -->
+    <record id="supply_order_action_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">1</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="supply_order_view_list" />
+        <field name="act_window_id" ref="supply_order_action" />
+    </record>
+
+    <!-- Associate the supply order calendar view with the supply order action -->
+    <record id="supply_order_action_view_calendar" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">calendar</field>
+        <field name="view_id" ref="supply_order_view_calendar" />
+        <field name="act_window_id" ref="supply_order_action" />
+    </record>
+
+
+    <record id="action_service_templates" model="ir.actions.act_window">
+        <field name="name">Service Templates</field>
+        <field name="path">service-template</field>
+        <field name="res_model">riverflow.service</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="riverflow.service_view_search" />
+        <field name="domain">[('is_root_a_template', '=', True)]</field>
+        <field name="context">{'default_is_this_a_template': True}</field>
+    </record>
+
+    <record id="service_tag_view_view_form" model="ir.ui.view">
+        <field name="name">riverflow.service.tag.form</field>
+        <field name="model">riverflow.service.tag</field>
+        <field name="arch" type="xml">
+            <form string="Service Tags">
+                <sheet>
+                    <group>
+                        <field name="name" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="service_tag_view_view_list" model="ir.ui.view">
+        <field name="name">riverflow.service.tag.list</field>
+        <field name="model">riverflow.service.tag</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name" />
+                <field name="color" widget="color_picker" />
+            </list>
+        </field>
+    </record>
+
+    <record id="service_tag_action" model="ir.actions.act_window">
+        <field name="name">Service Tags</field>
+        <field name="path">service-tags</field>
+        <field name="res_model">riverflow.service.tag</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new service tag!
+            </p>
+        </field>
+    </record>
+
+    <!-- Define the action for the service start transition wizard -->
+    <record id="action_riverflow_start_service" model="ir.actions.act_window">
+        <field name="name">New Service</field>
+        <field name="path">start-service</field>
+        <field name="res_model">riverflow.start.service</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_riverflow_start_template" model="ir.actions.act_window">
+        <field name="name">New Service Template</field>
+        <field name="path">start-template</field>
+        <field name="res_model">riverflow.start.service</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_is_this_a_template': True}</field>
+    </record>
+
+    <!-- Menu Item Definitions 
+    https://www.svgrepo.com/svg/455931/service-bell?edit=true 
+    -->
+    <menuitem id='riverflow.service_root' name='Services'
+        web_icon='riverflow,static/description/icon.png' sequence="10">
+        <menuitem id="riverflow.services_menu" name="Services" action="riverflow.service_action" sequence="10" />
+        <menuitem id="riverflow.services_configuration_menu" name="Configuration" sequence="20">
+            <menuitem id="riverflow.services_menu_configuration_tags"
+                action="riverflow.service_tag_action" sequence="10" />
+            <menuitem id="riverflow.services_menu_configuration_templates"
+                action="riverflow.action_service_templates" sequence="200" />
+            <menuitem id="riverflow.service_menu_start_template" name="&#10133; New Template"
+                action="riverflow.action_riverflow_start_template" sequence="210" />
+        </menuitem>
+        <menuitem id="riverflow.service_menu_new_service" name="&#10133; New Service"
+            action="riverflow.action_riverflow_start_service" sequence="30" />
+    </menuitem>
+
+    <!-- Supply Orders Top-level Menu: dedicated view for supply order services -->
+    <menuitem id='riverflow.supply_order_root' name='Supply Orders'
+        web_icon='riverflow,static/description/taxi-cab.png' sequence="15"
+        action="riverflow.supply_order_action" />
+
+
+    <record id="action_add_child_service" model="ir.actions.server">
+        <field name="name">Add Child Service</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="binding_view_types">form</field>
+        <field name="state">code</field>
+        <field name="code">action = records.add_child_service()</field>
+    </record>
+
+    <record id="action_send_dummy_external_message" model="ir.actions.server">
+        <field name="name">Post Dummy Inbound Message on Chatter</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="binding_view_types">form</field>
+        <field name="code">
+            for record in records:
+            record._send_dummy_external_message()
+        </field>
+    </record>
+
+    <!-- Server action to bulk update service deadlines -->
+    <record id="action_bulk_update_service_deadline" model="ir.actions.server">
+        <field name="name">Update Deadline</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list</field>
+        <field name="code">
+            action = {
+            'name': 'Update Deadline',
+            'type': 'ir.actions.act_window',
+            'res_model': 'crewradar.service.deadline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+            'active_ids': records.ids,
+            'active_model': 'riverflow.service',
+            },
+            }
+        </field>
+    </record>
+
+    <!-- Server action to move services to another log entry -->
+    <record id="action_move_services_to_log_entry" model="ir.actions.server">
+        <field name="name">Move Services to Log Entry</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list,form</field>
+        <field name="code">
+            action = {
+            'name': 'Move Services to Log Entry',
+            'type': 'ir.actions.act_window',
+            'res_model': 'crewradar.move.services.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+            'active_ids': records.ids,
+            'active_model': 'riverflow.service',
+            },
+            }
+        </field>
+    </record>
+
+    <!-- Developer-only: force-recompute res_id/res_model to profile the
+         subject cascade. Restricted to base.group_no_one so it only shows
+         in developer mode. -->
+    <record id="action_recompute_subject_debug" model="ir.actions.server">
+        <field name="name">Recompute Subject (debug)</field>
+        <field name="model_id" ref="model_riverflow_service" />
+        <field name="binding_model_id" ref="model_riverflow_service" />
+        <field name="group_ids" eval="[(4, ref('base.group_no_one'))]" />
+        <field name="state">code</field>
+        <field name="binding_view_types">list,form</field>
+        <field name="code">
+            if records:
+            records.action_recompute_subject_debug()
+        </field>
+    </record>
+
+</odoo>

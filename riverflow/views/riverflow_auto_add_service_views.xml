@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_auto_add_service_form" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.form</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active" />
+                    <div class="oe_title">
+                        <h2>
+                            <field name="name" readonly="1" invisible="1" />
+                        </h2>
+                    </div>
+                    <group>
+                        <field name="active" invisible="1" />
+                        <field name="service_template_id" />
+                        <field name="domain_id" />
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_auto_add_service_list" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.list</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="active" column_invisible="1" />
+                <field name="applies_to_model_id" optional="show" />
+                <field name="domain_id" optional="show" />
+                <field name="service_template_id" optional="show" />
+                <field name="template_relative_timing" optional="show" />
+            </list>
+        </field>
+    </record>
+
+
+    <record id="view_auto_add_service_search" model="ir.ui.view">
+        <field name="name">riverflow.auto.add.service.search</field>
+        <field name="model">riverflow.auto.add.service</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="domain_id" />
+                <field name="service_template_id" />
+                <separator />
+                <filter string="Archived" name="inactive" domain="[('active','=',False)]" />
+                <separator />
+                <filter string="Model" name="group_applies_to_model_id" context="{'group_by': 'applies_to_model_id'}" />
+                <filter string="Domain" name="group_domain_id" context="{'group_by': 'domain_id'}" />
+                <filter string="Service Template" name="group_service_template_id" context="{'group_by': 'service_template_id'}" />
+            </search>
+        </field>
+    </record>
+
+    <record id="action_auto_add_service" model="ir.actions.act_window">
+        <field name="name">Auto Add Services</field>
+        <field name="res_model">riverflow.auto.add.service</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_auto_add_service_search" />
+    </record>
+
+    <menuitem id="menu_auto_add_service"
+        name="Auto Add Services"
+        action="action_auto_add_service"
+        parent="riverflow.services_configuration_menu" sequence="110"
+    />
+</odoo>

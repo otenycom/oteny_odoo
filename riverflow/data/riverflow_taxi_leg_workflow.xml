@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<odoo noupdate="1">
+    <!-- Workflow -->
+    <record id="workflow_taxi_leg" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Travel Leg</field>
+        <field name="description">For-information only workflow</field>
+        <field name="icon">fa-info-circle</field>
+        <field name="is_supply_order">False</field>
+        <field name="has_supply_quantity">False</field>
+        <field name="has_supplier">False</field>
+        <field name="has_supply_unit_price">False</field>
+    </record>
+
+    <!-- Define all states first (to prevent forward references) -->
+    <record id="state_taxi_leg_info" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_taxi_leg" />
+        <field name="name">Info</field>
+        <field name="sequence">10</field>
+        <field name="is_end_state">False</field>
+        <field name="color_int">7</field>
+    </record>
+
+    <record id="state_taxi_leg_completed" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_taxi_leg" />
+        <field name="name">Completed</field>
+        <field name="sequence">20</field>
+        <field name="is_end_state">True</field>
+        <field name="color_int">10</field>
+    </record>
+    <!-- Then define all transitions -->
+    <!-- No transitions needed for a single state workflow -->
+
+</odoo> 

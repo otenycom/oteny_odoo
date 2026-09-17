@@ -1,0 +1,17 @@
+<odoo>
+    <record id="view_start_service_wizard_form" model="ir.ui.view">
+        <field name="name">riverflow.start.service.form</field>
+        <field name="model">riverflow.start.service</field>
+        <field name="arch" type="xml">
+            <form string="New Service">
+                <sheet>
+                    <field name="start_transition_ids" invisible="1" />
+                    <field name="transition_buttons_json" widget="transition_buttons" style="width: 100%" />
+                </sheet>
+                <footer>
+                    <button string="Cancel" class="btn-secondary" special="cancel" data-hotkey="z" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

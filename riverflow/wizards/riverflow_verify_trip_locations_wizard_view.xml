@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_verify_trip_locations_form" model="ir.ui.view">
+        <field name="name">riverflow.verify.trip.locations.wizard.form</field>
+        <field name="model">riverflow.verify.trip.locations.wizard</field>
+        <field name="inherit_id" ref="riverflow.view_service_transition_action_default_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='use_project_deadline_from']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='days_relative_to_project']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='project_deadline']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//group" position="after">
+                <group colspan="2">
+                    <field name="leg_ids" nolabel="1" force_save="1">
+                        <list editable="bottom" create="0" delete="0">
+                            <field name="sequence" widget="handle" force_save="1" />
+                            <field name="supply_from" force_save="1" />
+                            <field name="supply_to" force_save="1" />
+                            <field name="supply_distance_km" sum="Total Distance" force_save="1" />
+                            <field name="supply_cost_currency_id" column_invisible="1" force_save="1" />
+                            <field name="supply_cost_amount" sum="Total Cost"
+                                currency_field="supply_cost_currency_id" force_save="1" optional="show" />
+                            <field name="service_leg_id" column_invisible="1" force_save="1" />
+                            <field name="wizard_id" column_invisible="1" force_save="1" />
+                        </list>
+                    </field>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

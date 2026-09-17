@@ -1,0 +1,103 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="state_view_form" model="ir.ui.view">
+        <field name="name">riverflow.state.form</field>
+        <field name="model">riverflow.state</field>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <label for="name" />
+                        <h1>
+                            <field name="active" invisible="True" />
+                            <field name="name" class="w-100" on_change="1" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="workflow_id" readonly="1" />
+                            <field name="description" />
+                            <field name="color_int" widget="color_picker" />
+                        </group>
+                        <group>
+                            <field name="is_end_state" />
+                            <field name="is_cancelled_state" />
+                            <field name="is_supply_order_delivered" />
+                            <field name="hide_in_statusbar" />
+                            <field name="show_state_in_crew_planning" />
+                            <field name="auto_progress_on_children_done" />
+                            <field name="auto_done_children_on_enter" />
+                            <field name="is_owned_by_bot" />
+                            <field name="bot_stage" />
+                            <field name="bot_timeout_minutes" />
+                            <field name="bot_login_hold" />
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="From-Transitions" name="from_transitions">
+                            <div>
+                                <button name="workflow_add_from_transition" type="object" class="oe_link"
+                                    icon="fa-plus">
+                                    Add Transition</button>
+                            </div>
+                            <field name="from_transition_ids" default_order="sequence,name,id" widget="riverflow_one2many">
+                                <list create="0" delete="0" edit="0">
+                                    <field name="active" column_invisible="True" />
+                                    <field name="workflow_id" column_invisible="True" />
+                                    <field name="sequence" widget="handle" />
+                                    <field name="name" />
+                                    <field name="from_state_id" />
+                                    <field name="to_state_id" />
+                                    <field name="description" />
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="state_view_list" model="ir.ui.view">
+        <field name="name">riverflow.state.list</field>
+        <field name="model">riverflow.state</field>
+        <field name="arch" type="xml">
+            <list default_order="workflow_id,sequence,name,id">
+                <field name="active" column_invisible="True" />
+                <field name="sequence" widget="handle" />
+                <field name="workflow_id" />
+                <field name="name" />
+                <field name="color_int" widget="color_picker" />
+                <field name="display_name" optional="hide" />
+                <field name="description" />
+                <field name="is_cancelled_state" />
+                <field name="is_end_state" />
+                <field name="is_supply_order_delivered" />
+                <field name="hide_in_statusbar" />
+                <field name="show_state_in_crew_planning" />
+                <field name="auto_progress_on_children_done" optional="hide" />
+                <field name="auto_done_children_on_enter" optional="hide" />
+            </list>
+        </field>
+    </record>
+
+    <record id="state_action" model="ir.actions.act_window">
+        <field name="name">Workflow States</field>
+        <field name="path">workflow-states</field>
+        <field name="res_model">riverflow.state</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Add a new workflow state!
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="riverflow.services_menu_configuration_states"
+        parent="riverflow.services_configuration_menu" sequence="30"
+        action="riverflow.state_action" />
+
+</odoo>

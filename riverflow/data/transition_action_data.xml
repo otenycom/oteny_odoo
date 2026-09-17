@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<odoo noupdate="0">
+    <record id="transition_action_default" model="riverflow.transition.action">
+        <field name="name">Default Transition Action</field>
+        <field name="description"></field>
+        <field name="odoo_view">view_service_transition_action_default_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_email_sender" model="riverflow.transition.action">
+        <field name="name">Send Email Action</field>
+        <field name="description">Sends an email related to the service</field>
+        <field name="odoo_view">view_service_email_sender_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_supplier_confirmed" model="riverflow.transition.action">
+        <field name="name">Supplier Confirmed</field>
+        <field name="description">Supplier Confirmation Received</field>
+        <field name="odoo_view">view_supplier_confirmed_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_register_service" model="riverflow.transition.action">
+        <field name="name">Register Service</field>
+        <field name="description">Hand over the service to back-office</field>
+        <field name="odoo_view">view_service_register_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_enter_train_ticket" model="riverflow.transition.action">
+        <field name="name">Enter Train Ticket</field>
+        <field name="description">Enter the train ticket details</field>
+        <field name="odoo_view">view_enter_train_ticket_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_enter_airline_ticket" model="riverflow.transition.action">
+        <field name="name">Enter Airline Ticket</field>
+        <field name="description">Enter the airline ticket details</field>
+        <field name="odoo_view">view_enter_airline_ticket_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_enter_distance" model="riverflow.transition.action">
+        <field name="name">Enter Distance</field>
+        <field name="description">Enter the distance for each leg of the trip</field>
+        <field name="odoo_view">view_enter_distance_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_set_deadline_tomorrow" model="riverflow.transition.action">
+        <field name="name">Set Deadline Tomorrow</field>
+        <field name="description">Set the service deadline to tomorrow</field>
+        <field name="odoo_view">view_set_deadline_tomorrow_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+
+    <record id="transition_action_verify_trip_locations" model="riverflow.transition.action">
+        <field name="name">Verify Trip Locations</field>
+        <field name="description">Verify trip locations and capture actual trip date</field>
+        <field name="odoo_view">view_verify_trip_locations_form</field>
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+    </record>
+</odoo>

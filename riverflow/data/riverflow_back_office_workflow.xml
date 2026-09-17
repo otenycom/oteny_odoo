@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<odoo noupdate="1">
+    <!-- Workflow -->
+    <record id="workflow_service_back_office" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Back-office</field>
+        <field name="description">The service is reviewed, billed or paid as salary by the billing- and salary wizard</field>
+        <field name="icon">fa-book</field>
+    </record>
+
+    <!-- States -->
+    <record id="back_office_state_registered" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_back_office" />
+        <field name="name">Registered</field>
+        <field name="sequence">10</field>
+        <field name="is_back_office_state">True</field>
+        <field name="is_end_state">True</field>
+        <field name="color_int">2</field>
+    </record>
+
+</odoo>

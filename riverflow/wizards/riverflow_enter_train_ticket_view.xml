@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_enter_train_ticket_form" model="ir.ui.view">
+        <field name="name">riverflow.enter.train.ticket.wizard.form</field>
+        <field name="model">riverflow.enter.train.ticket.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Enter Train Ticket">
+                <sheet>
+                    <group>
+                        <field name="date" />
+                        <field name="from_station" required="1" />
+                        <field name="to_station" required="1" />
+                        <field name="is_round_trip" />
+
+                        <field name="price" required="1" />
+                        <field name="notes" />
+
+                        <field name="attachment_ids" widget="many2many_binary" invisible="use_existing_attachment" />
+                        <field name="use_existing_attachment" />
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirm" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo> 

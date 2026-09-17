@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<odoo noupdate="1">
+    <!-- Workflow -->
+    <record id="workflow_service_train_ticket" model="riverflow.workflow">
+        <field name="model_id" ref="riverflow.model_riverflow_service" />
+        <field name="name">Train Ticket</field>
+        <field name="description">Workflow for managing train tickets</field>
+        <field name="icon">fa-train</field>
+        <field name="is_supply_order">True</field>
+        <field name="has_supply_quantity">False</field>
+        <field name="has_supplier">False</field>
+        <field name="has_supply_unit_price">False</field>
+        <field name="has_legs">True</field>
+        <field name="has_supply_time">True</field>
+    </record>
+
+    <!-- States -->
+    <record id="state_train_not_started" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_train_ticket" />
+        <field name="name">Not Started</field>
+        <field name="sequence">10</field>
+        <field name="color_int">7</field>
+    </record>
+
+    <record id="state_train_booked" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_train_ticket" />
+        <field name="name">Booked</field>
+        <field name="sequence">20</field>
+        <field name="color_int">7</field>
+    </record>
+
+    <record id="state_train_registered" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_train_ticket" />
+        <field name="name">Registered</field>
+        <field name="sequence">30</field>
+        <field name="color_int">2</field>
+        <field name="is_end_state" eval="True" />
+        <field name="is_back_office_state" eval="True" />
+    </record>
+
+    <record id="state_train_cancelled" model="riverflow.state">
+        <field name="workflow_id" ref="workflow_service_train_ticket" />
+        <field name="name">Cancelled</field>
+        <field name="sequence">40</field>
+        <field name="hide_in_statusbar">True</field>
+        <field name="is_cancelled_state">True</field>
+        <field name="is_end_state">True</field>
+        <field name="color_int">1</field>
+    </record>
+
+    <!-- Transitions -->
+    <record id="trans_train_initial_to_not_started" model="riverflow.transition">
+        <field name="name">Not Started</field>
+        <field name="from_state_id" ref="" />
+        <field name="to_state_id" ref="state_train_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">10</field>
+    </record>
+
+    <!-- Transitions from Not Started -->
+    <record id="trans_train_not_started_to_booked" model="riverflow.transition">
+        <field name="name">Book Ticket</field>
+        <field name="from_state_id" ref="state_train_not_started" />
+        <field name="to_state_id" ref="state_train_booked" />
+        <field name="action_id" ref="riverflow.transition_action_enter_train_ticket" />
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_train_not_started_to_cancelled" model="riverflow.transition">
+        <field name="name">Cancel</field>
+        <field name="from_state_id" ref="state_train_not_started" />
+        <field name="to_state_id" ref="state_train_cancelled" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from Booked -->
+    <record id="trans_train_booked_to_registered" model="riverflow.transition">
+        <field name="name">Register</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_registered" />
+        <field name="action_id" ref="riverflow.transition_action_register_service" />
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_train_booked_to_booked" model="riverflow.transition">
+        <field name="name">Update Booking</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_booked" />
+        <field name="action_id" ref="riverflow.transition_action_enter_train_ticket" />
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="trans_train_booked_to_not_started" model="riverflow.transition">
+        <field name="name">Back to Not Started</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-undo</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="trans_train_booked_to_cancelled" model="riverflow.transition">
+        <field name="name">Cancel</field>
+        <field name="from_state_id" ref="state_train_booked" />
+        <field name="to_state_id" ref="state_train_cancelled" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">40</field>
+    </record>
+
+    <!-- Transitions from Registered -->
+    <record id="trans_train_registered_to_booked" model="riverflow.transition">
+        <field name="name">Return to Booked</field>
+        <field name="from_state_id" ref="state_train_registered" />
+        <field name="to_state_id" ref="state_train_booked" />
+        <field name="action_id" ref="riverflow.transition_action_enter_train_ticket" />
+        <field name="icon">fa-pencil</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="trans_train_registered_to_cancelled" model="riverflow.transition">
+        <field name="name">Cancel</field>
+        <field name="from_state_id" ref="state_train_registered" />
+        <field name="to_state_id" ref="state_train_cancelled" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Transitions from Cancelled -->
+    <record id="trans_train_cancelled_to_not_started" model="riverflow.transition">
+        <field name="name">Restart</field>
+        <field name="from_state_id" ref="state_train_cancelled" />
+        <field name="to_state_id" ref="state_train_not_started" />
+        <field name="action_id" ref="riverflow.transition_action_default" />
+        <field name="icon">fa-undo</field>
+        <field name="sequence">10</field>
+    </record>
+</odoo>

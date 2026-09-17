@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_service_email_sender_form" model="ir.ui.view">
+        <field name="name">riverflow.service.email.sender.wizard.form</field>
+        <field name="model">riverflow.service.email.sender.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Send Email">
+                <sheet>
+                    <group>
+                        <group string="Supply Order" invisible="not is_supply_order">
+                            <field name="supplier_partner_id" />
+                            <field name="deadline" string="Supply Date" />
+                            <field name="supply_order_instructions" />
+                        </group>
+                        <group string="Email">
+                            <field name="mail_template_id" options="{'no_create': True, 'no_open': False}" />
+                            <field name="responsible_team_id" string="Responsible Team" required="1" invisible="responsible_team_id_invisible" />
+                            <field name="responsible_team_id_invisible" invisible="1" />
+                            <field name="project_deadline" string="Follow-up deadline" invisible="project_deadline_invisible" />
+                            <field name="project_deadline_invisible" invisible="1" />
+                            <field name="res_id" invisible="1"></field>
+                            <field name="res_model" invisible="1"></field>
+                            <field name="is_supply_order" invisible="1" />
+                            <field name="records_to_transition_ids" invisible="1" />
+                            <field name="transition_id" invisible="1" />
+                            <field name="show_attachment_warning" invisible="1" />
+                        </group>
+                    </group>
+                    <group string="Recipients">
+                        <group colspan="1">
+                            <field name="supplier_email_formatted" invisible="not is_supply_order" />
+                        </group>
+                        <!-- Localized missing-recipient warning: surfaces
+                             the "no recipients" condition right next to the
+                             recipients list, before HR clicks Send. For
+                             supply orders the supplier_partner_id satisfies
+                             the requirement on its own, so the alert only
+                             fires when both the recipients list and (when
+                             applicable) the supplier are empty. -->
+                        <div class="alert alert-warning mb-2" role="alert" colspan="2"
+                            invisible="recipient_partner_ids or (is_supply_order and supplier_partner_id)">
+                            <i class="fa fa-exclamation-circle me-1" />
+                            No recipients selected. Add at least one recipient below before sending.
+                        </div>
+                        <field name="recipient_partner_ids" nolabel="1">
+                            <list>
+                                <field name="name" string="Recipients" />
+                                <field name="email" />
+                            </list>
+                        </field>
+                    </group>
+                    <group colspan="2">
+                        <field name="subject_updatable" required="1" />
+                    </group>
+                    <notebook>
+                        <page string="Message" name="message">
+                            <field name="body_updatable" widget="html" options="{'style-inline': true}" required="1" />
+                            <field name="attachment_ids" widget="many2many_binary" />
+                        </page>
+                        <page string="Template" name="template" groups="base.group_no_one">
+                            <group>
+                                <field name="subject" />
+                            </group>
+                            <field name="body" widget="html" options="{'style-inline': true, 'codeview': true, 'dynamic_placeholder': true}" />
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <div class="alert alert-warning mb-0 ms-auto" role="alert"
+                        invisible="not show_attachment_warning">
+                        Attachments not yet added
+                    </div>
+                    <button string="Send" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

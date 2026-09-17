@@ -1,0 +1,114 @@
+.transition_button {
+    margin-right: 0px;
+    padding: 0px;
+    border-width: 0px;
+}
+
+.transition_button .icon_span {
+    width: 4em;
+}
+
+.button-separator-group button {
+    margin-right: 0px;
+}
+
+.button-separator {
+    margin-left: 0px;
+    margin-right: 4px;
+}
+
+.riverflow_end_state {
+    color: map-get($o-theme-text-colors, 'success');
+}
+
+.riverflow_pending_state {
+    color: map-get($o-theme-text-colors, 'primary');
+}
+
+.riverflow_input_dropdown {
+    position: relative;
+
+    &__input {
+        width: 100%;
+        // transition: background-color 0.3s ease, border-color 0.3s ease;
+
+        &:focus {
+            outline: none;
+            box-shadow: none;
+            border-color: transparent;
+            // background-color: rgba(255, 255, 255, 0.1); // Slight highlight
+        }
+    }
+}
+
+.full-list-layout {
+
+    .template-list-scroll {
+        height: calc(100vh - 400px);
+        overflow: auto;
+    }
+
+    .transition-search-input {
+        width: 100%;
+    }
+
+    h3 {
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        color: $o-main-text-color;
+        font-size: 1rem;
+    }
+
+    .template-item,
+    .service-item {
+        display: flex;
+        align-items: center;
+        padding: 0.25rem 0;
+        padding-left: 1.5rem;
+
+        .btn-link {
+            padding: 0;
+            text-align: left;
+        }
+
+        .fa-chevron-right,
+        .fa-chevron-down {
+            cursor: pointer;
+            margin-left: 0.5rem;
+            width: 1rem;
+            text-align: center;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .icon_span {
+            margin-right: 0.5rem;
+        }
+    }
+
+    [class*="indent-"] {
+        padding-left: calc(var(--indent-level) * 1.5rem);
+    }
+
+    .indent-0 {
+        --indent-level: 0;
+    }
+
+    .indent-1 {
+        --indent-level: 1;
+    }
+
+    .indent-2 {
+        --indent-level: 2;
+    }
+
+    .indent-3 {
+        --indent-level: 3;
+    }
+
+    .indent-4 {
+        --indent-level: 4;
+    }
+}

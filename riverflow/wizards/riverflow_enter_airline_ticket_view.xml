@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_enter_airline_ticket_form" model="ir.ui.view">
+        <field name="name">riverflow.enter.airline.ticket.wizard.form</field>
+        <field name="model">riverflow.enter.airline.ticket.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Enter Airline Flight Ticket">
+                <sheet>
+                    <group>
+                        <field name="date" string="Booking Date" />
+                        <field name="new_note" required="0" invisible="new_note_invisible" widget="html" string="Departure and arrival details" />
+                        <field name="new_note_invisible" invisible="1" />
+                        <field name="supply_unit_price" />
+                        <field name="use_existing_attachment" />
+                        <field name="attachment_ids" widget="many2many_binary" invisible="use_existing_attachment" />
+                    </group>
+                </sheet>
+                <footer>
+                    <button string="Confirm" name="action_save" type="object" class="btn-primary" data-hotkey="q" />
+                    <button string="Cancel" class="btn-secondary" special="cancel" />
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo> 

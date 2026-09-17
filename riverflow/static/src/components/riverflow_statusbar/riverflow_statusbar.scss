@@ -1,0 +1,6 @@
+.o_form_statusbar {
+    .o_field_transition_buttons {
+        // this moves the transition buttons to the left, normally they are centered between the buttons on the left and the statusbar on the right
+        flex-grow: 1;
+    }
+}

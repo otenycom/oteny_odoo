@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_set_deadline_tomorrow_form" model="ir.ui.view">
+        <field name="name">riverflow.set.deadline.tomorrow.wizard.form</field>
+        <field name="model">riverflow.set.deadline.tomorrow.wizard</field>
+        <field name="inherit_id" ref="riverflow.view_service_transition_action_default_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="supply_actual_date" required="1" force_save="1" />
+                <field name="supply_time_of_day" widget="float_time" />
+            </xpath>
+            <xpath expr="//field[@name='use_project_deadline_from']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='days_relative_to_project']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='project_deadline']" position="attributes">
+                <attribute name="string">Task Deadline</attribute>
+                <attribute name="help">Deadline for completing location check</attribute>
+                <attribute name="force_save">1</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,35 @@
+<odoo>
+    <record id="view_service_transition_action_default_form" model="ir.ui.view">
+        <field name="name">service.wizard.form</field>
+        <field name="model">riverflow.service.wizard</field>
+        <field name="inherit_id" ref="riverflow.view_transition_wizard_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='responsible_team_id']" position="before">
+                <field name="incomplete_children_warning" invisible="1" />
+                <div class="alert alert-warning" role="alert" colspan="2"
+                     invisible="not incomplete_children_warning">
+                    <field name="incomplete_children_warning" nolabel="1" readonly="1" />
+                    <field name="ignore_incomplete_children" />
+                </div>
+                <field name="name" required="1" invisible="name_invisible" />
+                <field name="name_invisible" invisible="1" />
+            </xpath>
+            <xpath expr="//field[@name='responsible_team_id']" position="after">
+                <field name="use_project_deadline_from_options" invisible="1" on_change="1" />
+                <field name="use_project_deadline_from" widget="filterable_selection"
+                    options="{'whitelist_fname': 'use_project_deadline_from_options'}"
+                    required="1"
+                    invisible="use_project_deadline_from_invisible or use_project_deadline_from == 'self'" />
+                <field name="use_project_deadline_from_invisible" invisible="1" />
+                <field name="project_deadline" invisible="use_project_deadline_from != 'self' or use_project_deadline_from_invisible" />
+                <field name="project_deadline_invisible" invisible="1" />
+                <field name="days_relative_to_project" invisible="days_relative_to_project_invisible or use_project_deadline_from == 'self'" />
+                <field name="days_relative_to_project_invisible" invisible="1" />
+                <field name="res_id" invisible="1" />
+                <field name="res_model" invisible="1" />
+                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}" invisible="tag_ids_invisible" />
+                <field name="tag_ids_invisible" invisible="1" />
+            </xpath>
+        </field>
+    </record>
+</odoo>
