@@ -46,7 +46,7 @@ JSON into the DTO `search_read` the Talent already does.
 | Change a visible wizard field | Part 1 `set` on that handle. |
 | Confirm | Part 1 `save`, then wizard `action_save`. |
 | Cancel | Part 1 `discard`. |
-| Harness or reaper, no pause | Call `bot_claim`. It is open-and-save. |
+| The reaper, or the bridge's `work_release` | Call `bot_claim` on the timeout exit. It is open-and-save. |
 | A person clicks while a claim is live | The fence refuses them. You pass only with `riverflow_bot_caller`. |
 
 ## Checklist — a bot that must fill
@@ -151,7 +151,7 @@ values stay in workflow XML.
 | Caller | Calls |
 | --- | --- |
 | Person | 0 extra — the form already has the JSON |
-| Harness / reaper | 1 — `bot_claim` |
+| Reaper, or `work_release` through the bridge | 1 — `bot_claim` |
 | Agent, no fields | 1 after the DTO read — open-and-act |
 | Agent that must fill | 1 open, N `set`, 1 `save` |
 | Forbidden | A second strip method. Talent-built `fields_spec`. |

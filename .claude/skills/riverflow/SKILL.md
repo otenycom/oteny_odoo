@@ -132,7 +132,7 @@ the underscore method is private) returns the same `ir.actions.act_window` a per
 
 **`bot_token_check`.** Why: a filing skill must probe the claim epoch before an irreversible portal submit. `res_id` is optional. `work_token` alone resolves the record. Extra kwargs are ignored so a leftover `number` cannot 422. The Talent should still send both (`res_id` + `work_token`) in two-dispatch / filing Step 4A.
 
-**Keep `state.name` unique inside one workflow.** The service list groups by `"<state> | <workflow>"`. The bot harness also passes `state.name` (not the xmlid) as `in_progress_state` / `expect_state_in`. Two states that share a label collapse into one list group, and a refusal or escalation can no longer name which state. A strip-friendly qualifier is fine (`Barney is filling (after login)`). Do not alias two states just to share one strip label.
+**Keep `state.name` unique inside one workflow.** The service list groups by `"<state> | <workflow>"`. `bot_work_queue` also returns `state.name` (not the xmlid) as `in_progress_state` / `expect_state_in`. Two states that share a label collapse into one list group, and a refusal or escalation can no longer name which state. A strip-friendly qualifier is fine (`Barney is filling (after login)`). Do not alias two states just to share one strip label.
 
 ### Transitions
 

@@ -20,6 +20,12 @@ exchange + outcome), oteny.bot.turn (per-LLM-call detail). The record_activity()
 bot calls over /json/2/ to log an exchange. A session's origin is a soft (model, id) reference, so
 a workflow module (riverflow) or an app module attaches its own record without this addon
 depending on it.
+
+The platform speaks to this Odoo only through this module. Its work contract is three
+@api.model methods keyed by the work token of a dispatched session: work_consume (turn start,
+fail-closed), work_probe (once a minute: mine / released / next_token) and work_release (a
+hand-back with the run's values). An engine inherits oteny.bot and implements _work_consume,
+_work_probe and _work_release; a missing engine answers ok=False. See README.md.
 """,
     "data": [
         "security/oteny_bot_groups.xml",

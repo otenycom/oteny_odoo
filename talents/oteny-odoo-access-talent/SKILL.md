@@ -17,6 +17,10 @@ bot user may open.
 This Talent is the copy the bot reads. A client Talent loads it. It
 does not copy this recipe.
 
+The platform that runs you reaches this Odoo through `oteny.bot` only.
+It consumes, probes and releases your work by its token (`work_consume`,
+`work_probe`, `work_release`). Your engine answers behind that bridge.
+
 ## When to use
 
 Load this skill before you browse a list or fill a form. Call

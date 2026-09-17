@@ -24,7 +24,7 @@ This skill is the operator surface. The one-live-slot **gate** stays in
 - A sign-in dance latch looks stuck after a cancelled login
 - Discuss is silent and staff must open the bot row, not the website login
 - A second bot for a company needs dance chrome without postedworkers names
-- A bot must browse a standard Odoo list or form through the views a person already has. The recipe the bot reads is the module Talent [`oteny_bot/talents/oteny-odoo-access-talent/`](../../../oteny_bot/talents/oteny-odoo-access-talent/SKILL.md)
+- A bot must browse a standard Odoo list or form through the views a person already has. The recipe the bot reads is the module Talent [`talents/oteny-odoo-access-talent/`](../../../talents/oteny-odoo-access-talent/SKILL.md)
 
 ## Why the operator UI lives here
 
@@ -186,7 +186,7 @@ values never go back to the model. The host does not import
 Create-save keeps invisible defaults and x2many ids.
 
 The recipe the bot reads is the module Talent
-[`oteny_bot/talents/oteny-odoo-access-talent/`](../../../oteny_bot/talents/oteny-odoo-access-talent/SKILL.md).
+[`talents/oteny-odoo-access-talent/`](../../../talents/oteny-odoo-access-talent/SKILL.md).
 Delivery is a talent git path. See
 [host-module-talents.md](plans/host-module-talents.md).
 This skill is the operator surface. It is not the runtime copy.
@@ -217,7 +217,7 @@ Operator pointers:
 [talent-author-host.md](references/talent-author-host.md),
 [talent-author-odoo-library.md](references/talent-author-odoo-library.md).
 The riverflow door is
-[`riverflow/talents/riverflow-execute-talent/`](../../../riverflow/talents/riverflow-execute-talent/SKILL.md).
+[`talents/riverflow-execute-talent/`](../../../talents/riverflow-execute-talent/SKILL.md).
 
 ## Tests
 
@@ -251,8 +251,8 @@ while the queued count is 0.
 
 ## Key files
 
-- `oteny_bot/models/oteny_form_session.py` — list/form adapter. Verbs `views` / `list` / `open` / `set` / `save` / `discard` / `unlink_record`. `open` accepts an xmlid or a prepared act_window dict. Bot recipe: [`oteny_bot/talents/oteny-odoo-access-talent/`](../../../oteny_bot/talents/oteny-odoo-access-talent/SKILL.md)
-- `oteny_bot/talents/oteny-odoo-access-talent/` — host Talent. Git path delivery. Not Odoo data.
+- `oteny_bot/models/oteny_form_session.py` — list/form adapter. Verbs `views` / `list` / `open` / `set` / `save` / `discard` / `unlink_record`. `open` accepts an xmlid or a prepared act_window dict. Bot recipe: [`talents/oteny-odoo-access-talent/`](../../../talents/oteny-odoo-access-talent/SKILL.md)
+- `talents/oteny-odoo-access-talent/` — host Talent. Git path delivery. Not Odoo data.
 - `oteny_bot/models/oteny_bot.py` — dance latch, force-clear, Discuss actions
 - `oteny_bot/views/oteny_bot_views.xml` — list, form, manager menu. Root `oteny_bot_menu_root` uses `web_icon="oteny_bot,static/description/icon.png"`
 - `oteny_bot/static/description/icon.png` — Oteny Bots home-menu tile. Render from the official flat-top cell (`oteny-cell.svg` in the hermeshost brand mark). Points are left and right. Do not scale a PNG that already clipped those points. Do not add a large PNG margin — the home menu already pads 10 px. `test_oteny_bots_app_uses_brand_icon` checks `web_icon` / `web_icon_data`, that the mark fills most of the canvas, and that the left and right vertices stay sharp
@@ -263,4 +263,4 @@ while the queued count is 0.
 - UI history: `cuneus_barney/plans/barney-one-live-slot-ui.md`
 - Part 1 plan (built): [`plans/oteny-odoo-access.md`](plans/oteny-odoo-access.md) — the `oteny.form.session` form/list adapter; parts 2–3 are linked in its header
 - Host Talent delivery: [`plans/host-module-talents.md`](plans/host-module-talents.md)
-- Part 2 door: [`riverflow/talents/riverflow-execute-talent/`](../../../riverflow/talents/riverflow-execute-talent/SKILL.md)
+- Part 2 door: [`talents/riverflow-execute-talent/`](../../../talents/riverflow-execute-talent/SKILL.md)
