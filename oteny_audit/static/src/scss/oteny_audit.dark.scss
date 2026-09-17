@@ -1,0 +1,8 @@
+// ============================================================================
+// = Oteny Audit - Dark Mode Styles
+// ============================================================================
+
+// Define CSS custom properties for dark mode overrides using Bootstrap 5 dark mode selector
+[data-bs-theme="dark"] {
+    --o-audit-record-header-color: #4da6ff; // Dark mode: lighter blue for better contrast
+}
