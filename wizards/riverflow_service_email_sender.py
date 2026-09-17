@@ -292,11 +292,6 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
 
     def _get_render_context(self, service, vals):
         res_id = vals.get("res_id") or service.res_id
-        if res_id:
-            """TODO: move this to crewradar module"""
-            log_entry_id = self.env["crewradar.log.entry"].browse(res_id)
-        else:
-            log_entry_id = None
 
         write_vals = {}
         self.update_write_values(service, write_vals)
@@ -304,11 +299,21 @@ class RiverflowServiceEmailSenderWizard(models.TransientModel):
             # HACK: writing to the record to make sure the template has the latest data
             service.write(write_vals)
 
-        return {
+        context = {
             "service": service,
-            "log_entry": log_entry_id,
             "company": service.company_id,
         }
+        context.update(self._render_context_extra(service, res_id))
+        return context
+
+    def _render_context_extra(self, service, res_id):
+        """Hook: the app's own template variables for this service's subject.
+
+        Empty here. An app module extends it to expose the subject record of
+        ``res_id`` under the name its templates use. riverflow names no such
+        model.
+        """
+        return {}
 
     def update_write_values(self, service, vals):
         super(RiverflowServiceEmailSenderWizard, self).update_write_values(service, vals)

@@ -110,7 +110,6 @@ class Service(models.Model):
         "Templates can be created in Odoo's Email Templates module.",
     )
 
-    # todo: add to crewradar module
     add_operator_as_recipient = fields.Boolean(
         string="Send to operator",
         default=False,
@@ -1149,17 +1148,19 @@ class Service(models.Model):
                     record.invalidate_recordset(["parent_id", "parent_path", "root_id"])
                     record.parent_id.invalidate_recordset(["child_ids"])
 
-        # When a supply order service changes state, trigger recomputation of related info services
-        # Info services (leg pax services) track the delivery status of their parent supply order
         if "state_id" in vals:
-            for record in self:
-                # Find all leg pax records that reference this service's legs
-                pax_records = self.env["crewradar.leg.pax"].search([("leg_id.service_id", "=", record.id)])
-                if pax_records:
-                    # Trigger recomputation of info_service_id which updates info service states
-                    pax_records._compute_info_service()
+            self._on_state_changed()
 
         return result
+
+    def _on_state_changed(self):
+        """Hook: the state of these services changed through ``write``.
+
+        Empty here. An app module that keeps records of its own in step with a
+        service's state extends it (an app's info rows that track a supply
+        order's delivery, for example). riverflow itself names no such model.
+        """
+        return None
 
     @api.depends("root_id.is_this_a_template", "is_this_a_template")
     def _compute_is_root_a_template(self):
