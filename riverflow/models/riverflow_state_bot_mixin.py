@@ -95,6 +95,11 @@ class RiverflowStateBotMixin(models.AbstractModel):
         "is rejected server-side. Rides the dispatch message so the isolated run can prove its "
         "epoch (bot_run_claim / bot_token_check).",
     )
+    bot_released_token = fields.Char(
+        "Released Work Token", copy=False, readonly=True,
+        help="The last claim token that left a bot in-progress state through its own "
+        "bot_claim (the turn's advance or hand-back). The bridge's work_probe tells an "
+        "expected end from a lost claim by it.")
     bot_run_started_at = fields.Datetime(
         "Bot Run Started",
         copy=False,
@@ -692,10 +697,14 @@ class RiverflowStateBotMixin(models.AbstractModel):
         guard = record._bot_claim_guard(transition)
         if guard:
             return {"ok": False, "state": record.state_id.name, "reason": guard}
+        exiting_epoch = (record.state_id.bot_stage == "in_progress" and record.bot_claim_token
+                         and work_token == record.bot_claim_token)
         try:
             record._bot_claim_run_wizard(transition)
         except UserError as exc:
             return {"ok": False, "state": record.state_id.name, "reason": str(exc)}
+        if exiting_epoch:
+            record.bot_released_token = work_token
         result = {"ok": True, "state": record.state_id.name}
         if record.bot_claim_token:
             # the target is a bot in_progress state — hand the WINNER its fresh epoch

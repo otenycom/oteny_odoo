@@ -21,3 +21,4 @@ from . import riverflow_import
 from . import models
 from . import mail_mail
 from . import res_partner
+from . import riverflow_oteny_bot

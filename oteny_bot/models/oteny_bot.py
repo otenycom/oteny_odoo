@@ -480,6 +480,87 @@ class OtenyBot(models.Model):
         session.write(vals)
         return {"ok": True, "session_id": session.id}
 
+    # ------------------------------------------------------------------ #
+    # The work contract: the three verbs the platform calls on a dispatch.  #
+    # Named without any engine. The bridge finds the record by the session   #
+    # the token names and asks the engine of that record's model through the #
+    # ``_work_*`` hooks below; an engine module extends ``oteny.bot`` and     #
+    # answers for its own models. No engine → fail-closed, as the platform   #
+    # treats every refusal.                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _work_session(self, work_token):
+        if not work_token:
+            return self.env["oteny.bot.session"].sudo()
+        return self.env["oteny.bot.session"].sudo().search(
+            [("work_token", "=", work_token)], order="id desc", limit=1)
+
+    @api.model
+    def work_consume(self, work_token):
+        """Consume the one agent run of the dispatch that carries ``work_token``.
+
+        Called by the platform before any model activity. ``{ok: True, state}`` once
+        per dispatch; ``{ok: False, reason}`` for a second consume, a stale token, an
+        unknown token, or a record without an engine. The platform drops the dispatch
+        on ``ok: False``; the engine's own belts redispatch it."""
+        session = self._work_session(work_token)
+        if not session:
+            return {"ok": False, "reason": f"unknown work token {work_token!r}"}
+        out = self._work_consume(session.origin_model, session.origin_res_id, work_token)
+        if out is None:
+            return {"ok": False, "reason": f"no engine for {session.origin_model!r}"}
+        return out
+
+    @api.model
+    def work_probe(self, work_token):
+        """Whether the turn that holds ``work_token`` still owns its record.
+
+        ``{ok: True, mine: True}`` while the claim is live. ``{ok: True, mine: False,
+        released: True}`` when the record left the bot's hands through the turn's own
+        advance (an expected end, not a loss; ``next_token`` names the new epoch when
+        the advance minted one). ``{ok: True, mine: False, released: False, reason}``
+        when the claim was lost (timed out, reaped, re-assigned). ``{ok: False}`` only
+        for an unknown token or a record without an engine, which the platform reads
+        as "cannot tell", never as a loss."""
+        session = self._work_session(work_token)
+        if not session:
+            return {"ok": False, "mine": False, "released": False,
+                    "reason": f"unknown work token {work_token!r}"}
+        out = self._work_probe(session.origin_model, session.origin_res_id, work_token)
+        if out is None:
+            return {"ok": False, "mine": False, "released": False,
+                    "reason": f"no engine for {session.origin_model!r}"}
+        return out
+
+    @api.model
+    def work_release(self, work_token, reason=None, run=None):
+        """Give the record back after a turn that ended without an outcome (a hung
+        model stream, a crashed run). ``run`` (optional) is the ``record_run`` payload
+        written to the session first, so the reason lands even when the engine holds
+        no exit. Returns ``{ok, released, reason, state}``: ``released`` is True only
+        when the engine moved the record out of the bot's hands under this token."""
+        session = self._work_session(work_token)
+        if not session:
+            return {"ok": False, "released": False, "reason": f"unknown work token {work_token!r}"}
+        if run:
+            self.record_run(work_token, run=run)
+        out = self._work_release(session.origin_model, session.origin_res_id, work_token, reason)
+        if out is None:
+            return {"ok": False, "released": False, "reason": f"no engine for {session.origin_model!r}"}
+        return out
+
+    # The engine hooks. Each returns None when this bridge holds no engine for
+    # ``origin_model``; an engine module extends oteny.bot and answers for its models.
+
+    def _work_consume(self, origin_model, res_id, work_token):
+        return None
+
+    def _work_probe(self, origin_model, res_id, work_token):
+        return None
+
+    def _work_release(self, origin_model, res_id, work_token, reason):
+        return None
+
     @api.model
     def attach_browser_sessions(self, work_token, session_ids=None):
         """Mid-run attach of opaque broker browser session ids (Watch live).
