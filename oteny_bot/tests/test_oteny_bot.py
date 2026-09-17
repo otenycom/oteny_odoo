@@ -895,6 +895,24 @@ class TestOtenyBot(TransactionCase):
         self.assertTrue(bot.login_dance_stop(token))
         self.assertFalse(bot.login_dance_active())
 
+    def test_login_dance_stop_own_releases_only_the_owners_dance(self):
+        # The dance belongs to the person signing in, not to the screen that started it:
+        # a fresh dialog holds no token, and the owner's save still ends the dance. A
+        # stranger's save ends nothing.
+        bot = self.env["oteny.bot"].create({"name": "DanceOwn"})
+        stranger = self.env["res.users"].create({
+            "name": "Other Desk",
+            "login": "other_desk_dance",
+            "group_ids": [Command.set([self.env.ref("base.group_user").id])],
+        })
+        bot.login_dance_start()
+        self.assertEqual(bot.login_dance_user_id, self.env.user)
+        self.assertFalse(bot.with_user(stranger).sudo().login_dance_stop_own())
+        self.assertTrue(bot.login_dance_active(), "a stranger released the latch")
+        self.assertTrue(bot.login_dance_stop_own())
+        self.assertFalse(bot.login_dance_active())
+        self.assertFalse(bot.login_dance_stop_own())  # nothing left to release
+
     def test_login_dance_force_clear_manager_only(self):
         bot = self.env["oteny.bot"].create({"name": "DanceMgr"})
         bot.login_dance_start()

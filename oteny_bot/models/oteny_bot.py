@@ -413,6 +413,26 @@ class OtenyBot(models.Model):
         })
         return True
 
+    def login_dance_stop_own(self):
+        """Release the latch when the CURRENT dance is the caller's own: its user is
+        ``env.user``. A dance is owned by the person signing in, not by the screen that
+        started it. On 2026-09-17 a person started the dance from one Ask dialog,
+        reloaded the form, and saved from a fresh dialog that held no token; the save
+        released nothing and every dispatch deferred until the TTL ran out. The token
+        still guards a stop from anyone else's screen (``login_dance_stop``): a
+        colleague's save never releases this person's dance. Same mutex, same compare
+        against committed truth. Returns True when it released."""
+        self.ensure_one()
+        self.login_dance_hold()
+        bot = self.sudo()
+        if not bot.login_dance_active() or bot.login_dance_user_id != self.env.user:
+            return False
+        bot.write({
+            "login_dance_until": False, "login_dance_user_id": False, "login_dance_token": False,
+            "login_dance_session_id": False,
+        })
+        return True
+
     @api.model
     def record_activity(self, uplink_ref, session, turns=None):
         """The seam the bot calls over /json/2/ to log ONE exchange (owner-visibility, generic).
