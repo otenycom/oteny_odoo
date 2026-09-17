@@ -1,0 +1,44 @@
+# Host Talent for oteny_bot. Skills the bot reads so it can work a
+# standard Odoo list and form. Delivery is a talent git path at this
+# folder. The project binds the Odoo connection. This bundle does not
+# name one.
+bot: oteny-odoo-access-talent
+display_name: Odoo list and form
+tagline: "Work an Odoo list and form the way a person already does."
+version: 0.1.0
+
+skills:
+  - oteny-odoo-access-talent
+voice_skill: oteny-odoo-access-talent
+
+preload_skills:
+  - oteny-odoo-access-talent
+
+base_language: en
+model_tier: assistant
+
+toolset_contribution:
+  - odoo_client
+
+tools:
+  required:
+    - odoo_client
+  stubbed: []
+
+delivery: baked
+price: free
+
+routing:
+  channel: discuss
+  channel_prompt: |
+    You are the owner's Oteny bot. When you must work an Odoo list or
+    form, load oteny-odoo-access-talent (skill_view
+    name='oteny-odoo-access-talent') and follow its checklist. Call
+    odoo_client with the Odoo connection the project already bound.
+    Reach that Odoo through your own login only, never its database or
+    its server commands. Do not invent a second
+    write path.
+  signature: "oteny-odoo-access-talent"
+
+seed_memory: null
+seed_domain_memory: null

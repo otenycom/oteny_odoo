@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- oteny.bot -->
+    <record id="oteny_bot_view_list" model="ir.ui.view">
+        <field name="name">oteny.bot.list</field>
+        <field name="model">oteny.bot</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="bot_user_id"/>
+                <field name="discuss_channel_id"/>
+                <field name="uplink_ref" optional="hide"/>
+                <field name="session_count" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="oteny_bot_view_form" model="ir.ui.view">
+        <field name="name">oteny.bot.form</field>
+        <field name="model">oteny.bot</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="login_dance_is_active" invisible="1"/>
+                    <!-- Read by the Clear login dance button's own visibility, so the
+                         button is offered only while a dance actually holds the latch. -->
+                    <button name="action_open_discuss_channel" type="object"
+                            string="Open Discuss"
+                            invisible="not discuss_channel_id"
+                            groups="oteny_bot.group_oteny_bot_manager"/>
+                    <button name="action_login_dance_force_clear" type="object"
+                            string="Clear login dance"
+                            invisible="not login_dance_is_active"
+                            groups="oteny_bot.group_oteny_bot_manager"/>
+                    <field name="jar_clear_available" invisible="1"/>
+                    <!-- Read by the Stop and Reset browser button's own visibility. The
+                         button is hidden rather than broken when this Oteny account has
+                         no stop-and-reset credential wired, because the call would
+                         otherwise answer 401 while the button still looked available. -->
+                    <button name="action_stop_and_reset_browser" type="object"
+                            string="Stop and Reset browser"
+                            invisible="not jar_clear_available"
+                            confirm="Stop this bot's cloud browser and clear its saved sign-in? A run using that window right now will stop."/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_sessions" type="object" class="oe_stat_button" icon="fa-comments-o">
+                            <field name="session_count" widget="statinfo" string="Exchanges"/>
+                        </button>
+                    </div>
+                    <div class="alert alert-info" role="alert">
+                        If Discuss is silent for this bot, check
+                        <code>oteny traces --ref &lt;uplink_ref&gt;</code> for
+                        <code>uplink_status</code> (<code>auth_failed</code> → re-mint / re-provision).
+                        Website login is not the Talent debug path.
+                    </div>
+                    <group name="identity">
+                        <field name="name"/>
+                        <field name="bot_user_id"/>
+                        <field name="discuss_channel_id"/>
+                        <field name="uplink_ref"/>
+                        <field name="active"/>
+                    </group>
+                    <group name="login_dance" string="Login dance"
+                           invisible="not login_dance_is_active">
+                        <field name="login_dance_user_id"/>
+                        <field name="login_dance_until"/>
+                    </group>
+                    <notebook>
+                        <page string="Role Channels" name="role_channels">
+                            <div class="alert alert-info" role="alert">
+                                Bind one of this bot's declared roles to a room and the bot
+                                answers there with that role's own persona and preloaded
+                                skills, and its workflow dispatches land there. Rooms you
+                                simply add the bot to still work — it answers with its general
+                                desk persona. Role names come from the bot's Talent; a typo
+                                silently leaves the room general.
+                            </div>
+                            <field name="channel_ids">
+                                <list editable="bottom">
+                                    <field name="role"/>
+                                    <field name="channel_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="oteny_bot_action" model="ir.actions.act_window">
+        <field name="name">Bots</field>
+        <field name="res_model">oteny.bot</field>
+        <field name="view_mode">list,form</field>
+        <field name="path">oteny-bots</field>
+    </record>
+
+    <!-- oteny.bot.session -->
+    <record id="oteny_bot_session_view_list" model="ir.ui.view">
+        <field name="name">oteny.bot.session.list</field>
+        <field name="model">oteny.bot.session</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="started_at"/>
+                <field name="bot_id"/>
+                <field name="name"/>
+                <field name="origin_ref" optional="show"/>
+                <field name="outcome" widget="badge"
+                       decoration-success="outcome == 'ok'"
+                       decoration-warning="outcome == 'halted' or outcome == 'escalated'"
+                       decoration-danger="outcome == 'error' or outcome == 'timeout'"
+                       decoration-info="outcome == 'dispatched'"/>
+                <field name="browser_status" optional="show"/>
+                <field name="response_first_line" string="Outcome Detail"/>
+                <field name="duration_s"/>
+                <field name="kind" optional="hide"/>
+                <field name="turn_count" optional="hide"/>
+                <field name="tool_call_count" optional="hide"/>
+                <field name="outcome_detail" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="oteny_bot_session_view_form" model="ir.ui.view">
+        <field name="name">oteny.bot.session.form</field>
+        <field name="model">oteny.bot.session</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="has_origin" invisible="1"/>
+                    <button name="action_open_origin" type="object"
+                            string="Open related record"
+                            invisible="not has_origin"
+                            groups="base.group_user"/>
+                    <button name="action_watch_live_browser" type="object"
+                            string="Watch live browser"
+                            class="btn-primary"
+                            invisible="not has_browser_session or outcome != 'dispatched'"
+                            groups="base.group_user"/>
+                    <button name="action_replay_browser" type="object"
+                            string="Replay browser session"
+                            invisible="not has_browser_session or outcome == 'dispatched'"
+                            groups="base.group_user"/>
+                </header>
+                <sheet>
+                    <notebook>
+                        <page string="Summary" name="summary">
+                            <group>
+                                <group>
+                                    <field name="bot_id"/>
+                                    <field name="name"/>
+                                    <field name="origin_model_label"
+                                           invisible="not has_origin"/>
+                                    <field name="origin_ref"
+                                           invisible="not origin_ref"/>
+                                    <field name="origin_res_id"
+                                           string="Related record id"
+                                           invisible="not has_origin or origin_ref"/>
+                                    <field name="outcome" widget="badge"
+                                           decoration-success="outcome == 'ok'"
+                                           decoration-warning="outcome == 'halted' or outcome == 'escalated'"
+                                           decoration-danger="outcome == 'error' or outcome == 'timeout'"
+                                           decoration-info="outcome == 'dispatched'"/>
+                                    <field name="browser_status"/>
+                                    <field name="has_browser_session" invisible="1"/>
+                                    <field name="browser_session_ids" invisible="1"/>
+                                </group>
+                                <group>
+                                    <field name="started_at"/>
+                                    <field name="duration_s"/>
+                                </group>
+                            </group>
+                            <separator string="Response"/>
+                            <div class="o_oteny_bot_session_body w-100">
+                                <div class="alert alert-info" role="alert"
+                                     invisible="outcome != 'dispatched' or response">
+                                    The bot is working. The answer is not ready.
+                                </div>
+                                <field name="response" nolabel="1"
+                                       invisible="outcome == 'dispatched' and not response"/>
+                            </div>
+                            <separator string="Request"/>
+                            <div class="o_oteny_bot_session_body w-100">
+                                <field name="request" nolabel="1"/>
+                            </div>
+                        </page>
+                        <page string="Technical" name="technical">
+                            <group>
+                                <group>
+                                    <field name="kind"/>
+                                    <field name="name"/>
+                                    <field name="origin_model"/>
+                                    <field name="origin_res_id"/>
+                                    <field name="work_token" groups="base.group_no_one"/>
+                                </group>
+                                <group>
+                                    <field name="turn_count"/>
+                                    <field name="tool_call_count"/>
+                                    <field name="outcome_detail"/>
+                                </group>
+                            </group>
+                            <field name="turn_ids">
+                                <list>
+                                    <field name="sequence"/>
+                                    <field name="llm_model"/>
+                                    <field name="tool_call_count"/>
+                                    <field name="tokens_in"/>
+                                    <field name="tokens_out"/>
+                                    <field name="duration_s"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="oteny_bot_session_action" model="ir.actions.act_window">
+        <field name="name">Activity Log</field>
+        <field name="res_model">oteny.bot.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="path">oteny-bot-activity</field>
+    </record>
+
+    <!-- oteny.bot.turn (drill-in) -->
+    <record id="oteny_bot_turn_view_form" model="ir.ui.view">
+        <field name="name">oteny.bot.turn.form</field>
+        <field name="model">oteny.bot.turn</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="session_id"/>
+                        <field name="llm_model"/>
+                        <field name="tool_call_count"/>
+                    </group>
+                    <notebook>
+                        <page string="System Prompt"><field name="system_prompt"/></page>
+                        <page string="User Message"><field name="user_message"/></page>
+                        <page string="LLM Response"><field name="llm_response"/></page>
+                        <page string="Tool Calls"><field name="tool_calls" widget="json"/></page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- menu (manager-gated) -->
+    <menuitem id="oteny_bot_menu_root" name="Oteny Bots" sequence="90"
+              web_icon="oteny_bot,static/description/icon.png"
+              groups="oteny_bot.group_oteny_bot_manager"/>
+    <menuitem id="oteny_bot_menu_bots" name="Bots" parent="oteny_bot_menu_root"
+              action="oteny_bot_action" sequence="10"/>
+    <menuitem id="oteny_bot_menu_activity" name="Activity Log" parent="oteny_bot_menu_root"
+              action="oteny_bot_session_action" sequence="20"/>
+</odoo>
