@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="oteny_shortcut.X2ManyField" t-inherit="web.X2ManyField" t-inherit-mode="extension">
+        <!-- A handle on the field's root, to find the toolbar above it after mount. -->
+        <xpath expr="//div[@t-att-class='className']" position="attributes">
+            <attribute name="t-ref">x2manyShortcutRoot</attribute>
+        </xpath>
+        <xpath expr="//ListRenderer" position="before">
+            <t t-if="hasX2ManyShortcuts">
+                <!-- Into the toolbar above the list when there is one, else on its own line. -->
+                <t t-if="shortcutState.toolbarSelector">
+                    <t t-portal="shortcutState.toolbarSelector">
+                        <X2ManyShortcutsRow
+                            shortcuts="x2manyShortcuts"
+                            activeId="shortcutState.activeId"
+                            onClick.bind="onX2ManyShortcutClick"
+                            inToolbar="true"/>
+                    </t>
+                </t>
+                <X2ManyShortcutsRow t-else=""
+                    shortcuts="x2manyShortcuts"
+                    activeId="shortcutState.activeId"
+                    onClick.bind="onX2ManyShortcutClick"/>
+            </t>
+        </xpath>
+    </t>
+
+</templates>

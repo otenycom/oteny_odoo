@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="oteny_shortcut.X2ManyShortcutsRow">
+        <div t-attf-class="o_x2many_shortcuts d-flex gap-2 flex-wrap align-items-center #{props.inToolbar ? 'order-last ms-auto' : 'mb-2'}">
+            <t t-foreach="props.shortcuts" t-as="shortcut" t-key="shortcut.id">
+                <button
+                    type="button"
+                    t-attf-class="btn btn-sm #{shortcut.id === props.activeId ? 'btn-primary' : 'btn-outline-secondary'}"
+                    t-on-click.stop.prevent="() => props.onClick(shortcut)">
+                    <i t-if="shortcut.shortcut_icon" t-attf-class="fa #{shortcut.shortcut_icon} me-1"/>
+                    <t t-esc="shortcut.name"/>
+                </button>
+            </t>
+        </div>
+    </t>
+
+</templates>

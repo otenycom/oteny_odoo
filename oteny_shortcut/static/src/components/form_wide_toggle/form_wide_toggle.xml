@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="oteny_shortcut.FormWideToggle">
+        <button type="button" class="o_form_wide_toggle"
+                t-on-click="toggle"
+                t-att-title="formWideState.isWide ? titleNarrow : titleWide">
+            <i t-attf-class="fa {{ formWideState.isWide ? 'fa-compress' : 'fa-expand' }}"/>
+        </button>
+    </t>
+
+</templates>

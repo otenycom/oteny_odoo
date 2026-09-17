@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+
+    <!--
+        Global on/off switch for the form-wide toggle button. When set
+        to "False", the toggle button is hidden and forms behave as
+        stock Odoo (sheet capped at 1400px). Default "True" enables
+        the toggle for all users.
+    -->
+    <record id="form_wide_toggle_param" model="ir.config_parameter">
+        <field name="key">oteny_shortcut.form_wide_toggle</field>
+        <field name="value">True</field>
+    </record>
+
+</odoo>
