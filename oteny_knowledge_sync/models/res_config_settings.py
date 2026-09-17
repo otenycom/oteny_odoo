@@ -4,7 +4,7 @@ from odoo import fields, models
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
-    oteny_knowledge_sync_roots = fields.Text(
+    oteny_knowledge_sync_roots = fields.Char(
         string="Skill roots",
         config_parameter="oteny_knowledge_sync.roots",
         help="One root per line as Label=path. The path is a repository folder that "

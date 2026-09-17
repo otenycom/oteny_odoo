@@ -73,3 +73,23 @@ class TestRoots(TransactionCase):
         empty = Path(self.tmp.name) / "empty"; empty.mkdir()
         self._configure(("Alpha", self.root_a), ("Empty", empty))
         self.assertEqual([label for label, _p in self.Sync._skill_roots()], ["Alpha"])
+
+    def test_default_roots_are_the_addons_entries_that_hold_skills(self):
+        from unittest.mock import patch
+        from odoo.tools import config
+        self.Param.set_param("oteny_knowledge_sync.roots", "")
+        plain = Path(self.tmp.name) / "plain"; plain.mkdir()
+        fake = [str(plain), str(self.root_a), str(self.root_b), str(self.root_b)]
+        with patch.dict(config.options, {"addons_path": fake}):
+            roots = self.Sync._skill_roots()
+        self.assertEqual([(l, str(p)) for l, p in roots],
+                         [("alpha", str(self.root_a.resolve())), ("beta", str(self.root_b.resolve()))])
+
+    def test_legacy_articles_without_a_root_are_adopted_in_place(self):
+        self._configure(("Alpha", self.root_a))
+        self.Sync.sync_skills_to_knowledge()
+        tree = self._tree("Alpha")
+        ids = set(tree.ids)
+        tree.write({"x_skill_root": False})
+        self.Sync.sync_skills_to_knowledge()
+        self.assertEqual(set(self._tree("Alpha").ids), ids, "adopted, not recreated")

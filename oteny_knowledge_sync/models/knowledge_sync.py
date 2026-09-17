@@ -79,14 +79,16 @@ class KnowledgeSync(models.AbstractModel):
                 label = (label.strip() or path.name)
                 roots.append((label, path))
         else:
+            # An addons-path entry is a repository root: its direct children are the
+            # modules, and its ``.claude/skills`` is the skills tree.
             seen = set()
             for entry in addons:
-                parent = entry.resolve().parent
-                if parent in seen:
+                entry = entry.resolve()
+                if entry in seen:
                     continue
-                seen.add(parent)
-                if (parent / ".claude" / "skills").is_dir():
-                    roots.append((parent.name, parent))
+                seen.add(entry)
+                if (entry / ".claude" / "skills").is_dir():
+                    roots.append((entry.name, entry))
         out = []
         for label, path in roots:
             if (Path(path) / ".claude" / "skills").is_dir():
@@ -120,6 +122,7 @@ class KnowledgeSync(models.AbstractModel):
     def _sync_root(self, label, skills_dir):
         """Sync one root's ``skills_dir`` into its own Knowledge tree. Returns the count."""
         Article = self.env["knowledge.article"]
+        self._adopt_legacy_articles(label, skills_dir)
         managed = Article.search([("x_skill_is_managed", "=", True), ("x_skill_root", "=", label)])
         existing_by_path = {}
         for art in managed:
@@ -138,6 +141,23 @@ class KnowledgeSync(models.AbstractModel):
         self._rewrite_internal_links(label, excluded_paths)
         _logger.info("Knowledge sync root %r: %d articles", label, len(processed_paths))
         return len(processed_paths)
+
+    def _adopt_legacy_articles(self, label, skills_dir):
+        """Managed articles without a root (written before roots existed) join the
+        first root whose tree holds their source file, so they update in place and
+        keep their ids and URLs instead of being deleted and recreated."""
+        Article = self.env["knowledge.article"]
+        legacy = Article.search([("x_skill_is_managed", "=", True), ("x_skill_root", "=", False)])
+        if not legacy:
+            return
+        claude_dir = skills_dir.parent
+        adopted = legacy.filtered(
+            lambda a: a.x_skill_file_path and (claude_dir / a.x_skill_file_path).is_file())
+        # The root article of the legacy tree carries the index path or no path at all.
+        adopted |= legacy.filtered(lambda a: not a.parent_id and not a.x_skill_file_path)
+        if adopted:
+            adopted.write({"x_skill_root": label})
+            _logger.info("Knowledge sync root %r adopted %d legacy article(s)", label, len(adopted))
 
     def _unpublish_roots_not_in(self, labels):
         """Delete the managed trees of roots that left the configuration."""
@@ -516,11 +536,18 @@ class KnowledgeSync(models.AbstractModel):
         managed = self.env["knowledge.article"].search(
             [("x_skill_is_managed", "=", True), ("x_skill_root", "=", label)])
         link_map = self._build_link_map(managed)
+        _logger.debug("Knowledge sync root %r: path map has %d entries", label, len(link_map))
+        rewritten_count = 0
+        articles_updated = 0
         for article in managed:
             if not article.body:
                 continue
             article_dir = str(Path(article.x_skill_file_path).parent) if article.x_skill_file_path else ""
-            new_body, _count = self._rewrite_body_links(
+            new_body, count = self._rewrite_body_links(
                 article.body, article_dir, link_map, article.name, warn=True, excluded_lower=excluded_lower)
+            rewritten_count += count
             if new_body != article.body:
                 article.body = new_body
+                articles_updated += 1
+        _logger.info("Knowledge sync root %r: rewrote %d link(s) in %d article(s)",
+                     label, rewritten_count, articles_updated)

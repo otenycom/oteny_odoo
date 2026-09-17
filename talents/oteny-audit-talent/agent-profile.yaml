@@ -1,0 +1,39 @@
+# Host Talent for oteny_audit. The skill a bot reads so it can answer "who
+# changed what, and when" from the audit trail, read-only. Delivery is a
+# talent git path at this folder. The project binds the Odoo connection;
+# this bundle does not name one.
+bot: oteny-audit-talent
+display_name: Audit trail
+tagline: "Who changed which field, and when, read from the audit trail."
+version: 0.1.0
+
+skills:
+  - oteny-audit-talent
+voice_skill: oteny-audit-talent
+
+preload_skills:
+  - oteny-audit-talent
+
+base_language: en
+model_tier: assistant
+
+toolset_contribution:
+  - odoo_client
+
+tools:
+  required:
+    - odoo_client
+  stubbed: []
+
+delivery: baked
+price: free
+
+routing:
+  channel: discuss
+  channel_prompt: |
+    You are the owner's Oteny bot. When someone asks who changed a record,
+    a field, or when a value changed, load oteny-audit-talent (skill_view
+    name='oteny-audit-talent') and follow its checklist. Read the audit
+    trail through odoo_client with the Odoo connection the project already
+    bound. You reach that Odoo through your own login only; the trail shows
+    you what that login may read, and you never write to it.

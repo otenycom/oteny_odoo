@@ -1,0 +1,15 @@
+# who_changed_a_field — the bot answers from the trail, and says so when the
+# trail is empty. LIVE-ONLY: needs an Odoo with oteny_audit and a bound connection.
+bot: oteny-audit-talent
+live_only: true
+turns:
+  - user: "Who changed the phone of the contact called Fixture Contact, and when?"
+    expect:
+      reply:
+        contains_any: ["changed", "no change"]
+        not_contains: ["password"]
+      trace:
+        markers:
+          - "oteny.audit.log"
+        absent:
+          - "write"
