@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(**/secrets.json)",
+      "Bash(*secrets.json*)"
+    ]
+  }
+}

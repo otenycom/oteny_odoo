@@ -54,7 +54,6 @@
     <record id="partner_team_finance" model="res.partner">
         <field name="name">Finance Team</field>
         <field name="company_id" ref="base.main_company" />
-        <field name="email">financeDE@cuneuscrew.eu</field>
         <field name="phone">+49 203 443310</field>
     </record>
 
@@ -86,9 +85,4 @@
         <field name="discuss_channel_id" ref="discuss_channel_team_sales" />
     </record>
 
-    <record id="team_cuneus_yangon" model="riverflow.team">
-        <field name="name">Cuneus Yangon</field>
-        <field name="company_id" ref="base.main_company" />
-        <field name="discuss_channel_id" ref="mail.channel_all_employees" />
-    </record>
 </odoo>

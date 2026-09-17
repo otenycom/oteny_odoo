@@ -1,0 +1,40 @@
+name: Module tests
+
+# Installs the community-only modules on the official Odoo 19 image and runs their
+# tests. riverflow (depends on documents) and oteny_knowledge_sync (depends on
+# knowledge) need Odoo Enterprise, which this public runner does not hold; their
+# tests run on the lab's CrewRadar database (see AGENTS.md, "Tests").
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    container:
+      image: odoo:19.0
+      options: --user root
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python deps of the modules
+        run: pip3 install --break-system-packages mistune pyyaml
+      - name: Install and test the community modules
+        run: |
+          odoo --db_host=db --db_user=odoo --db_password=odoo \
+            --addons-path=/usr/lib/python3/dist-packages/odoo/addons,$GITHUB_WORKSPACE \
+            -d oteny_odoo_ci --without-demo=True --stop-after-init --test-enable \
+            -i oteny_shortcut,oteny_audit,oteny_backup_trigger,oteny_bot,odoo_parallel_tests \
+            --test-tags=oteny_shortcut,oteny_audit,oteny_backup_trigger,oteny_bot,odoo_parallel_tests \
+            --log-level=test

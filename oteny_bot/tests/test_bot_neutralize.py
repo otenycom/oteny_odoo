@@ -30,8 +30,8 @@ BROKER_PARAMS = (
 )
 
 
-@tagged("oteny_bot", "post_install", "-at_install", "test_barney_neutralize")
-class TestBarneyNeutralize(TransactionCase):
+@tagged("oteny_bot", "post_install", "-at_install", "test_bot_neutralize")
+class TestBotNeutralize(TransactionCase):
     def test_sql_lists_every_broker_param_name(self):
         """A fourth broker param can never be added without disconnecting it too."""
         sql = NEUTRALIZE_SQL.read_text()
@@ -43,9 +43,9 @@ class TestBarneyNeutralize(TransactionCase):
         for key in BROKER_PARAMS:
             icp.set_param(key, f"seed-{key}")
 
-        channel = self.env["discuss.channel"].create({"name": "HR-and-Barney (neutralize test)"})
+        channel = self.env["discuss.channel"].create({"name": "HR-and-Bot (neutralize test)"})
         bot = self.env["oteny.bot"].sudo().create({
-            "name": "Barney",
+            "name": "Acme Bot",
             "uplink_ref": "hh0prod",
             "discuss_channel_id": channel.id,
             "bot_user_id": self.env.user.id,

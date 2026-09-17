@@ -1,0 +1,36 @@
+name: Talent lint
+
+on:
+  pull_request:
+    paths:
+      - 'talents/**'
+  push:
+    branches: [main]
+    paths:
+      - 'talents/**'
+  workflow_dispatch:
+
+jobs:
+  talent-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout oteny_odoo
+        uses: actions/checkout@v4
+      - name: Checkout the Oteny Talent standard (public peer, talents.git)
+        uses: actions/checkout@v4
+        with:
+          repository: otenycom/talents
+          ref: main
+          path: talents-standard
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Oteny Talent lint (talent-authoring-standard)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t DIRS < <(find talents -mindepth 2 -maxdepth 2 -name SKILL.md -printf '%h\n' | sort -u)
+          if [ ${#DIRS[@]} -eq 0 ]; then echo "No Talent bundles to lint."; exit 0; fi
+          echo "Linting: ${DIRS[*]}"
+          python3 talents-standard/skills/talent-authoring-standard/scripts/lint_upgrade_safe.py "${DIRS[@]}"

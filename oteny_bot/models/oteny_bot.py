@@ -855,7 +855,7 @@ class OtenyBotChannel(models.Model):
     role = fields.Char(
         required=True,
         help="The role name as the bot's Talent declares it (routing.channels[].role), "
-        "e.g. mfnl_filing. Must match exactly — a typo silently leaves the room casual.")
+        "e.g. permit_filing. Must match exactly — a typo silently leaves the room casual.")
     channel_id = fields.Many2one(
         "discuss.channel", required=True, ondelete="cascade", string="Channel",
         help="The room that plays this role. The bot must be a member of it.")

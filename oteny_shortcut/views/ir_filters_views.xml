@@ -68,8 +68,8 @@
                             <li><span class="font-monospace">uid</span>, <span class="font-monospace">context</span>: the current user and their context</li>
                         </ul>
                         <p class="mb-0">
-                            Examples: <span class="font-monospace">subject == 'crewradar.log.entry'</span>,
-                            <span class="font-monospace">subject in ('hr.employee', 'crewradar.site')</span>,
+                            Examples: <span class="font-monospace">subject == 'project.task'</span>,
+                            <span class="font-monospace">subject in ('hr.employee', 'res.partner')</span>,
                             <span class="font-monospace">view == 'calendar'</span>,
                             <span class="font-monospace">not subject</span>.
                         </p>

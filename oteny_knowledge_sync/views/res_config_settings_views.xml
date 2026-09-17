@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_knowledge_sync" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.oteny_knowledge_sync</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Knowledge Sync" string="Knowledge Sync" name="oteny_knowledge_sync">
+                    <block title="Agent skills in Knowledge" name="oteny_knowledge_sync_block">
+                        <setting string="Skill roots" help="One Label=path per line. Empty means every addons root that holds .claude/skills.">
+                            <field name="oteny_knowledge_sync_roots" widget="text"/>
+                            <button name="action_oteny_knowledge_sync_now" type="object" string="Sync now" class="btn-link"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

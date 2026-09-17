@@ -23,8 +23,8 @@ class TestOtenyBot(TransactionCase):
         bot = self.env["oteny.bot"].create({"name": "TestBot", "uplink_ref": "hh09999"})
         res = self.env["oteny.bot"].record_activity(
             "hh09999",
-            {"name": "File MFNL for Becoy", "kind": "isolated_turn",
-             "request": "File the MFNL.", "response": "Filed NL-MFNL-123.", "outcome": "ok",
+            {"name": "File permit for Fixture Case", "kind": "isolated_turn",
+             "request": "File the permit.", "response": "Filed P-123.", "outcome": "ok",
              "origin_model": "riverflow.service", "origin_res_id": 42, "duration_s": 3.5},
             turns=[{"sequence": 10, "llm_model": "claude", "tool_calls": [{"name": "browser"}],
                     "tool_call_count": 1, "llm_response": "done"}])
@@ -57,17 +57,17 @@ class TestOtenyBot(TransactionCase):
 
     def test_ensure_bot_creates_once_and_is_idempotent(self):
         Bot = self.env["oteny.bot"]
-        res = Bot.ensure_bot("hh00140", name="Barney")
+        res = Bot.ensure_bot("hh00140", name="Acme Bot")
         self.assertTrue(res["ok"] and res["created"])
         bot = Bot.browse(res["bot_id"])
         self.assertEqual(bot.uplink_ref, "hh00140")
-        self.assertEqual(bot.name, "Barney")
+        self.assertEqual(bot.name, "Acme Bot")
         # a re-call is a no-op that returns the SAME bot and never renames it
         again = Bot.ensure_bot("hh00140", name="Renamed")
         self.assertTrue(again["ok"])
         self.assertFalse(again["created"])
         self.assertEqual(again["bot_id"], bot.id)
-        self.assertEqual(bot.name, "Barney")
+        self.assertEqual(bot.name, "Acme Bot")
 
     def test_ensure_bot_defaults_name_to_uplink_ref(self):
         res = self.env["oteny.bot"].ensure_bot("hh00777")
@@ -85,24 +85,24 @@ class TestOtenyBot(TransactionCase):
     def test_ensure_bot_adopts_a_seeded_channel_bound_bot(self):
         # a business app seeds the bot (with its channel) but no uplink_ref; the write-back,
         # authenticated as the bot user, adopts it rather than forking a second record.
-        seeded = self.env["oteny.bot"].create({"name": "Barney", "bot_user_id": self.env.uid})
+        seeded = self.env["oteny.bot"].create({"name": "Acme Bot", "bot_user_id": self.env.uid})
         res = self.env["oteny.bot"].ensure_bot("hh00140", name="ignored")
         self.assertTrue(res["ok"] and res.get("adopted") and not res["created"])
         self.assertEqual(res["bot_id"], seeded.id)
         self.assertEqual(seeded.uplink_ref, "hh00140")
-        self.assertEqual(seeded.name, "Barney")           # not renamed on adoption
+        self.assertEqual(seeded.name, "Acme Bot")           # not renamed on adoption
 
     def test_ensure_bot_rehomes_stale_same_user_uplink_ref(self):
         # --fresh destroys the box but leaves the seeded row on the old uplink_ref.
         # Rehome that row; do not fork a second bot (xmlid Hand-to-Barney stays live).
         seeded = self.env["oteny.bot"].create({
-            "name": "Barney", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
+            "name": "Acme Bot", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
         })
         res = self.env["oteny.bot"].ensure_bot("hh00397", name="ignored")
         self.assertTrue(res["ok"] and res.get("rehomed") and not res["created"])
         self.assertEqual(res["bot_id"], seeded.id)
         self.assertEqual(seeded.uplink_ref, "hh00397")
-        self.assertEqual(seeded.name, "Barney")
+        self.assertEqual(seeded.name, "Acme Bot")
         self.assertEqual(
             self.env["oteny.bot"].search_count([("bot_user_id", "=", self.env.uid)]), 1)
 
@@ -110,7 +110,7 @@ class TestOtenyBot(TransactionCase):
         # Bad prior provision already forked: seed keeps old ref; fork has the new ref.
         # ensure_bot must collapse onto the seed and deactivate the fork.
         seed = self.env["oteny.bot"].create({
-            "name": "Barney", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
+            "name": "Acme Bot", "uplink_ref": "hh00396", "bot_user_id": self.env.uid,
         })
         channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         fork = self.env["oteny.bot"].create({
@@ -130,7 +130,7 @@ class TestOtenyBot(TransactionCase):
         # keeps the HR channel there (never a mute seed + channel-holding fork).
         channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         seeded = self.env["oteny.bot"].create({
-            "name": "Barney", "uplink_ref": "hh00394",
+            "name": "Acme Bot", "uplink_ref": "hh00394",
             "bot_user_id": self.env.uid, "discuss_channel_id": channel.id,
         })
         res = self.env["oteny.bot"].bind_discuss_channel("hh00395")
@@ -154,8 +154,8 @@ class TestOtenyBot(TransactionCase):
     def test_dispatch_isolated_turn_posts_a_flagged_message(self):
         channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": "hh5", "discuss_channel_id": channel.id})
-        res = bot.dispatch_isolated_turn("File the MFNL for placement 42")
+            {"name": "Acme Bot", "uplink_ref": "hh5", "discuss_channel_id": channel.id})
+        res = bot.dispatch_isolated_turn("File the permit for placement 42")
         self.assertTrue(res["ok"])
         msg = self.env["mail.message"].browse(res["message_id"])
         self.assertEqual(msg.res_id, channel.id)
@@ -163,7 +163,7 @@ class TestOtenyBot(TransactionCase):
         self.assertIn("placement 42", msg.body)
 
     def test_dispatch_isolated_turn_needs_a_channel(self):
-        bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hh6"})
+        bot = self.env["oteny.bot"].create({"name": "Acme Bot", "uplink_ref": "hh6"})
         self.assertFalse(bot.dispatch_isolated_turn("x")["ok"])
 
     def test_dispatch_is_signed_by_odoobot_whichever_user_fires_it(self):
@@ -177,10 +177,10 @@ class TestOtenyBot(TransactionCase):
             "name": "Seam Bot", "login": "seam.bot.author",
             "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
         bot = self.env["oteny.bot"].create({
-            "name": "Barney", "uplink_ref": "hh8", "discuss_channel_id": channel.id,
+            "name": "Acme Bot", "uplink_ref": "hh8", "discuss_channel_id": channel.id,
             "bot_user_id": bot_user.id})
         res = bot.with_user(bot_user).dispatch_isolated_turn(
-            "File the MFNL for record 43",
+            "File the permit for record 43",
             work={"res_model": "riverflow.service", "res_id": 43, "token": "tok_DRAIN-1"})
         self.assertTrue(res["ok"])
         msg = self.env["mail.message"].browse(res["message_id"])
@@ -194,9 +194,9 @@ class TestOtenyBot(TransactionCase):
         # token instructions the run needs for its bot_claim advances.
         channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": "hh7", "discuss_channel_id": channel.id})
+            {"name": "Acme Bot", "uplink_ref": "hh7", "discuss_channel_id": channel.id})
         res = bot.dispatch_isolated_turn(
-            "File the MFNL for record 42",
+            "File the permit for record 42",
             work={"res_model": "riverflow.service", "res_id": 42, "token": "tok_ABC-x9"})
         self.assertTrue(res["ok"])
         body = self.env["mail.message"].browse(res["message_id"]).body
@@ -210,7 +210,7 @@ class TestOtenyBot(TransactionCase):
         # tokenless isolated messages remain the plain legacy shape (scenario driver / chat)
         channel = self.env["discuss.channel"].create({"name": "Plain"})
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": "hh8", "discuss_channel_id": channel.id})
+            {"name": "Acme Bot", "uplink_ref": "hh8", "discuss_channel_id": channel.id})
         body = self.env["mail.message"].browse(
             bot.dispatch_isolated_turn("hello")["message_id"]).body
         self.assertNotIn("[oteny:work:", body)
@@ -220,7 +220,7 @@ class TestOtenyBot(TransactionCase):
         # opt-in live-narration flag — off by default, present only when asked
         channel = self.env["discuss.channel"].create({"name": "Bot Room"})
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": "hh9", "discuss_channel_id": channel.id})
+            {"name": "Acme Bot", "uplink_ref": "hh9", "discuss_channel_id": channel.id})
         plain = self.env["mail.message"].browse(
             bot.dispatch_isolated_turn("run it")["message_id"]).body
         self.assertNotIn(VERBOSE_SENTINEL, plain)
@@ -238,7 +238,7 @@ class TestOtenyBot(TransactionCase):
         user = self.env["res.users"].create({
             "name": "Seam Bot", "login": login, "group_ids": [Command.set(groups)]})
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": ref, "bot_user_id": user.id})
+            {"name": "Acme Bot", "uplink_ref": ref, "bot_user_id": user.id})
         return bot, user
 
     def _room(self, name, creator, members):
@@ -254,12 +254,12 @@ class TestOtenyBot(TransactionCase):
         # role, so the run starts with that role's persona + preloaded skills — not in
         # whatever casual room happens to share the bot.
         home = self.env["discuss.channel"].create({"name": "Crew Ops"})
-        lane = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        lane = self.env["discuss.channel"].create({"name": "Bot Permit Filing"})
         bot = self.env["oteny.bot"].create({
-            "name": "Barney", "uplink_ref": "hhROLE", "discuss_channel_id": home.id,
-            "channel_ids": [Command.create({"role": "mfnl_filing",
+            "name": "Acme Bot", "uplink_ref": "hhROLE", "discuss_channel_id": home.id,
+            "channel_ids": [Command.create({"role": "permit_filing",
                                             "channel_id": lane.id})]})
-        res = bot.dispatch_isolated_turn("File it", role="mfnl_filing")
+        res = bot.dispatch_isolated_turn("File it", role="permit_filing")
         self.assertEqual(res["channel_id"], lane.id)
         self.assertEqual(
             self.env["mail.message"].browse(res["message_id"]).res_id, lane.id)
@@ -274,28 +274,28 @@ class TestOtenyBot(TransactionCase):
         # its "bad query" ERROR would otherwise turn the Odoo.sh build red.
         a = self.env["discuss.channel"].create({"name": "A"})
         b = self.env["discuss.channel"].create({"name": "B"})
-        bot = self.env["oteny.bot"].create({"name": "Barney", "uplink_ref": "hhUNIQ"})
+        bot = self.env["oteny.bot"].create({"name": "Acme Bot", "uplink_ref": "hhUNIQ"})
         self.env["oteny.bot.channel"].create(
-            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": a.id})
+            {"bot_id": bot.id, "role": "permit_filing", "channel_id": a.id})
         with self.assertRaises(IntegrityError), self.cr.savepoint():
             self.env["oteny.bot.channel"].create(
-                {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": b.id})
+                {"bot_id": bot.id, "role": "permit_filing", "channel_id": b.id})
 
     def test_channels_for_bot_returns_home_and_declared_roles(self):
         # The declared lane is served on the strength of the CONFIGURATION, so it holds
         # even with autoauth off on the Oteny side (the adapter keeps `declared` rooms).
         bot, user = self._bot_with_seam_user(login="seam.declared", ref="hhDECL")
         home = self.env["discuss.channel"].create({"name": "Crew Ops"})
-        lane = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        lane = self.env["discuss.channel"].create({"name": "Bot Permit Filing"})
         bot.discuss_channel_id = home
         self.env["oteny.bot.channel"].create(
-            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": lane.id})
+            {"bot_id": bot.id, "role": "permit_filing", "channel_id": lane.id})
         out = self.env["oteny.bot"].with_user(user).channels_for_bot()
         self.assertTrue(out["ok"])
         by_id = {c["id"]: c for c in out["channels"]}
         self.assertEqual(by_id[home.id], {"id": home.id, "name": "Crew Ops",
                                           "role": "", "declared": True})
-        self.assertEqual(by_id[lane.id]["role"], "mfnl_filing")
+        self.assertEqual(by_id[lane.id]["role"], "permit_filing")
         self.assertTrue(by_id[lane.id]["declared"])
 
     def test_channels_for_bot_names_the_home_channels_role_when_they_are_one_room(self):
@@ -303,13 +303,13 @@ class TestOtenyBot(TransactionCase):
         # that is already the home channel. It must come back once, WITH the role — a
         # duplicate row (or a role-less home entry) would run the lane personaless.
         bot, user = self._bot_with_seam_user(login="seam.oneroom", ref="hhONE")
-        room = self.env["discuss.channel"].create({"name": "Barney MFNL Filing"})
+        room = self.env["discuss.channel"].create({"name": "Bot Permit Filing"})
         bot.discuss_channel_id = room
         self.env["oteny.bot.channel"].create(
-            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": room.id})
+            {"bot_id": bot.id, "role": "permit_filing", "channel_id": room.id})
         rows = self.env["oteny.bot"].with_user(user).channels_for_bot()["channels"]
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["role"], "mfnl_filing")
+        self.assertEqual(rows[0]["role"], "permit_filing")
 
     def test_channels_for_bot_autoauths_an_operators_all_internal_room(self):
         # The casual lane: an operator adds the bot to a staff room and it answers there.
@@ -395,7 +395,7 @@ class TestOtenyBot(TransactionCase):
             "group_ids": [Command.set([self.env.ref("base.group_user").id])]})
         room = self._room("Filing", plain, [plain.partner_id, seam.partner_id])
         self.env["oteny.bot.channel"].create(
-            {"bot_id": bot.id, "role": "mfnl_filing", "channel_id": room.id})
+            {"bot_id": bot.id, "role": "permit_filing", "channel_id": room.id})
         out = self.env["oteny.bot"].with_user(seam).channels_for_bot()
         self.assertEqual([c["id"] for c in out["channels"]], [room.id])
         self.assertNotIn(room.id, [s["id"] for s in out["skipped"]])
@@ -420,10 +420,10 @@ class TestOtenyBot(TransactionCase):
     def _open_session(self, token="tokRUN", origin_id=17143):
         """Simulate the dispatch-time open session the state machine creates."""
         bot = self.env["oteny.bot"].create(
-            {"name": "Barney", "uplink_ref": "hh00140"})
+            {"name": "Acme Bot", "uplink_ref": "hh00140"})
         return self.env["oteny.bot.session"].create({
-            "bot_id": bot.id, "name": "MFNL filing", "kind": "isolated_turn",
-            "request": "File the MFNL for #%s" % origin_id, "outcome": "dispatched",
+            "bot_id": bot.id, "name": "Permit filing", "kind": "isolated_turn",
+            "request": "File the permit for #%s" % origin_id, "outcome": "dispatched",
             "work_token": token, "origin_model": "riverflow.service", "origin_res_id": origin_id})
 
     def test_record_run_adopts_the_token_matched_session_with_failure_reason(self):
@@ -462,10 +462,10 @@ class TestOtenyBot(TransactionCase):
         # a healthy run reports no outcome (outcome key absent) → session stays 'dispatched'
         # so the deterministic close can still set ok/escalated/timeout.
         session = self._open_session(token="tokH")
-        self.env["oteny.bot"].record_run("tokH", run={"response": "Filed NL-MFNL-42."})
+        self.env["oteny.bot"].record_run("tokH", run={"response": "Filed P-42."})
         session.invalidate_recordset()
         self.assertEqual(session.outcome, "dispatched")
-        self.assertEqual(session.response, "Filed NL-MFNL-42.")
+        self.assertEqual(session.response, "Filed P-42.")
 
     def test_record_run_unknown_token_fails_cleanly(self):
         res = self.env["oteny.bot"].record_run("nope", run={"response": "x"})

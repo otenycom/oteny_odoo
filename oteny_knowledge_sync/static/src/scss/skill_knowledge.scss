@@ -1,0 +1,14 @@
+// Override Odoo's default checklist styling for skill sync Knowledge articles.
+// Odoo applies text-decoration: line-through and opacity: 0.5 to checked items
+// (o_checked), which is appropriate for interactive todo lists but makes
+// completed roadmap items unreadable in documentation articles.
+// The o_skill_content wrapper is added by markdown_utils.markdown_to_html().
+.o_skill_content ul.o_checklist > li.o_checked {
+    text-decoration: none;
+    opacity: 1;
+
+    &:has(ul, ol) > :not(ul, ol) {
+        text-decoration: none;
+        opacity: 1;
+    }
+}

@@ -1,0 +1,61 @@
+initdb.bak
+node_modules*
+
+# sphinx build directories
+_build/
+sqldumps/
+riverdeploy/backups/
+# dotfiles
+.*
+!.gitignore
+!.claude
+!.cursor
+!.basecamp
+!.basecamp/config.json.example
+.basecamp/config.json
+!.obisidian
+!.git_hooks
+!.github
+!.mailmap
+!.vscode
+!.cursorrules
+!.cursorignore
+!.pre-commit-config.yaml
+.DS_Store
+*.DS_Store
+# compiled python files
+*.py[co]
+__pycache__/
+# setup.py egg_info
+*.egg-info
+# hg stuff
+*.orig
+!.env.example
+
+status
+crew_docs.xlsx
+
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
+.vscode/settings.json
+.vscode/secrets.json
+secrets
+
+riverdeploy/backups/*
+!riverdeploy/backups/reference-db.zip
+!riverdeploy/backups/.gitkeep
+
+pyrightconfig.json
+initdb.bak
+cr.zip
+crewradar/static/img/living/*.mp4
+crewradar/static/img/living/composites/*.jpg
+
+secrets.json
+node_modules/
+
+# Local-only secret store (0600 keys — e.g. the Cuneus /json/2/ account key for
+# the Barney dev loop). NEVER committed; see README.md "Local secrets".
+secrets/
+

@@ -1,0 +1,40 @@
+---
+description: Less-terse STE for replies to Ries and for markdown you write
+alwaysApply: true
+---
+
+# Less-terse STE (chat and new markdown)
+
+Write to Ries in ASD-STE100 Simplified Technical English. Use the same voice in `.md` you write. Do not sweep old files just to make them longer.
+
+Still STE: active voice, simple tenses, one word for one thing, no slang. Keep file paths, flags, prices, and error text exact, in backticks.
+
+Prefer one idea per sentence. A short second clause is allowed when it stops a telegram. There is no hard 20-word cap. Do not cut `because` or `so` just to shrink a sentence. Split a long sentence; never compress one into jargon. Complete sentences. Explain why, not only the headline. Do not write status as a table of fragments when a short paragraph is clearer.
+
+```
+BAD (telegram):
+- Hook green.
+- D263 stands.
+- Cap gone.
+
+GOOD:
+The STE gate still runs. `ste-sentence` now reports only, so a longer sentence does not fail the commit. D263 still governs STE voice. D304 retires the 20-word cap.
+```
+
+HermesHost committed `.md` still keeps the 6-sentence paragraph ratchet, the idiom and term-drift checks, and the qualifier guard.
+
+## Pit of failure, pit of success
+
+This plain voice **is** STE for Ries, not a second style. Start with the human picture. Then give the exact token in backticks.
+
+Name the pit of failure: where we left the agent in the dark. Then name the pit of success: what we hand him so he cannot make that mistake. Say where *we* made the flow go dark. Do not only blame the model.
+
+Do not open with wrap jargon (`generation`, digest, `_fold_aim_peek`, same-hash) when a photo or sticker picture will do.
+
+```
+BAD (compiler-speak):
+A same-hash peek in `_fold_aim_peek` omitted `snapshot`, so `_aim_handle_ok` kept `@e16` valid after the Samenvatting remount.
+
+GOOD (this is STE doing its job):
+After the Samenvatting click we sent "success" and a short hash. We did not send the new photo of the page. Barney kept the old stickers (`@e16`) from chat. Those stickers were already dead. Halt stopped the second stab. The pit of success is: after a hop, hand him the new photo and retire the old stickers in the same result.
+```

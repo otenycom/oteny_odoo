@@ -132,8 +132,8 @@ class IrFilters(models.Model):
         "list belongs to, e.g. 'hr.employee'; False on a top-level view), "
         "subject_id, field (the list's field name), view ('form' inside a form, "
         "else 'list', 'kanban', 'calendar', ...), uid, context. Examples: "
-        "subject == 'crewradar.log.entry'; subject in ('hr.employee', "
-        "'crewradar.site'); view == 'calendar'; not subject. A shortcut's "
+        "subject == 'project.task'; subject in ('hr.employee', "
+        "'res.partner'); view == 'calendar'; not subject. A shortcut's "
         "Default Filter applies only where the expression is true.",
     )
     shortcut_view_type = fields.Selection(

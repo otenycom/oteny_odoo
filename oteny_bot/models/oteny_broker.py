@@ -115,7 +115,7 @@ class OtenyBrokerClient(models.AbstractModel):
                     )
                     if body.get("error") == "bad_login_url":
                         detail += _(
-                            " — fix the CrewRadar system parameter "
+                            " — fix the system parameter "
                             "posted_workers_nl_url"
                         )
                     elif body.get("error") == "login_page_unreachable":

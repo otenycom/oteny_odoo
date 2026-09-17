@@ -1,0 +1,18 @@
+from odoo import fields, models
+
+
+class ResConfigSettings(models.TransientModel):
+    _inherit = "res.config.settings"
+
+    oteny_knowledge_sync_roots = fields.Text(
+        string="Skill roots",
+        config_parameter="oteny_knowledge_sync.roots",
+        help="One root per line as Label=path. The path is a repository folder that "
+        "holds .claude/skills, absolute or relative to an addons-path entry. Empty "
+        "means every addons-path entry whose parent folder holds .claude/skills, "
+        "labelled by that folder's name.",
+    )
+
+    def action_oteny_knowledge_sync_now(self):
+        self.ensure_one()
+        return self.env["oteny.knowledge.sync"].sync_skills_to_knowledge()

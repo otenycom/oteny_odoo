@@ -13,7 +13,7 @@
                             <setting string="Email Domain Restriction" help="Set allowed email domains for recipients">
                                 <field name="restrict_email_recipients_to" class="o_field_char" style="width: 100%;" />
                                 <div class="text-muted mt8">
-                                    Comma-separated list of allowed email domains (e.g., cuneuscrew.eu,vriend.com)
+                                    Comma-separated list of allowed email domains (e.g., example.com,example.org)
                                 </div>
                             </setting>
                         </block>

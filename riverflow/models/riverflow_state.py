@@ -20,7 +20,7 @@ class RiverflowWorkflowState(models.Model):
         "Owned by Bot",
         default=False,
         help="If true, a service in this state is owned/worked by an automated agent "
-        "(e.g. Barney), not a human. Ownership lives in the STATE — a hand-off transition "
+        "(a business bot), not a human. Ownership lives in the STATE — a hand-off transition "
         "moves the service between a human-owned and a bot-owned state, so the per-state "
         "transition buttons stay meaningful. Drives the bot's work poll and lets a human "
         "review filter exclude the bot's in-flight queue (is_owned_by_bot = False).",

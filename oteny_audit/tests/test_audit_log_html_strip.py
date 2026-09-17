@@ -165,7 +165,7 @@ class TestAuditLogHtmlStrip(TransactionCase):
             '<div style="margin-bottom:8px; padding:8px; background-color:#f8f9fa;'
             ' border-left:4px solid #2196F3; border-radius:4px;"'
             ' data-oe-version="2.0">'
-            '<a href="https://rivermen.cuneuscrew.eu/web#id=23986&amp;model=riverflow.service&amp;'
+            '<a href="https://erp.example.com/web#id=23986&amp;model=riverflow.service&amp;'
             'view_type=form" class="o_view_link" style="color:#2196F3;">Service link</a>'
             '<p style="margin:0px; padding:0px; font-size:13px" data-oe-version="2.0">'
             "Dear Mr. Sajol,</p>"
