@@ -8,7 +8,7 @@ If a record was created from XML with `noupdate="1"`, its `ir.model.data` row st
 
 ## Version Format
 
-CrewRadar modules use **4-segment versions**: `19.0.<major>.<minor>` (e.g. `19.0.9.63`). Migration folder names must match this format. `oteny_knowledge_sync` is five segments (`19.0.1.0.0`). Radar's `increment_version.py` bumps the last segment of any dotted version; a four-segment-only regex left that module unraised. A missing generic file is an error, not a skip.
+Every module here uses **4-segment versions**: `19.0.<major>.<minor>` (e.g. `19.0.9.63`). The live `oteny_knowledge_sync` version is `19.0.2.0`. Five segments (`19.0.1.0.1`) are history only. Odoo 19.0 rejects a version that does not start with `19.0.` (`19.1.0.0` was uninstallable / `installable=False`). `19.0.1.0` is not greater than `19.0.1.0.1`. Migration folder names must match this format. Radar's `increment_version.py` bumps the last segment of any dotted version. A missing generic file is an error, not a skip.
 
 When creating a new migration **on `dev`**, set the folder name to the module's current manifest version (or one higher). The `merge-branches` tool (`python -m riverdeploy merge-branches`) automatically detects and renumbers migration folders on feature branches that have become stale relative to `max(dev, main)`. See [Deploy Tool — Feature Branch Merges](deploy-tool.md#feature-branch-merges).
 

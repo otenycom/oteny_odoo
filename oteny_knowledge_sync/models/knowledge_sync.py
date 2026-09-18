@@ -16,6 +16,13 @@ The sync runs after every upgrade of a module under a root, so it does as little
 as possible when nothing changed: internal ``.md`` links are resolved to
 Knowledge URLs inline while each body is written, and :meth:`_write_managed`
 writes only fields that differ.
+
+A CrewRadar article may still name a sibling skill (``riverflow/SKILL.md``,
+``../odoo-development/references/…``) after that skill moved to another
+configured knowledge root. The rewrite looks up the path in every configured
+root, same knowledge root first, then the others. A truly missing target still
+warns. An author does not need to rewrite the href to
+``../../oteny_odoo/.claude/skills/…``.
 """
 
 import base64
@@ -110,17 +117,26 @@ class KnowledgeSync(models.AbstractModel):
             return {"articles_synced": 0, "skipped": "no_roots"}
         total = 0
         per_root = {}
+        excluded_paths = set()
         for label, path in roots:
-            count = self._sync_root(label, path / ".claude" / "skills")
+            count, excluded = self._sync_root(label, path / ".claude" / "skills")
+            excluded_paths |= excluded
             per_root[label] = count
             total += count
         self._unpublish_roots_not_in([label for label, _p in roots])
         self._sort_articles_alphabetically()
+        # Warn only after every configured knowledge root has published, so a
+        # sibling name that lives in another root is a Knowledge link, not a miss.
+        self._rewrite_internal_links(excluded_paths=excluded_paths)
         _logger.info("Knowledge sync completed: %d articles over %d root(s)", total, len(roots))
         return {"articles_synced": total, "roots": per_root}
 
     def _sync_root(self, label, skills_dir):
-        """Sync one root's ``skills_dir`` into its own Knowledge tree. Returns the count."""
+        """Sync one root's ``skills_dir`` into its own Knowledge tree.
+
+        Returns ``(count, excluded_paths)``. The caller rewrites links after
+        every configured knowledge root has published.
+        """
         Article = self.env["knowledge.article"]
         self._adopt_legacy_articles(label, skills_dir)
         managed = Article.search([("x_skill_is_managed", "=", True), ("x_skill_root", "=", label)])
@@ -128,7 +144,9 @@ class KnowledgeSync(models.AbstractModel):
         for art in managed:
             if art.x_skill_file_path:
                 existing_by_path.setdefault(art.x_skill_file_path, art)
-        link_map = self._build_link_map(managed)
+        all_managed = Article.search([("x_skill_is_managed", "=", True)])
+        maps_by_root = self._link_maps_by_knowledge_root(all_managed)
+        link_map = self._configured_link_map(label, maps_by_root)
         processed_paths = set()
         excluded_paths = set()
         root_article = self._ensure_root_article(label, skills_dir, processed_paths, link_map)
@@ -138,9 +156,8 @@ class KnowledgeSync(models.AbstractModel):
         )
         self._cleanup_stale_articles(label, processed_paths)
         self._add_internal_users_to_root_article(root_article)
-        self._rewrite_internal_links(label, excluded_paths)
         _logger.info("Knowledge sync root %r: %d articles", label, len(processed_paths))
-        return len(processed_paths)
+        return len(processed_paths), excluded_paths
 
     def _adopt_legacy_articles(self, label, skills_dir):
         """Managed articles without a root (written before roots existed) join the
@@ -178,6 +195,24 @@ class KnowledgeSync(models.AbstractModel):
             self._add_to_link_map(link_map, article.x_skill_file_path, article.id)
         return link_map
 
+    def _link_maps_by_knowledge_root(self, articles):
+        """``{knowledge_root: link_map}`` for the given managed articles."""
+        maps_by_root = {}
+        for article in articles:
+            knowledge_root = article.x_skill_root or ""
+            link_map = maps_by_root.setdefault(knowledge_root, {})
+            self._add_to_link_map(link_map, article.x_skill_file_path, article.id)
+        return maps_by_root
+
+    def _configured_link_map(self, own_knowledge_root, maps_by_root):
+        """Every configured knowledge root, with ``own_knowledge_root`` last so it wins."""
+        combined = {}
+        for knowledge_root, link_map in maps_by_root.items():
+            if knowledge_root != own_knowledge_root:
+                combined.update(link_map)
+        combined.update(maps_by_root.get(own_knowledge_root) or {})
+        return combined
+
     @staticmethod
     def _add_to_link_map(link_map, path, article_id):
         if not path:
@@ -190,12 +225,22 @@ class KnowledgeSync(models.AbstractModel):
         """Rewrite relative ``.md`` hrefs in ``body`` to Knowledge article URLs.
 
         Resolution order: relative to the article's own folder, then the stored path
-        as-is, then with a ``skills/`` prefix. A link that escapes the synced tree is
-        a deliberate cross-reference and stays untouched. Returns ``(body, count)``.
+        as-is, then with a ``skills/`` prefix. ``link_map`` holds every configured
+        knowledge root (same root last). A path that escapes this tree is tried as
+        a ``skills/…`` tail against that map, so
+        ``../../oteny_odoo/.claude/skills/riverflow/SKILL.md`` can become a
+        Knowledge link when that skill is published. An escape with no skill tail
+        stays untouched. Returns ``(body, count)``.
         """
         if not body:
             return body, 0
         rewritten = 0
+
+        def knowledge_href(article_id):
+            return (
+                f'href="/knowledge/article/{article_id}" '
+                f'class="o_knowledge_article_link" data-res_id="{article_id}"'
+            )
 
         def replace_link(match):
             nonlocal rewritten
@@ -206,21 +251,22 @@ class KnowledgeSync(models.AbstractModel):
             if article_dir:
                 resolved = posixpath.normpath(posixpath.join(article_dir, original_href))
                 if self._escapes_skills_tree(resolved):
+                    suffix = self._skills_tree_suffix(resolved)
+                    if suffix and suffix in link_map:
+                        rewritten += 1
+                        return knowledge_href(link_map[suffix])
                     return match.group(0)
                 resolved_lower = resolved.lower()
                 if resolved_lower in link_map:
-                    article_id = link_map[resolved_lower]
                     rewritten += 1
-                    return f'href="/knowledge/article/{article_id}" class="o_knowledge_article_link" data-res_id="{article_id}"'
+                    return knowledge_href(link_map[resolved_lower])
             if original_href.lower() in link_map:
-                article_id = link_map[original_href.lower()]
                 rewritten += 1
-                return f'href="/knowledge/article/{article_id}" class="o_knowledge_article_link" data-res_id="{article_id}"'
+                return knowledge_href(link_map[original_href.lower()])
             skills_path = f"skills/{original_href}".lower()
             if skills_path in link_map:
-                article_id = link_map[skills_path]
                 rewritten += 1
-                return f'href="/knowledge/article/{article_id}" class="o_knowledge_article_link" data-res_id="{article_id}"'
+                return knowledge_href(link_map[skills_path])
             if excluded_lower:
                 candidates = {original_href.lower(), skills_path}
                 if resolved_lower:
@@ -240,6 +286,23 @@ class KnowledgeSync(models.AbstractModel):
         """True when a resolved link lies outside the synced ``skills/`` tree."""
         norm = resolved_path.replace("\\", "/").lower()
         return norm.startswith("..") or not norm.startswith(cls._SKILLS_TREE_PREFIX)
+
+    @classmethod
+    def _skills_tree_suffix(cls, resolved_path):
+        """The ``skills/…`` tail of ``resolved_path``, or ``None``.
+
+        An href that walks into another repository still names a skill file when
+        that tail is present. The rewrite then looks the tail up across configured
+        knowledge roots.
+        """
+        norm = resolved_path.replace("\\", "/").lower()
+        marker = "/" + cls._SKILLS_TREE_PREFIX
+        idx = norm.find(marker)
+        if idx != -1:
+            return norm[idx + 1:]
+        if norm.startswith(cls._SKILLS_TREE_PREFIX):
+            return norm
+        return None
 
     @staticmethod
     def _build_excluded_lookup(excluded_paths):
@@ -530,24 +593,41 @@ class KnowledgeSync(models.AbstractModel):
             for article in stale.sorted(key=lambda a: len(a.parent_path or ""), reverse=True):
                 article.unlink()
 
-    def _rewrite_internal_links(self, label, excluded_paths=None):
-        """Final pass per root: resolve links to articles created during this run."""
+    def _rewrite_internal_links(self, label=None, excluded_paths=None, warn=True):
+        """Resolve ``.md`` links using every managed article, not only one root.
+
+        When ``label`` is set, only that knowledge root's articles are rewritten.
+        Their hrefs may target any configured knowledge root. When ``label`` is
+        omitted, every managed article is rewritten. Same-root paths win when two
+        roots publish the same relative skill path.
+        """
         excluded_lower = self._build_excluded_lookup(excluded_paths)
-        managed = self.env["knowledge.article"].search(
-            [("x_skill_is_managed", "=", True), ("x_skill_root", "=", label)])
-        link_map = self._build_link_map(managed)
-        _logger.debug("Knowledge sync root %r: path map has %d entries", label, len(link_map))
-        rewritten_count = 0
-        articles_updated = 0
-        for article in managed:
-            if not article.body:
-                continue
-            article_dir = str(Path(article.x_skill_file_path).parent) if article.x_skill_file_path else ""
-            new_body, count = self._rewrite_body_links(
-                article.body, article_dir, link_map, article.name, warn=True, excluded_lower=excluded_lower)
-            rewritten_count += count
-            if new_body != article.body:
-                article.body = new_body
-                articles_updated += 1
-        _logger.info("Knowledge sync root %r: rewrote %d link(s) in %d article(s)",
-                     label, rewritten_count, articles_updated)
+        all_managed = self.env["knowledge.article"].search([("x_skill_is_managed", "=", True)])
+        maps_by_root = self._link_maps_by_knowledge_root(all_managed)
+        targets = all_managed.filtered(lambda a: a.x_skill_root == label) if label else all_managed
+        _logger.debug(
+            "Knowledge sync: resolving links in %d article(s) using %d configured root(s)",
+            len(targets), len(maps_by_root),
+        )
+        by_root_targets = {}
+        for article in targets:
+            knowledge_root = article.x_skill_root or ""
+            by_root_targets.setdefault(knowledge_root, self.env["knowledge.article"])
+            by_root_targets[knowledge_root] |= article
+        for knowledge_root, articles in by_root_targets.items():
+            link_map = self._configured_link_map(knowledge_root, maps_by_root)
+            rewritten_count = 0
+            articles_updated = 0
+            for article in articles:
+                if not article.body:
+                    continue
+                article_dir = str(Path(article.x_skill_file_path).parent) if article.x_skill_file_path else ""
+                new_body, count = self._rewrite_body_links(
+                    article.body, article_dir, link_map, article.name,
+                    warn=warn, excluded_lower=excluded_lower)
+                rewritten_count += count
+                if new_body != article.body:
+                    article.body = new_body
+                    articles_updated += 1
+            _logger.info("Knowledge sync root %r: rewrote %d link(s) in %d article(s)",
+                         knowledge_root, rewritten_count, articles_updated)

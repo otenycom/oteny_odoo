@@ -276,7 +276,7 @@ A production dump never installed `oteny_bot`, and its schema is older than the 
 
 ### Skill sync XML-RPC return
 
-`crewradar.skill.sync.sync_skills_to_knowledge` must return a marshalable dict (`{"articles_synced": N}`), never `None`. Odoo 19 XML-RPC dumps with `allow_none=False`. Shipped in `crewradar` **19.0.10.9**. See [Knowledge Skill Sync — Manual admin call](references/knowledge-skill-sync.md#manual-admin-call-xml-rpc).
+`oteny.knowledge.sync.sync_skills_to_knowledge` must return a marshalable dict (`{"articles_synced": N}`), never `None`. Odoo 19 XML-RPC dumps with `allow_none=False`. First shipped in `crewradar` **19.0.10.9**; the model now lives in `oteny_knowledge_sync`. The CrewRadar skill `crewradar-development/references/knowledge-skill-sync.md` owns the call.
 
 ### Odoo test run issues
 
@@ -319,9 +319,10 @@ Bodies rendered with **`engine='inline_template'`** (e.g. via `mail.render.mixin
 | Module | Path |
 |--------|------|
 | crewradar | `~/oteny/radar/crewradar` |
-| riverflow | `~/oteny/radar/riverflow` |
 | rivercreds | `~/oteny/radar/rivercreds` |
-| oteny_audit | `~/oteny/radar/oteny_audit` |
+| riverflow | `~/oteny/oteny_odoo/riverflow` |
+| oteny_audit | `~/oteny/oteny_odoo/oteny_audit` |
+| oteny_knowledge_sync | `~/oteny/oteny_odoo/oteny_knowledge_sync` |
 | Odoo core | `~/odoo/odoo19` |
 | Odoo enterprise | `~/odoo/enterprise19` |
 

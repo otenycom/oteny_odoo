@@ -12,7 +12,7 @@ For crewradar, riverflow, and rivercreds tests:
 cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo-bin \
   --stop-after-init \
   -p 8068 \
-  --addons-path=../../odoo/odoo19/addons,/Users/ries/odoo/enterprise19,/Users/ries/oteny/radar \
+  --addons-path=../../odoo/odoo19/addons,/Users/ries/odoo/enterprise19,/Users/ries/oteny/oteny_odoo,/Users/ries/oteny/radar \
   --without-demo=True \
   --http-interface 127.0.0.1 \
   --test-enable \
@@ -26,7 +26,7 @@ cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo
 
 ### Full radar workspace suite (Cursor `/radar/test`)
 
-The radar workspace defines a command in `.claude/commands/test.md` that instructs running the default **combined** tag set from `.vscode/settings.json` → `odoo.testTags` (currently `oteny_audit,riverflow,rivercreds,crewradar,oteny_bot,odoo_parallel_tests`). In the command palette, the slash command may appear with the workspace or folder prefix (e.g. `/radar/test`).
+The radar workspace defines a command in `.claude/commands/test.md` that instructs running the default **combined** tag set from `.vscode/settings.json` → `odoo.testTags`. That list must equal `odoo.installModules`: every first-party module we built and install for CrewRadar. In the command palette, the slash command may appear with the workspace or folder prefix (e.g. `/radar/test`).
 
 **Tag semantics**: Comma-separated values in `--test-tags` are **OR** in Odoo’s TagsSelector: a test runs if its class matches **any** of the listed tags.
 
@@ -36,11 +36,11 @@ Manual equivalent on database `cr-test` (same addons path and credentials as abo
 cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo-bin \
   --stop-after-init \
   -p 8068 \
-  --addons-path=../../odoo/odoo19/addons,/Users/ries/odoo/enterprise19,/Users/ries/oteny/radar \
+  --addons-path=../../odoo/odoo19/addons,/Users/ries/odoo/enterprise19,/Users/ries/oteny/oteny_odoo,/Users/ries/oteny/radar \
   --without-demo=True \
   --http-interface 127.0.0.1 \
   --test-enable \
-  --test-tags=oteny_audit,riverflow,rivercreds,crewradar,oteny_bot,odoo_parallel_tests \
+  --test-tags=oteny_audit,oteny_shortcut,oteny_bot,oteny_backup_trigger,odoo_parallel_tests,oteny_knowledge_sync,riverflow,rivercreds,crewradar,crewradar_wilma,crewradar_cuneus_sign,crewradar_creds,crewradar_sign,crewradar_marinetraffic \
   -d cr-test \
   -r ries -w ries \
   --max-cron-threads 0 \
@@ -49,7 +49,7 @@ cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo
   | tee /tmp/radar_test_full_suite.txt
 ```
 
-**Suite size**: The `crewradar` tag selects every class that includes it, including derived addons (e.g. `crewradar_wilma`, `crewradar_cuneus_sign`) that tag tests with both their module tag and `crewradar`. Together with the other module tags the run covers 470 classes and 4263 tests, and it finishes in about 85 seconds on 21 parallel workers (2026-08-21). `oteny_bot` and `odoo_parallel_tests` need their own tag, because neither module tags any test with `crewradar`.
+**Suite size**: The `crewradar` tag selects every class that includes it, including derived addons (e.g. `crewradar_wilma`, `crewradar_cuneus_sign`) that tag tests with both their module tag and `crewradar`. Together with the other module tags the run covers 470 classes and 4263 tests, and it finishes in about 85 seconds on 21 parallel workers (2026-08-21). A module that does not carry the `crewradar` tag (`oteny_bot`, `odoo_parallel_tests`, `oteny_knowledge_sync`, `oteny_audit`, `riverflow`) still gates a deploy because `odoo.testTags` lists every installed first-party module.
 
 **`-u` also gates test discovery.** A combined `-u <modules> --test-enable` run loads tests only from the modules named in the `-u` list. So a tag in `odoo.testTags` selects nothing when its module is missing from `odoo.installModules`. `odoo_parallel_tests` hit exactly that on 2026-08-21: the tag was set, the module was not in the `-u` list, and `TestCloneReuseKey` dropped 6 tests from the run with no warning. Keep the two settings in step — every module whose tag you list must also sit in the install list.
 
@@ -63,7 +63,7 @@ For oteny_audit tests (not in use / disregard):
 cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo-bin \
   --stop-after-init \
   -p 8068 \
-  --addons-path=~/odoo/odoo19/addons,~/odoo/enterprise19,~/oteny/radar \
+  --addons-path=~/odoo/odoo19/addons,~/odoo/enterprise19,~/oteny/oteny_odoo,~/oteny/radar \
   --without-demo=True \
   --http-interface 127.0.0.1 \
   -i oteny_audit \
@@ -91,7 +91,8 @@ cd /Users/ries/oteny/radar && ../../odoo/venv/bin/python3 ../../odoo/odoo19/odoo
 Add tags to new test classes:
 
 - For base `crewradar` module tests, use `crewradar` as the module tag.
-- Satellite modules used with the full Crewradar install (`oteny_shortcut`, `riverflow`, `rivercreds`, `crewradar_wilma`, `crewradar_cuneus_sign`, `crewradar_creds`, `crewradar_sign`, `crewradar_marinetraffic`): include `crewradar` in `@tagged(...)` alongside the module-specific tag so `--test-tags=crewradar` runs the full stack.
+- CrewRadar-derived addons (`crewradar_wilma`, `crewradar_cuneus_sign`, `crewradar_creds`, `crewradar_sign`, `crewradar_marinetraffic`) and `rivercreds`: include `crewradar` in `@tagged(...)` alongside the module-specific tag so `--test-tags=crewradar` still runs that stack as a convenience.
+- Generic modules in `oteny_odoo` (`oteny_shortcut`, `oteny_knowledge_sync`, `riverflow`, `oteny_audit`, …) gate a deploy through their **own** addon tag. `odoo.testTags` equals `odoo.installModules`. Do not add a leftover `crewradar` tag on a generic module — that is how `oteny_shortcut` used to hide from the gate, and how a class tagged only `oteny_knowledge_sync` never ran.
 
 ```python
 from odoo.tests import tagged

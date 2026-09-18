@@ -367,3 +367,151 @@ class TestSkillSyncLinks(TransactionCase):
             "Expected a WARNING for a typo'd in-tree .md link, "
             f"but none mentioned {broken_href!r}. Got: {[r.getMessage() for r in cm.records]}",
         )
+
+    def _managed_article(self, name, body, knowledge_root, file_path, parent=None):
+        admin_partner = self.env.ref("base.partner_admin")
+        return self.env["knowledge.article"].create(
+            {
+                "name": name,
+                "body": body,
+                "parent_id": parent.id if parent else False,
+                "is_locked": True,
+                "internal_permission": "read",
+                "article_member_ids": [(0, 0, {"partner_id": admin_partner.id, "permission": "write"})],
+                "x_skill_is_managed": True,
+                "x_skill_root": knowledge_root,
+                "x_skill_file_path": file_path,
+            }
+        )
+
+    def test_cross_root_sibling_name_becomes_knowledge_link(self):
+        """A CrewRadar article that names a sibling skill in another configured
+        knowledge root becomes a Knowledge link. The old one-tree href
+        (``../test-xroot-target/SKILL.md``) is enough. No WARNING.
+        """
+        target = self._managed_article(
+            "test-xroot-target",
+            "<p>Oteny Odoo skill</p>",
+            "OtenyOdoo",
+            "skills/test-xroot-target/SKILL.md",
+        )
+        source = self._managed_article(
+            "test-xroot-source",
+            '<p>See <a href="../test-xroot-target/SKILL.md">Target</a></p>',
+            "Crewradar",
+            "skills/test-xroot-source/SKILL.md",
+        )
+
+        logger_name = "odoo.addons.oteny_knowledge_sync.models.knowledge_sync"
+        with self.assertLogs(logger_name, level="DEBUG") as cm:
+            self.env["oteny.knowledge.sync"]._rewrite_internal_links("Crewradar")
+
+        offending = [
+            r for r in cm.records
+            if r.levelname == "WARNING" and "test-xroot-target" in r.getMessage()
+        ]
+        self.assertEqual(
+            offending,
+            [],
+            "A healthy two-root sibling name must not log "
+            f"'Could not resolve link'. Got: {[r.getMessage() for r in offending]}",
+        )
+        source.invalidate_recordset(["body"])
+        self.assertIn(
+            f"/knowledge/article/{target.id}",
+            source.body,
+            "Sibling name in another configured knowledge root must become a Knowledge URL",
+        )
+
+    def test_cross_root_missing_target_still_warns(self):
+        """A sibling name that no configured knowledge root published is still a miss."""
+        missing_href = "../test-xroot-missing/SKILL.md"
+        self._managed_article(
+            "test-xroot-broken",
+            f'<p>See <a href="{missing_href}">Missing</a></p>',
+            "Crewradar",
+            "skills/test-xroot-broken/SKILL.md",
+        )
+
+        logger_name = "odoo.addons.oteny_knowledge_sync.models.knowledge_sync"
+        with self.assertLogs(logger_name, level="WARNING") as cm:
+            self.env["oteny.knowledge.sync"]._rewrite_internal_links("Crewradar")
+
+        matched = [r for r in cm.records if missing_href in r.getMessage()]
+        self.assertTrue(
+            matched,
+            "Expected a WARNING for a sibling name no root published, "
+            f"but none mentioned {missing_href!r}. Got: {[r.getMessage() for r in cm.records]}",
+        )
+
+    def test_escape_path_into_other_root_becomes_knowledge_link(self):
+        """``../../oteny_odoo/.claude/skills/…`` is not required, but when an
+        author already wrote it the sync still makes a Knowledge link.
+        """
+        target = self._managed_article(
+            "test-xroot-escape-target",
+            "<p>Oteny Odoo skill</p>",
+            "OtenyOdoo",
+            "skills/test-xroot-escape-target/SKILL.md",
+        )
+        escape_href = "../../../oteny_odoo/.claude/skills/test-xroot-escape-target/SKILL.md"
+        source = self._managed_article(
+            "test-xroot-escape-source",
+            f'<p>See <a href="{escape_href}">Target</a></p>',
+            "Crewradar",
+            "skills/test-xroot-escape-source/SKILL.md",
+        )
+
+        logger_name = "odoo.addons.oteny_knowledge_sync.models.knowledge_sync"
+        with self.assertLogs(logger_name, level="DEBUG") as cm:
+            self.env["oteny.knowledge.sync"]._rewrite_internal_links("Crewradar")
+
+        offending = [
+            r for r in cm.records
+            if r.levelname == "WARNING" and escape_href in r.getMessage()
+        ]
+        self.assertEqual(offending, [], f"Got: {[r.getMessage() for r in offending]}")
+        source.invalidate_recordset(["body"])
+        self.assertIn(f"/knowledge/article/{target.id}", source.body)
+
+    def test_same_knowledge_root_wins_on_path_collision(self):
+        """When two configured roots publish the same relative skill path, the
+        article's own knowledge root wins.
+        """
+        own_target = self._managed_article(
+            "test-xroot-dup-own",
+            "<p>Own</p>",
+            "Crewradar",
+            "skills/test-xroot-dup/SKILL.md",
+        )
+        other_target = self._managed_article(
+            "test-xroot-dup-other",
+            "<p>Other</p>",
+            "OtenyOdoo",
+            "skills/test-xroot-dup/SKILL.md",
+        )
+        source = self._managed_article(
+            "test-xroot-dup-source",
+            '<p>See <a href="../test-xroot-dup/SKILL.md">Dup</a></p>',
+            "Crewradar",
+            "skills/test-xroot-dup-source/SKILL.md",
+        )
+
+        self.env["oteny.knowledge.sync"]._rewrite_internal_links("Crewradar")
+        source.invalidate_recordset(["body"])
+        self.assertIn(f"/knowledge/article/{own_target.id}", source.body)
+        self.assertNotIn(f"/knowledge/article/{other_target.id}", source.body)
+
+    def test_skills_tree_suffix_from_escaped_path(self):
+        """An escaped href that still names a skill file yields a ``skills/`` tail."""
+        Sync = self.env["oteny.knowledge.sync"]
+        self.assertEqual(
+            Sync._skills_tree_suffix("oteny_odoo/.claude/skills/odoo-development/SKILL.md"),
+            "skills/odoo-development/skill.md",
+        )
+        self.assertEqual(
+            Sync._skills_tree_suffix("skills/already-in-tree.md"),
+            "skills/already-in-tree.md",
+        )
+        self.assertIsNone(Sync._skills_tree_suffix("commands/profile.md"))
+        self.assertIsNone(Sync._skills_tree_suffix("../../riverdeploy/README.md"))

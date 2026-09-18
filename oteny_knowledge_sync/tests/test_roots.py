@@ -93,3 +93,49 @@ class TestRoots(TransactionCase):
         tree.write({"x_skill_root": False})
         self.Sync.sync_skills_to_knowledge()
         self.assertEqual(set(self._tree("Alpha").ids), ids, "adopted, not recreated")
+
+    def test_two_root_sync_resolves_sibling_name_without_warning(self):
+        """A healthy two-root upgrade: Alpha names Beta as a sibling, the old
+        one-tree shape. That becomes a Knowledge link. No
+        ``Could not resolve link`` WARNING. The
+        ``../../oteny_odoo/.claude/skills/…`` escape is not required.
+        """
+        skill_md = self.root_a / ".claude" / "skills" / "alpha-skill" / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().rstrip() + "\n\nSee [beta](../beta-skill/SKILL.md).\n")
+        self._configure(("Alpha", self.root_a), ("Beta", self.root_b))
+        logger_name = "odoo.addons.oteny_knowledge_sync.models.knowledge_sync"
+        with self.assertLogs(logger_name, level="DEBUG") as cm:
+            self.Sync.sync_skills_to_knowledge()
+        offending = [
+            r for r in cm.records
+            if r.levelname == "WARNING"
+            and "Could not resolve link" in r.getMessage()
+            and "beta-skill" in r.getMessage()
+        ]
+        self.assertEqual(
+            offending,
+            [],
+            f"Healthy two-root sibling name must not warn. Got: {[r.getMessage() for r in offending]}",
+        )
+        alpha_skill = self._tree("Alpha").filtered(
+            lambda a: a.x_skill_file_path == "skills/alpha-skill/SKILL.md")
+        beta_skill = self._tree("Beta").filtered(
+            lambda a: a.x_skill_file_path == "skills/beta-skill/SKILL.md")
+        self.assertEqual(len(alpha_skill), 1)
+        self.assertEqual(len(beta_skill), 1)
+        self.assertIn(f'href="/knowledge/article/{beta_skill.id}"', alpha_skill.body)
+
+    def test_two_root_sync_missing_sibling_still_warns(self):
+        """A sibling name that no configured knowledge root published still warns."""
+        missing_href = "../no-such-skill/SKILL.md"
+        skill_md = self.root_a / ".claude" / "skills" / "alpha-skill" / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().rstrip() + f"\n\nSee [gone]({missing_href}).\n")
+        self._configure(("Alpha", self.root_a), ("Beta", self.root_b))
+        logger_name = "odoo.addons.oteny_knowledge_sync.models.knowledge_sync"
+        with self.assertLogs(logger_name, level="WARNING") as cm:
+            self.Sync.sync_skills_to_knowledge()
+        matched = [r for r in cm.records if missing_href in r.getMessage()]
+        self.assertTrue(
+            matched,
+            f"Expected a WARNING for {missing_href!r}. Got: {[r.getMessage() for r in cm.records]}",
+        )

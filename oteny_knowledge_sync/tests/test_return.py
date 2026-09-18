@@ -47,9 +47,10 @@ class TestSyncReturn(TransactionCase):
         with tempfile.TemporaryDirectory() as tmp:
             with (
                 patch.object(KnowledgeSync, "_skill_roots", return_value=[("T", Path(tmp))]),
-                patch.object(KnowledgeSync, "_sync_root", return_value=1),
+                patch.object(KnowledgeSync, "_sync_root", return_value=(1, set())),
                 patch.object(KnowledgeSync, "_unpublish_roots_not_in"),
                 patch.object(KnowledgeSync, "_sort_articles_alphabetically"),
+                patch.object(KnowledgeSync, "_rewrite_internal_links"),
             ):
                 result = Sync.sync_skills_to_knowledge()
         self._assert_xmlrpc_dumpable(result)

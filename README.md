@@ -14,7 +14,7 @@ in `.git_hooks/` holds it on every commit.
 | `oteny_audit` | `base`, `mail` | The audit trail: who changed which field when, on any model. |
 | `oteny_backup_trigger` | `base` | Trigger an Odoo.sh backup from a button or a cron. |
 | `oteny_bot` | `base`, `mail`, `web` | The bridge between an Oteny business bot and this Odoo: the Discuss channel, the activity log, the form session, and the work contract the platform calls. |
-| `oteny_knowledge_sync` | `base`, `mail`, `knowledge` | Publish every configured repository's `.claude/skills` as locked Knowledge articles, one tree per root. |
+| `oteny_knowledge_sync` | `base`, `mail`, `knowledge` | Publish every configured repository's `.claude/skills` as locked Knowledge articles, one tree per root. A markdown skill path is resolved across every configured root, so a CrewRadar article can name an Oteny Odoo skill. |
 | `riverflow` | `base`, `mail`, `documents`, `oteny_shortcut` | The workflow engine: services, states, transitions, and the bot dispatch that hands work to a bot. |
 | `odoo_parallel_tests` | `base` | The parallel test runner: clones the test database and runs batches in worker processes. |
 
