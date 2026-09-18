@@ -37,6 +37,20 @@ business repository then moves its submodule pointer and upgrades the modules
 here before its own. This repository is released before any business build
 that depends on the change.
 
+A business stores a pin: one commit. It does not follow a branch name at
+build time. Create a same-name feature branch here only when that
+business's work changes a module here. Do not invent `dev` or `test1` in
+this repository. The only promotion line is `main`.
+
+`increment_version.py` at this root bumps only the generic manifests.
+Radar calls it during a paired or infra deploy, then moves the pin.
+`python -m riverdeploy merge-branches feat/X main --repo <this checkout>
+--push` merges a feature into `main`. The ceiling is `main` only.
+
+In the CrewRadar pipeline, the generic merge happens when radar
+`feat/X` lands on radar `dev`, not when radar reaches `main`. Other
+businesses can pin `main` while CrewRadar is still on `test1`.
+
 ## Where things are
 
 - `talents/<bundle>/`: the Talent a bot reads to work a module; one git ref
