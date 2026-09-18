@@ -8,7 +8,7 @@ If a record was created from XML with `noupdate="1"`, its `ir.model.data` row st
 
 ## Version Format
 
-All modules in this workspace use **4-segment versions**: `19.0.<major>.<minor>` (e.g. `19.0.9.63`). Migration folder names must match this format. The `increment_version.py` script's regex only matches 4-segment versions — modules with a different segment count will be silently skipped during version bumps.
+CrewRadar modules use **4-segment versions**: `19.0.<major>.<minor>` (e.g. `19.0.9.63`). Migration folder names must match this format. `oteny_knowledge_sync` is five segments (`19.0.1.0.0`). Radar's `increment_version.py` bumps the last segment of any dotted version; a four-segment-only regex left that module unraised. A missing generic file is an error, not a skip.
 
 When creating a new migration **on `dev`**, set the folder name to the module's current manifest version (or one higher). The `merge-branches` tool (`python -m riverdeploy merge-branches`) automatically detects and renumbers migration folders on feature branches that have become stale relative to `max(dev, main)`. See [Deploy Tool — Feature Branch Merges](deploy-tool.md#feature-branch-merges).
 
